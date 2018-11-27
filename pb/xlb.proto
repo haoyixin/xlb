@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package xlb.pb;
+
+// common
+message Value {
+    oneof value {
+        bool bool = 1;
+        string string = 2;
+        int64 int64 = 3;
+        uint64 uint64 = 4;
+        float float = 5;
+    }
+}
+
+message Error {
+    int32 code = 1;
+    string errmsg = 2;
+}
+
+message EmptyRequest {
+}
+
+message EmptyResponse {
+    Error error = 1;
+}
+
+message ConfResponse {
+    Error error = 1;
+    map<string, Value> pairs = 2;
+}
+
+message StatsResponse {
+    Error error = 1;
+    map<string, Value> pairs = 2;
+}
+
+// global
+message SetGlobalConfRequest {
+    map<string, Value> pairs = 1;
+}
+
+// virtual server
+message VirtualServerIdent {
+    string vaddr = 1;
+    uint32 vport = 2;
+    string proto = 3;
+}
+
+message ListVirtualServerResponse {
+    Error error = 1;
+    repeated VirtualServerIdent vlist = 2;
+}
+
+message SetVirtualServerConfRequest {
+    VirtualServerIdent ident = 1;
+    map<string, Value> pairs = 2;
+}
+
+// real server
+message RealServerIdent {
+    string vaddr = 1;
+    uint32 vport = 2;
+    string proto = 3;
+    string raddr = 4;
+    uint32 rport = 5;
+}
+
+message ListRealServerResponse {
+    Error error = 1;
+    repeated RealServerIdent rlist = 2;
+}
+
+message SetRealServerConfRequest {
+    RealServerIdent ident = 1;
+    map<string, Value> pairs = 2;
+}
+
+service Control {
+    // virtual server
+    rpc AddVirtualServer (VirtualServerIdent) returns (EmptyResponse);
+    rpc DelVirtualServer (VirtualServerIdent) returns (EmptyResponse);
+    rpc ListVirtualServer (EmptyRequest) returns (ListVirtualServerResponse);
+
+    // real server
+    rpc AddRealServer (RealServerIdent) returns (EmptyResponse);
+    rpc DelRealServer (RealServerIdent) returns (EmptyResponse);
+    rpc ListRealServer (VirtualServerIdent) returns (ListRealServerResponse);
+}
+
+service Config {
+    // global
+    rpc SetGlobalConf (SetGlobalConfRequest) returns (EmptyResponse);
+    rpc GetGlobalConf (EmptyRequest) returns (ConfResponse);
+
+    // virtual server
+    rpc SetVirtualServerConf (SetVirtualServerConfRequest) returns (EmptyResponse);
+    rpc GetVirtualServerConf (VirtualServerIdent) returns (ConfResponse);
+
+    // real server
+    rpc SetRealServerConf (SetRealServerConfRequest) returns (EmptyResponse);
+    rpc GetRealServerConf (RealServerIdent) returns (ConfResponse);
+}
+
+service Stats {
+    // global
+    rpc GetGlobalStats (EmptyRequest) returns (StatsResponse);
+
+    // virtual server
+    rpc GetVirtualServerStats (VirtualServerIdent) returns (StatsResponse);
+
+    // real server
+    rpc GetRealServerStats (RealServerIdent) returns (StatsResponse);
+}
