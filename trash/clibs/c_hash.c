@@ -104,7 +104,6 @@ struct c_hash *c_hash_create(const struct c_hash_parameters *params) {
   unsigned num_entry_slots;
   unsigned i;
   unsigned int no_free_on_del = 0;
-  uint32_t *tbl_chng_cnt = NULL;
 
   c_hash_function default_hash_func = (c_hash_function)rte_hash_crc;
   c_hash_cmp_eq_t default_cmp_func = (c_hash_cmp_eq_t)memcmp;
@@ -119,7 +118,7 @@ struct c_hash *c_hash_create(const struct c_hash_parameters *params) {
   /* Check for valid parameters */
   if ((params->entries > C_HASH_ENTRIES_MAX) ||
       (params->entries < C_HASH_BUCKET_ENTRIES) ||
-      (params->key_len + params->value_len == 0)) {
+      (params->key_len + params->value_len <= 0)) {
     rte_errno = EINVAL;
     RTE_LOG(ERR, HASH, "c_hash_create has invalid parameters\n");
     return NULL;
@@ -198,14 +197,6 @@ struct c_hash *c_hash_create(const struct c_hash_parameters *params) {
     goto err_unlock;
   }
 
-  tbl_chng_cnt = rte_zmalloc_socket(NULL, sizeof(uint32_t), RTE_CACHE_LINE_SIZE,
-                                    params->socket_id);
-
-  if (tbl_chng_cnt == NULL) {
-    RTE_LOG(ERR, HASH, "memory allocation failed\n");
-    goto err_unlock;
-  }
-
   /* Default hash function */
 #if defined(RTE_ARCH_X86)
   default_hash_func = (c_hash_function)rte_hash_crc;
@@ -226,8 +217,6 @@ struct c_hash *c_hash_create(const struct c_hash_parameters *params) {
       (params->cmp_func == NULL) ? default_cmp_func : params->cmp_func;
   h->entry_store = k;
   h->free_slots = r;
-  h->tbl_chng_cnt = tbl_chng_cnt;
-  *h->tbl_chng_cnt = 0;
   h->no_free_on_del = no_free_on_del;
 
   /* Populate free slots ring. Entry zero is reserved for key misses. */
@@ -247,7 +236,6 @@ err:
   rte_free(h);
   rte_free(buckets);
   rte_free(k);
-  rte_free(tbl_chng_cnt);
   return NULL;
 }
 
@@ -280,7 +268,6 @@ void c_hash_free(struct c_hash *h) {
   rte_ring_free(h->free_slots);
   rte_free(h->entry_store);
   rte_free(h->buckets);
-  rte_free(h->tbl_chng_cnt);
   rte_free(h);
   rte_free(te);
 }
@@ -306,7 +293,6 @@ void c_hash_reset(struct c_hash *h) {
 
   memset(h->buckets, 0, h->num_buckets * sizeof(struct c_hash_bucket));
   memset(h->entry_store, 0, h->entry_size * (h->entries + 1));
-  *h->tbl_chng_cnt = 0;
 
   /* clear the free ring */
   while (rte_ring_dequeue(h->free_slots, &ptr) == 0)
@@ -398,7 +384,6 @@ c_hash_cuckoo_move_insert(const struct c_hash *h, struct c_hash_bucket *bkt,
                           struct c_queue_node *leaf, uint32_t leaf_slot,
                           uint16_t sig, uint32_t new_idx, int32_t *ret_val) {
   uint32_t prev_alt_bkt_idx;
-  struct c_hash_bucket *cur_bkt;
   struct c_queue_node *prev_node, *curr_node = leaf;
   struct c_hash_bucket *prev_bkt, *curr_bkt = leaf->bkt;
   uint32_t prev_slot, curr_slot = leaf_slot;
@@ -418,12 +403,6 @@ c_hash_cuckoo_move_insert(const struct c_hash *h, struct c_hash_bucket *bkt,
       return -1;
     }
 
-    /* Inform the previous move. The current move need
-     * not be informed now as the current bucket entry
-     * is present in both primary and secondary.
-     */
-    *h->tbl_chng_cnt += 1;
-
     /* Need to swap current/alt sig to allow later
      * Cuckoo insert to move elements back to its
      * primary bucket if available
@@ -436,12 +415,6 @@ c_hash_cuckoo_move_insert(const struct c_hash *h, struct c_hash_bucket *bkt,
     curr_node = prev_node;
     curr_bkt = curr_node->bkt;
   }
-
-  /* Inform the previous move. The current move need
-   * not be informed now as the current bucket entry
-   * is present in both primary and secondary.
-   */
-  *h->tbl_chng_cnt += 1;
 
   curr_bkt->sig_current[curr_slot] = sig;
   /* Release the new bucket entry */
@@ -500,7 +473,8 @@ static inline int c_hash_cuckoo_make_space(const struct c_hash *h,
 
 static inline int32_t __c_hash_add_key_with_hash(const struct c_hash *h,
                                                  const void *key,
-                                                 c_hash_sig_t sig) {
+                                                 c_hash_sig_t sig,
+                                                 int *replaced) {
   uint16_t short_sig;
   uint32_t prim_bucket_idx, sec_bucket_idx;
   struct c_hash_bucket *prim_bkt, *sec_bkt, *cur_bkt;
@@ -518,6 +492,8 @@ static inline int32_t __c_hash_add_key_with_hash(const struct c_hash *h,
   rte_prefetch0(prim_bkt);
   rte_prefetch0(sec_bkt);
 
+  *replaced = 1;
+
   /* Check if key is already inserted in primary location */
   ret = c_search_and_update(h, key, prim_bkt, short_sig);
   if (ret != -1) {
@@ -531,6 +507,8 @@ static inline int32_t __c_hash_add_key_with_hash(const struct c_hash *h,
       return ret;
     }
   }
+
+  *replaced = 0;
 
   /* Did not find a match, so get a new slot for storing the new key */
   if (rte_ring_sc_dequeue(h->free_slots, &slot_id) != 0) {
@@ -567,14 +545,14 @@ static inline int32_t __c_hash_add_key_with_hash(const struct c_hash *h,
 }
 
 int32_t c_hash_add_key_with_hash(const struct c_hash *h, const void *key,
-                                 c_hash_sig_t sig) {
+                                 c_hash_sig_t sig, int *replaced) {
   C_RETURN_IF_TRUE(((h == NULL) || (key == NULL)), -EINVAL);
-  return __c_hash_add_key_with_hash(h, key, sig);
+  return __c_hash_add_key_with_hash(h, key, sig, replaced);
 }
 
-int32_t c_hash_add_key(const struct c_hash *h, const void *key) {
+int32_t c_hash_add_key(const struct c_hash *h, const void *key, int *replaced) {
   C_RETURN_IF_TRUE(((h == NULL) || (key == NULL)), -EINVAL);
-  return __c_hash_add_key_with_hash(h, key, c_hash_hash(h, key));
+  return __c_hash_add_key_with_hash(h, key, c_hash_hash(h, key), replaced);
 }
 
 /* Search one bucket to find the match key */
@@ -607,7 +585,6 @@ static inline int32_t __c_hash_lookup_with_hash_lf(const struct c_hash *h,
                                                    c_hash_sig_t sig) {
   uint32_t prim_bucket_idx, sec_bucket_idx;
   struct c_hash_bucket *bkt, *cur_bkt;
-  uint32_t cnt_b, cnt_a;
   int ret;
   uint16_t short_sig;
 
@@ -615,35 +592,22 @@ static inline int32_t __c_hash_lookup_with_hash_lf(const struct c_hash *h,
   prim_bucket_idx = c_get_prim_bucket_index(h, sig);
   sec_bucket_idx = c_get_alt_bucket_index(h, prim_bucket_idx, short_sig);
 
-  do {
-    /* Load the table change counter before the lookup
-     * starts.
-     */
-    cnt_b = *h->tbl_chng_cnt;
+  /* Check if key is in primary location */
+  bkt = &h->buckets[prim_bucket_idx];
+  ret = c_search_one_bucket_lf(h, key, short_sig, bkt);
+  if (ret != -1) {
+    return ret;
+  }
+  /* Calculate secondary hash */
+  bkt = &h->buckets[sec_bucket_idx];
 
-    /* Check if key is in primary location */
-    bkt = &h->buckets[prim_bucket_idx];
-    ret = c_search_one_bucket_lf(h, key, short_sig, bkt);
+  /* Check if key is in secondary location */
+  FOR_EACH_BUCKET(cur_bkt, bkt) {
+    ret = c_search_one_bucket_lf(h, key, short_sig, cur_bkt);
     if (ret != -1) {
       return ret;
     }
-    /* Calculate secondary hash */
-    bkt = &h->buckets[sec_bucket_idx];
-
-    /* Check if key is in secondary location */
-    FOR_EACH_BUCKET(cur_bkt, bkt) {
-      ret = c_search_one_bucket_lf(h, key, short_sig, cur_bkt);
-      if (ret != -1) {
-        return ret;
-      }
-    }
-
-    /* Re-read the table change counter to check if the
-     * table has changed during search. If yes, re-do
-     * the search.
-     */
-    cnt_a = *h->tbl_chng_cnt;
-  } while (cnt_b != cnt_a);
+  }
 
   return -ENOENT;
 }
@@ -805,8 +769,7 @@ int c_hash_free_key_with_position(const struct c_hash *h,
   return 0;
 }
 
-int32_t c_hash_iterate(const struct c_hash *h, const void **entry,
-                       uint32_t *next) {
+int32_t c_hash_iterate(const struct c_hash *h, void **entry, uint32_t *next) {
   uint32_t bucket_idx, idx, position;
   struct c_hash_entry *next_key;
 

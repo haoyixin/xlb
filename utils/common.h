@@ -1,6 +1,35 @@
+// Copyright (c) 2014-2016, The Regents of the University of California.
+// Copyright (c) 2016-2017, Nefeli Networks, Inc.
+// Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
+// All rights reserved.
 //
-// Created by haoyixin on 11/21/18.
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
 //
+// * Redistributions of source code must retain the above copyright notice, this
+// list of conditions and the following disclaimer.
+//
+// * Redistributions in binary form must reproduce the above copyright notice,
+// this list of conditions and the following disclaimer in the documentation
+// and/or other materials provided with the distribution.
+//
+// * Neither the names of the copyright holders nor the names of their
+// contributors may be used to endorse or promote products derived from this
+// software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+/* This header file contains general (not XLB specific) C/C++ definitions */
 
 #ifndef XLB_UTILS_COMMON_H
 #define XLB_UTILS_COMMON_H
@@ -11,28 +40,15 @@
 #include <cstdint>
 #include <string>
 
-#if __cplusplus < 201703L // pre-C++17?
+#if __cplusplus < 201703L  // pre-C++17?
 #error Must be built with C++17
 #endif
 
-/**
- * container_of - cast a member of a structure out to the containing structure
- * @ptr:	the pointer to the member.
- * @type:	the type of the container struct this is embedded in.
- * @member:	the name of the member within the struct.
- *
- */
-#define container_of(ptr, type, member)                                        \
-  ({                                                                           \
-    const typeof(((type *)0)->member) *__mptr = (ptr);                         \
-    (type *)((char *)__mptr - offsetof(type, member));                         \
-  })
-
 /* Hint for performance optimization. Same as _nDCHECK() of TI compilers */
-#define promise(cond)                                                          \
-  ({                                                                           \
-    if (!(cond))                                                               \
-      __builtin_unreachable();                                                 \
+#define promise(cond)          \
+  ({                           \
+    if (!(cond))               \
+      __builtin_unreachable(); \
   })
 #define promise_unreachable() __builtin_unreachable();
 
@@ -84,8 +100,8 @@ static inline uint64_t align_ceil_pow2(uint64_t v) {
 #define DISALLOW_ASSIGN(TypeName) void operator=(const TypeName &) = delete
 // A macro to disallow the copy constructor and operator= functions.
 // This should be used in the private: declarations for a class.
-#define DISALLOW_COPY_AND_ASSIGN(TypeName)                                     \
-  TypeName(const TypeName &) = delete;                                         \
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName &) = delete;     \
   void operator=(const TypeName &) = delete
 // A macro to disallow all the implicit constructors, namely the
 // default constructor, copy constructor and operator= functions.
@@ -93,8 +109,8 @@ static inline uint64_t align_ceil_pow2(uint64_t v) {
 // This should be used in the private: declarations for a class
 // that wants to prevent anyone from instantiating it. This is
 // especially useful for classes containing only static methods.
-#define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName)                               \
-  TypeName() = delete;                                                         \
+#define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName) \
+  TypeName() = delete;                           \
   DISALLOW_COPY_AND_ASSIGN(TypeName)
 
 // Used to explicitly mark the return value of a function as unused. If you are
@@ -105,7 +121,8 @@ static inline uint64_t align_ceil_pow2(uint64_t v) {
 //   if (TakeOwnership(my_var.get()) == SUCCESS)
 //     ignore_result(my_var.release());
 //
-template <typename T> inline void ignore_result(const T &) {}
+template <typename T>
+inline void ignore_result(const T &) {}
 
 // An RAII holder for file descriptors.  When initialized with a file desciptor,
 // takes
@@ -115,7 +132,7 @@ template <typename T> inline void ignore_result(const T &) {}
 // tests
 // have been cleaned up before starting new ones.
 class unique_fd {
-public:
+ public:
   // Constructs a unique fd that owns the given fd.
   unique_fd(int fd) : fd_(fd) {}
 
@@ -146,7 +163,7 @@ public:
 
   int get() const { return fd_; }
 
-private:
+ private:
   int fd_;
 
   DISALLOW_COPY_AND_ASSIGN(unique_fd);
@@ -171,7 +188,8 @@ inline void InsertSorted(T &container, U &item) {
 }
 
 // Returns the absolute difference between `lhs` and `rhs`.
-template <typename T> T absdiff(const T &lhs, const T &rhs) {
+template <typename T>
+T absdiff(const T &lhs, const T &rhs) {
   return lhs > rhs ? lhs - rhs : rhs - lhs;
 }
 
@@ -191,4 +209,4 @@ struct PairHasher {
   }
 };
 
-#endif // XLB_UTILS_COMMON_H
+#endif  // XLB_UTILS_COMMON_H_

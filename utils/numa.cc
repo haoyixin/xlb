@@ -1,5 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
-// Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
 // All rights reserved.
 //
@@ -29,43 +27,47 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
+#include "numa.h"
 
-#include <cassert>
-#include <memory>
+#include "format.h"
+#include <fstream>
+#include <limits.h>
+#include <unistd.h>
 
 namespace xlb {
 namespace utils {
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
+/* Check if a cpu is present by the presence of the cpu information for it */
+int is_cpu_present(unsigned int core_id) {
+  char path[PATH_MAX];
+  int len = snprintf(path, sizeof(path), SYS_CPU_DIR "/" CORE_ID_FILE, core_id);
+  if (len <= 0 || (unsigned)len >= sizeof(path)) {
+    return 0;
+  }
+  if (access(path, F_OK) != 0) {
+    return 0;
+  }
 
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
+  return 1;
 }
 
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
+int NumNumaNodes() {
+  static int cached = 0;
+  if (cached > 0) {
+    return cached;
+  }
 
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
+  std::ifstream fp("/sys/devices/system/node/possible");
+  if (fp.is_open()) {
+    std::string line;
+    if (std::getline(fp, line)) {
+      int cnt;
+      if (Parse(line, "0-%d", &cnt) == 1) {
+        cached = cnt + 1;
+        return cached;
+      }
+    }
+  }
 }
 
 } // namespace utils

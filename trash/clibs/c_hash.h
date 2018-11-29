@@ -12,7 +12,7 @@
 #define C_RETURN_IF_TRUE(cond, retval)
 #endif
 
-#include "hash.h"
+#include "_hash.h"
 
 /** Number of items per bucket. */
 #define C_HASH_BUCKET_ENTRIES 8
@@ -78,8 +78,6 @@ struct c_hash {
   /**< Table with buckets storing all the	hash values and key indexes
    * to the key table.
    */
-  uint32_t *tbl_chng_cnt;
-  /**< Indicates if the hash table changed from last read. */
 } __rte_cache_aligned;
 
 struct c_queue_node {

@@ -1,5 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
-// Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
 // All rights reserved.
 //
@@ -29,44 +27,21 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
+#ifndef XLB_UTILS_NUMA_H
+#define XLB_UTILS_NUMA_H
 
-#include <cassert>
-#include <memory>
+#define SYS_CPU_DIR "/sys/devices/system/cpu/cpu%u"
+#define CORE_ID_FILE "topology/core_id"
 
 namespace xlb {
 namespace utils {
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
+/* Check if a cpu is present by the presence of the cpu information for it */
+int is_cpu_present(unsigned int core_id);
 
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
-}
-
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
-
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
+int NumNumaNodes();
 
 } // namespace utils
 } // namespace xlb
+
+#endif // XLB_UTILS_NUMA_H

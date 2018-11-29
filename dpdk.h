@@ -29,44 +29,19 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
-
-#include <cassert>
-#include <memory>
+#ifndef XLB_DPDK_H
+#define XLB_DPDK_H
 
 namespace xlb {
-namespace utils {
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
+    /*
+bool IsDpdkInitialized();
+     */
 
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
-}
+// Initialize DPDK, with the specified amount of hugepage memory.
+// Safe to call multiple times.
+void InitDpdk(int dpdk_mb_per_socket);
 
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
+}  // namespace xlb
 
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-} // namespace utils
-} // namespace xlb
+#endif  // XLB_DPDK_H

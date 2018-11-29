@@ -29,44 +29,54 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
+#ifndef XLB_PACKET_BATCH_H
+#define XLB_PACKET_BATCH_H
 
-#include <cassert>
-#include <memory>
+#include "utils/copy.h"
 
 namespace xlb {
-namespace utils {
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
+class Packet;
 
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
-}
+class PacketBatch {
+ public:
+  int cnt() const { return cnt_; }
+  void set_cnt(int cnt) { cnt_ = cnt; }
+  void incr_cnt(int n = 1) { cnt_ += n; }
 
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
+  Packet *const *pkts() const { return pkts_; }
+  Packet **pkts() { return pkts_; }
 
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
+  void clear() { cnt_ = 0; }
 
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
+  // WARNING: this function has no bounds checks and so it's possible to
+  // overrun the buffer by calling this. We are not adding bounds check because
+  // we want maximum GOFAST.
+  void add(Packet *pkt) { pkts_[cnt_++] = pkt; }
+  void add(PacketBatch *batch) {
+    xlb::utils::CopyInlined(pkts_ + cnt_, batch->pkts(),
+                             batch->cnt() * sizeof(Packet *));
+    cnt_ += batch->cnt();
+  }
 
-} // namespace utils
-} // namespace xlb
+  bool empty() { return (cnt_ == 0); }
+
+  bool full() { return (cnt_ == kMaxBurst); }
+
+  void Copy(const PacketBatch *src) {
+    cnt_ = src->cnt_;
+    xlb::utils::CopyInlined(pkts_, src->pkts_, cnt_ * sizeof(Packet *));
+  }
+
+  static const size_t kMaxBurst = 32;
+
+ private:
+  int cnt_;
+  Packet *pkts_[kMaxBurst];
+};
+
+static_assert(std::is_pod<PacketBatch>::value, "PacketBatch is not a POD Type");
+
+}  // namespace xlb
+
+#endif  // XLB_PACKET_BATCH_H

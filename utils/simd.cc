@@ -29,44 +29,31 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+#include "simd.h"
+
 #include "format.h"
 
-#include <cassert>
-#include <memory>
+std::string m128i_to_str(__m128i a) {
+  union {
+    __m128i vec;
+    uint32_t b[4];
+  };
 
-namespace xlb {
-namespace utils {
-
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
-
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
+  vec = a;
+  return xlb::utils::Format("[%08x %08x %08x %08x]", b[0], b[1], b[2], b[3]);
 }
 
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
+#if __AVX__
+
+std::string m256i_to_str(__m256i a) {
+  union {
+    __m256i vec;
+    uint32_t b[8];
+  };
+
+  vec = a;
+  return xlb::utils::Format("[%08x %08x %08x %08x %08x %08x %08x %08x]",
+                             b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
 }
 
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-} // namespace utils
-} // namespace xlb
+#endif

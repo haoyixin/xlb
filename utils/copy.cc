@@ -1,4 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
 // Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
 // All rights reserved.
@@ -29,44 +28,15 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
-
-#include <cassert>
-#include <memory>
+#include "copy.h"
 
 namespace xlb {
 namespace utils {
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
-
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
+void CopyNonInlined(void *__restrict__ dst, const void *__restrict__ src,
+                    size_t bytes, bool sloppy) {
+  CopyInlined(dst, src, bytes, sloppy);
 }
 
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
-
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-} // namespace utils
-} // namespace xlb
+}  // namespace utils
+}  // namespace xlb

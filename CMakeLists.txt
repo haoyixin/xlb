@@ -3,11 +3,58 @@ project(xlb)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(. ./utils clibs /usr/local/include/dpdk)
+set(GTEST_SRC googletest/googletest)
+add_subdirectory(${GTEST_SRC})
 
-add_compile_options(-msse4 -mavx)
+add_compile_options(-O3 -msse4 -mavx)
 
-#add_executable(xlb main.cpp ctrl.h ctrl.cc utils/format.h utils/format.cc utils/cuckoo_map.h utils/common.h)
-add_executable(xlb main.cpp utils/allocator.h utils/cuckoo_map.h utils/common.h clibs/hash.h clibs/c_hash.h clibs/c_hash.c)
+set(DPDK_LIBS
+        dpdk
+        )
 
-target_link_libraries(xlb rte_ring rte_eal rte_kvargs pthread numa ${CMAKE_DL_LIBS})
+set(SYS_LIBS
+        gflags
+        glog
+        pthread
+        numa
+        ${CMAKE_DL_LIBS}
+        )
+
+set(GTEST_LIBS
+        gtest
+        gtest_main
+        ${DPDK_LIBS}
+        ${SYS_LIBS}
+        )
+
+set(DPDK_INCS
+        /usr/local/include/dpdk
+        )
+
+set(SRC_INCS
+        .
+        utils
+        )
+
+set(SYS_INCS
+        )
+
+set(GTEST_INCS
+        ${GTEST_SRC}/include
+        )
+
+include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
+
+#add_executable(runHashTests tests/hash.cc clibs/c_hash.c)
+#target_link_libraries(runHashTests ${GTEST_LIBS})
+
+#add_executable(runCuckooMapTests tests/cuckoo_map.cc clibs/c_hash.c)
+#target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
+
+#add_executable(xlb main.cpp)
+add_executable(xlb2 main2.cpp packet.cc packet_pool.cc opts.cc dpdk.cc utils/copy.cc utils/simd.cc utils/numa.cc utils/format.cc)
+#add_executable(packet packet.cc utils/format.cc)
+#add_executable(xlb main.cpp clibs/c_hash.c)
+
+#target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
+target_link_libraries(xlb2 dpdk gflags glog pthread numa ${CMAKE_DL_LIBS})

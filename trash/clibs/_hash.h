@@ -140,13 +140,15 @@ int32_t c_hash_count(const struct c_hash *h);
  *   Hash table to add the key to.
  * @param key
  *   Key to add to the hash table.
+ * @param replaced
+ *   Output indicate whether key exists.
  * @return
  *   - -EINVAL if the parameters are invalid.
  *   - -ENOSPC if there is no space in the hash for this key.
  *   - A positive value that can be used by the caller as an offset into an
  *     array of user data. This value is unique for this key.
  */
-int32_t c_hash_add_key(const struct c_hash *h, const void *key);
+int32_t c_hash_add_key(const struct c_hash *h, const void *key, int *replaced);
 
 /**
  * Add a key to an existing hash table.
@@ -159,6 +161,8 @@ int32_t c_hash_add_key(const struct c_hash *h, const void *key);
  *   Key to add to the hash table.
  * @param sig
  *   Precomputed hash value for 'key'.
+ * @param replaced
+ *   Output indicate whether key exists.
  * @return
  *   - -EINVAL if the parameters are invalid.
  *   - -ENOSPC if there is no space in the hash for this key.
@@ -166,7 +170,7 @@ int32_t c_hash_add_key(const struct c_hash *h, const void *key);
  *     array of user data. This value is unique for this key.
  */
 int32_t c_hash_add_key_with_hash(const struct c_hash *h, const void *key,
-                                 c_hash_sig_t sig);
+                                 c_hash_sig_t sig, int *replaced);
 
 /**
  * Remove a key from an existing hash table.
@@ -262,7 +266,7 @@ int c_hash_get_entry_with_position(const struct c_hash *h, int32_t position,
  *   - -EINVAL if the parameters are invalid.
  */
 int c_hash_free_key_with_position(const struct c_hash *h,
-                                                     const int32_t position);
+                                  const int32_t position);
 
 /**
  * Find a key in the hash table.
@@ -330,8 +334,7 @@ c_hash_sig_t c_hash_hash(const struct c_hash *h, const void *key);
  *   - -EINVAL if the parameters are invalid.
  *   - -ENOENT if end of the hash table.
  */
-int32_t c_hash_iterate(const struct c_hash *h, const void **entry,
-                       uint32_t *next);
+int32_t c_hash_iterate(const struct c_hash *h, void **entry, uint32_t *next);
 #ifdef __cplusplus
 }
 #endif

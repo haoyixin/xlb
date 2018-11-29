@@ -1,4 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
 // Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
 // All rights reserved.
@@ -29,44 +28,30 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "format.h"
+#ifndef XLB_OPTS_H
+#define XLB_OPTS_H
 
-#include <cassert>
-#include <memory>
+#include <gflags/gflags.h>
 
-namespace xlb {
-namespace utils {
+// TODO(barath): Rename these flags to something more intuitive.
+DECLARE_bool(t);
+DECLARE_string(i);
+DECLARE_bool(f);
+DECLARE_bool(k);
+DECLARE_bool(d);
+DECLARE_bool(a);
+DECLARE_int32(c);
+DECLARE_string(b);
+DECLARE_int32(p);
+DECLARE_string(grpc_url);
+DECLARE_int32(m);
+DECLARE_bool(skip_root_check);
+DECLARE_string(modules);
+DECLARE_bool(core_dump);
+DECLARE_bool(no_crashlog);
+DECLARE_int32(buffers);
+/*
+DECLARE_bool(dpdk);
+ */
 
-std::string FormatVarg(const char *fmt, va_list ap) {
-  char *ptr = nullptr;
-  int len = vasprintf(&ptr, fmt, ap);
-  if (len < 0)
-    return "<FormatVarg() error>";
-
-  std::string ret(ptr, len);
-  free(ptr);
-  return ret;
-}
-
-std::string Format(const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  const std::string s = FormatVarg(fmt, ap);
-  va_end(ap);
-  return s;
-}
-
-int ParseVarg(const std::string &s, const char *fmt, va_list ap) {
-  return vsscanf(s.c_str(), fmt, ap);
-}
-
-int Parse(const std::string &s, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int ret = ParseVarg(s, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-} // namespace utils
-} // namespace xlb
+#endif  // XLB_OPTS_H
