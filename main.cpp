@@ -26,7 +26,7 @@ typedef std::pair<int, int> Entry;
 
 int main() {
 
-  char *argv[] = {"-c", "0xff", "-n", "1", "--huge-dir", "/mnt/huge"};
+  char *argv[] = {"-c", "0xff", "-n", "1"};
   rte_eal_init(4, argv);
 
 //  Test t1 = {.l = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12}};

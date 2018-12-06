@@ -50,6 +50,8 @@ DECLARE_string(modules);
 DECLARE_bool(core_dump);
 DECLARE_bool(no_crashlog);
 DECLARE_int32(buffers);
+
+DECLARE_string(n);
 /*
 DECLARE_bool(dpdk);
  */

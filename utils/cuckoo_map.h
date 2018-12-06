@@ -1,34 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
-// Copyright (c) 2016-2017, Nefeli Networks, Inc.
-// Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// * Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
-//
-// * Redistributions in binary form must reproduce the above copyright notice,
-// this list of conditions and the following disclaimer in the documentation
-// and/or other materials provided with the distribution.
-//
-// * Neither the names of the copyright holders nor the names of their
-// contributors may be used to endorse or promote products derived from this
-// software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef XLB_UTILS_CUCKOO_MAP_H
 #define XLB_UTILS_CUCKOO_MAP_H
 
@@ -90,7 +59,7 @@ public:
       return *this;
     }
 
-    iterator operator++(int) { // Pre-increment
+    const iterator operator++(int) { // Post-increment
       iterator tmp(*this);
       do {
         slot_idx_++;
@@ -130,10 +99,11 @@ public:
   };
 
   CuckooMap(size_t reserve_buckets = kInitNumBucket,
-            size_t reserve_entries = kInitNumEntries)
-      : bucket_mask_(reserve_buckets - 1), num_entries_(0),
-        buckets_(reserve_buckets), entries_(reserve_entries),
-        free_entry_indices_() {
+            size_t reserve_entries = kInitNumEntries,
+            int socket = SOCKET_ID_ANY)
+      : bucket_mask_(reserve_buckets - 1), num_entries_(0), allocator_(socket),
+        buckets_(reserve_buckets, &allocator_),
+        entries_(reserve_entries, &allocator_), free_entry_indices_() {
     // the number of buckets must be a power of 2
     CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
@@ -529,11 +499,17 @@ protected:
   // # of entries
   size_t num_entries_;
 
-  // bucket and entry arrays grow independently
-  std::vector<Bucket, Allocator<Bucket>> buckets_;
-  std::vector<Entry, Allocator<Entry>> entries_;
+  // polymorphic_allocator
+  MemoryResource allocator_;
 
-  // Stack of free entries
+  // bucket and entry arrays grow independently
+  std::vector<Bucket, std::experimental::pmr::polymorphic_allocator<Bucket>>
+      buckets_;
+  std::vector<Entry, std::experimental::pmr::polymorphic_allocator<Entry>>
+      entries_;
+
+  // Stack of free entries (I don't know why using hugepage here will cause
+  // performance degradation.)
   std::stack<EntryIndex> free_entry_indices_;
 };
 

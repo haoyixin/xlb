@@ -1,38 +1,12 @@
-// Copyright (c) 2018-2019, Qihoo 360 Technology Co. Ltd.
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// * Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
-//
-// * Redistributions in binary form must reproduce the above copyright notice,
-// this list of conditions and the following disclaimer in the documentation
-// and/or other materials provided with the distribution.
-//
-// * Neither the names of the copyright holders nor the names of their
-// contributors may be used to endorse or promote products derived from this
-// software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef XLB_UTILS_ALLOCATOR_H
 #define XLB_UTILS_ALLOCATOR_H
 
 #include <cstddef>
+
 #include <rte_config.h>
 #include <rte_malloc.h>
+
+#include <experimental/memory_resource>
 #include <new>
 
 namespace xlb {
@@ -46,6 +20,7 @@ public:
 
   template <typename U> constexpr Allocator(const Allocator<U> &) noexcept {}
 
+  // Will be allocated on the socket which calling this.
   T *allocate(std::size_t n) {
     if (n > std::size_t(-1) / sizeof(T))
       throw std::bad_alloc();
@@ -56,6 +31,32 @@ public:
   }
 
   void deallocate(T *p, std::size_t n) noexcept { rte_free(p); }
+};
+
+class MemoryResource : public std::experimental::pmr::memory_resource {
+public:
+  explicit MemoryResource(int socket) : socket_(socket) {}
+
+protected:
+  void *do_allocate(std::size_t bytes, std::size_t) override {
+    if (auto p =
+            rte_malloc_socket(nullptr, bytes, RTE_CACHE_LINE_SIZE, socket_))
+      return p;
+
+    throw std::bad_alloc();
+  }
+
+  void do_deallocate(void *p, std::size_t, std::size_t) override {
+    rte_free(p);
+  }
+
+  bool do_is_equal(const std::experimental::pmr::memory_resource &other) const
+      noexcept override {
+    return this == &other;
+  }
+
+private:
+  int socket_;
 };
 
 } // namespace utils

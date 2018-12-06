@@ -179,7 +179,9 @@ public:
 
   void CheckSanity();
 
+  /*
   static Packet *from_paddr(phys_addr_t paddr);
+   */
 
   /*
   static int mt_offset_to_databuf_offset(xlb::metadata::mt_offset_t offset) {
@@ -195,14 +197,13 @@ public:
   // All pointers in pkts must not be nullptr.
   // cnt must be [0, PacketBatch::kMaxBurst]
 
-  /*
-  static inline void Free(Packet **pkts, size_t cnt);
-   */
+  static inline void Free(Packet **pkts, size_t cnt) {
+    for (size_t i = 0; i < cnt; i++)
+      Free(pkts[i]);
+  }
 
   // batch must not be nullptr
-  /*
   static void Free(PacketBatch *batch) { Free(batch->pkts(), batch->cnt()); }
-   */
 
 private:
   union {
@@ -353,16 +354,16 @@ inline void Packet::Free(Packet **pkts, size_t cnt) {
 
   /* NOTE: it seems that zeroing the refcnt of mbufs is not necessary.
    *   (allocators will reset them) */
-  rte_mempool_put_bulk(pool, reinterpret_cast<void **>(pkts), cnt);
-  return;
+rte_mempool_put_bulk(pool, reinterpret_cast<void **>(pkts), cnt);
+return;
 
-slow_path:
-  // slow path: packets are not homogeneous or simple enough
-  for (size_t i = 0; i < cnt; i++) {
-    Free(pkts[i]);
-  }
+slow_path :
+    // slow path: packets are not homogeneous or simple enough
+    for (size_t i = 0; i < cnt; i++) {
+  Free(pkts[i]);
 }
-*/
+}
+* /
 #endif
 
 } // namespace xlb
