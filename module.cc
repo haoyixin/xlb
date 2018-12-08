@@ -26,6 +26,7 @@ inline void Module::DropPacket(Context *ctx, Packet *pkt) {
 void Module::RegisterTask(void *arg) {
   if (!registered_) {
     Task::TaskProtos()->Emplace(name_, this, arg);
+    registered_ = true;
   }
 }
 

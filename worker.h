@@ -29,6 +29,7 @@ class Task;
 class Worker {
 public:
   Worker() = default;
+  explicit Worker(int core);
 
   WorkerState State() { return state_; }
   int Core() { return core_; }
@@ -51,7 +52,6 @@ public:
   static Worker *Current() { return current_worker_; }
 
 private:
-  explicit Worker(int core);
   // The entry point of worker threads.
   void *Run();
 

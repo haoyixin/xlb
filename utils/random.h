@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-#include "tsc.h"
+#include "utils/time.h"
 
 class Random {
  public:

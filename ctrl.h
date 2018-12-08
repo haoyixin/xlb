@@ -1,7 +1,3 @@
-//
-// Created by haoyixin on 11/20/18.
-//
-
 #ifndef XLB_CTRL_H
 #define XLB_CTRL_H
 

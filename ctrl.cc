@@ -1,7 +1,3 @@
-//
-// Created by haoyixin on 11/20/18.
-//
-
 #include "ctrl.h"
 
 #include <thread>

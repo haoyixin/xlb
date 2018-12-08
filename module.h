@@ -43,7 +43,7 @@ public:
 
   // -------------------------------------------------------------------------
 protected:
-  explicit Module(std::string &name) : name_(name) {}
+  explicit Module(std::string &name) : name_(name), registered_(false) {}
 
   template <typename T>
   inline void NextModule(T *mod, Context *ctx, PacketBatch *batch) {
@@ -75,10 +75,12 @@ static inline void deadend(Context *ctx, PacketBatch *batch) {
 
 } // namespace xlb
 
-#define DEFINE_MODULE(_MOD) _MOD *MODULES_##_MOD;
+// TODO: maybe a module builder is necessary
 
-#define DECLARE_MODULE(_MOD) extern _MOD *MODULES_##_MOD;
+#define DEFINE_MODULE(_MOD) _MOD *MODULES_##_MOD
 
-#define MODULE_INIT(_MOD, ...) MODULES_##_MOD = new _MOD(#_MOD, __VA_ARGS__);
+#define DECLARE_MODULE(_MOD) extern _MOD *MODULES_##_MOD
+
+#define MODULE_INIT(_MOD, ...) MODULES_##_MOD = new _MOD(#_MOD, __VA_ARGS__)
 
 #endif // XLB_MODULE_H

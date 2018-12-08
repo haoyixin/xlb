@@ -33,7 +33,6 @@ set(DPDK_INCS
 
 set(SRC_INCS
         .
-        utils
         )
 
 set(SYS_INCS
@@ -41,6 +40,26 @@ set(SYS_INCS
 
 set(GTEST_INCS
         ${GTEST_SRC}/include
+        )
+
+set(OBJS
+        packet.cc
+        packet_pool.cc
+        opts.cc
+        dpdk.cc
+        task.cc
+        module.cc
+        worker.cc
+        scheduler.cc
+        port.cc
+        utils/copy.cc
+        utils/simd.cc
+        utils/numa.cc
+        utils/format.cc
+        utils/time.cc
+        utils/endian.cc
+        headers/ether.cc
+        ports/pmd.cc
         )
 
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
@@ -52,7 +71,7 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
 #target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
 
 #add_executable(xlb main.cpp)
-add_executable(xlb2 main2.cpp packet.cc packet_pool.cc opts.cc dpdk.cc utils/copy.cc utils/simd.cc utils/numa.cc utils/format.cc task.cc module.cc utils/tsc.cc worker.cc scheduler.cc)
+add_executable(xlb2 main2.cpp ${OBJS})
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 

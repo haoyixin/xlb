@@ -1,6 +1,6 @@
-#include "numa.h"
+#include "utils/numa.h"
 
-#include "format.h"
+#include "utils/format.h"
 #include <fstream>
 #include <limits.h>
 #include <rte_lru.h>

@@ -41,6 +41,7 @@ void *Worker::Run() {
             << "(" << this << ") "
             << "is running on core " << core_ << " (socket " << socket_ << ")";
 
+  scheduler_ = new DefaultScheduler();
   scheduler_->ScheduleLoop();
 
   LOG(INFO) << "Worker "
@@ -57,8 +58,8 @@ void *Worker::Run() {
 
 Worker::Worker(int core)
     : core_(core), state_(WORKER_RUNNING), socket_(utils::cpu_socket_id(core_)),
-      packet_pool_(PacketPool::GetPool(socket_)),
-      scheduler_(new DefaultScheduler()) {
+      packet_pool_(PacketPool::GetPool(socket_)), silent_drops_(0),
+      current_tsc_(0), current_ns_(0) {
   CPU_ZERO(&cpu_set_);
   CPU_SET(core_, &cpu_set_);
 }
@@ -67,7 +68,7 @@ void Worker::Launch(int core) {
   if (!workers_)
     workers_ = new utils::CuckooMap<int, Worker>();
 
-  auto worker = &workers_->Emplace(core, Worker(core))->second;
+  auto worker = &workers_->Emplace(core, core)->second;
   worker->thread_ = new std::thread([=]() { worker->Run(); });
   worker->Thread()->detach();
 }

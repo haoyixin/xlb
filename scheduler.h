@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "utils/common.h"
-#include "utils/tsc.h"
+#include "utils/time.h"
 
 namespace xlb {
 
