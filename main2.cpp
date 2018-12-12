@@ -9,6 +9,9 @@
 #include "worker.h"
 #include "packet.h"
 #include "port.h"
+#include "opts.h"
+
+#include "config.h"
 
 #include "utils/time.h"
 #include "utils/random.h"
@@ -20,12 +23,17 @@
 
 #include "ports/pmd.h"
 
-//#include "ports/pmd.h"
+#include "glog/logging.h"
+
+#include "ports/pmd.h"
 
 int main() {
 
   char *argv[] = {"-c", "0xff", "-n", "1", "--huge-dir", "/mnt/huge"};
 //  rte_eal_init(4, argv);
+  google::InitGoogleLogging(argv[0]);
+
+  xlb::Config::Load();
 
   return 0;
 }

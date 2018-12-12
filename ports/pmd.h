@@ -21,6 +21,7 @@ typedef uint16_t dpdk_port_t;
 class PMDPort final : public Port {
 public:
   PMDPort(std::string &name);
+  ~PMDPort();
 
   bool GetStats(Port::Stats &stats) override;
 
@@ -44,6 +45,10 @@ private:
 
   // The NUMA node to which device is attached
   int node_;
+
+  static void InitDriver();
+  void Init();
+  void DeInit();
 };
 
 } // namespace ports

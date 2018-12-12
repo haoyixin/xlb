@@ -22,6 +22,7 @@ DECLARE_bool(no_crashlog);
 DECLARE_int32(buffers);
 
 DECLARE_string(n);
+DECLARE_string(config);
 /*
 DECLARE_bool(dpdk);
  */

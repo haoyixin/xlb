@@ -52,6 +52,7 @@ set(OBJS
         worker.cc
         scheduler.cc
         port.cc
+        config.cc
         utils/copy.cc
         utils/simd.cc
         utils/numa.cc

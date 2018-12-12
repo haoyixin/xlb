@@ -9,7 +9,7 @@ namespace xlb {
 namespace utils {
 
 /* Check if a cpu is present by the presence of the cpu information for it */
-int is_cpu_present(unsigned int core_id);
+bool IsValidCore(int core_id);
 
 int NumNumaNodes();
 

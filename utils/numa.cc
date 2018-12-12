@@ -10,17 +10,19 @@ namespace xlb {
 namespace utils {
 
 /* Check if a cpu is present by the presence of the cpu information for it */
-int is_cpu_present(unsigned int core_id) {
+bool IsValidCore(int core_id) {
+  if (core_id < 0)
+    return false;
   char path[PATH_MAX];
   int len = snprintf(path, sizeof(path), SYS_CPU_DIR "/" CORE_ID_FILE, core_id);
   if (len <= 0 || (unsigned)len >= sizeof(path)) {
-    return 0;
+    return true;
   }
   if (access(path, F_OK) != 0) {
-    return 0;
+    return true;
   }
 
-  return 1;
+  return true;
 }
 
 int NumNumaNodes() {

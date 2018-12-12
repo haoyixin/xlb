@@ -33,7 +33,7 @@ DEFINE_bool(dpdk, true, "Let DPDK manage hugepages");
  */
 
 static bool ValidateCoreID(const char *, int32_t value) {
-  if (!xlb::utils::is_cpu_present(value)) {
+  if (!xlb::utils::IsValidCore(value)) {
     LOG(ERROR) << "Invalid core ID: " << value;
     return false;
   }
@@ -95,4 +95,6 @@ DEFINE_int32(buffers, 262144,
              " must be a power of 2.");
 static const bool _buffers_dummy[[maybe_unused]] =
     google::RegisterFlagValidator(&FLAGS_buffers, &ValidateBuffersPerSocket);
+
+DEFINE_string(config, "/mnt/haoyixin/CLionProjects/xlb/config.json", "Path of config file.");
 
