@@ -6,13 +6,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(GTEST_SRC googletest/googletest)
 add_subdirectory(${GTEST_SRC})
 
-add_compile_options(-O3 -msse4 -mavx)
+add_compile_options(-O0 -msse4 -mavx)
 
 set(DPDK_LIBS
+        "-Wl,--whole-archive"
         dpdk
+        "-Wl,--no-whole-archive"
         )
 
 set(SYS_LIBS
+        stdc++fs
         gflags
         glog
         pthread
@@ -51,7 +54,6 @@ set(OBJS
         module.cc
         worker.cc
         scheduler.cc
-        port.cc
         config.cc
         utils/copy.cc
         utils/simd.cc
@@ -59,6 +61,7 @@ set(OBJS
         utils/format.cc
         utils/time.cc
         utils/endian.cc
+        headers/ip.cc
         headers/ether.cc
         ports/pmd.cc
         )
@@ -77,4 +80,4 @@ add_executable(xlb2 main2.cpp ${OBJS})
 #add_executable(xlb main.cpp clibs/c_hash.c)
 
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
-target_link_libraries(xlb2 dpdk gflags glog pthread numa ${CMAKE_DL_LIBS})
+target_link_libraries(xlb2 ${DPDK_LIBS} ${SYS_LIBS} ${CMAKE_DL_LIBS})

@@ -13,23 +13,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <numa.h>
 #include <string>
 
 #include "utils/numa.h"
 
-//#include "memory.h"
-//#include "worker.h"
-
 namespace xlb {
 namespace {
 
-void disable_syslog() {
-  setlogmask(0x01);
-}
+void disable_syslog() { setlogmask(0x01); }
 
-void enable_syslog() {
-  setlogmask(0xff);
-}
+void enable_syslog() { setlogmask(0xff); }
 
 // for log messages during rte_eal_init()
 ssize_t dpdk_log_init_writer(void *, const char *data, size_t len) {
@@ -45,7 +39,7 @@ ssize_t dpdk_log_writer(void *, const char *data, size_t len) {
 }
 
 class CmdLineOpts {
- public:
+public:
   explicit CmdLineOpts(std::initializer_list<std::string> args)
       : args_(), argv_({nullptr}) {
     Append(args);
@@ -63,7 +57,7 @@ class CmdLineOpts {
 
   int Argc() const { return args_.size(); }
 
- private:
+private:
   // Contains a copy of each argument.
   std::vector<std::vector<char>> args_;
   // Pointer to each argument (in `args_`), plus an extra `nullptr`.
@@ -71,6 +65,7 @@ class CmdLineOpts {
 };
 
 void init_eal(int dpdk_mb_per_socket, int default_core) {
+  // TODO: clean useless args
   CmdLineOpts rte_args{
       "xlb",
       "--master-lcore",
@@ -82,31 +77,17 @@ void init_eal(int dpdk_mb_per_socket, int default_core) {
       "--no-shconf",
   };
 
-  /*
-  if (dpdk_mb_per_socket <= 0) {
-    rte_args.Append({"--no-huge"});
-    */
-
-    // even if we opt out of using hugepages, many DPDK libraries still rely on
-    // rte_malloc (e.g., rte_lpm), so we need to reserve some (normal page)
-    // memory in advance. We allocate 512MB (this is shared among nodes).
-    /*
-    rte_args.Append({"-m", "512"});
-  } else {
-     */
-    std::string opt_socket_mem = std::to_string(dpdk_mb_per_socket);
-    for (int i = 1; i < utils::NumNumaNodes(); i++) {
-      opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
-    }
-
-    rte_args.Append({"--socket-mem", opt_socket_mem});
-
-    // Unlink mapped hugepage files so that memory can be reclaimed as soon as
-    // xlb terminates.
-    rte_args.Append({"--huge-unlink"});
-    /*
+  std::string opt_socket_mem = std::to_string(dpdk_mb_per_socket);
+  int n = utils::num_sockets();
+  for (int i = 1; i < n; i++) {
+    opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
   }
-     */
+
+  rte_args.Append({"--socket-mem", opt_socket_mem});
+
+  // Unlink mapped hugepage files so that memory can be reclaimed as soon as
+  // xlb terminates.
+  rte_args.Append({"--huge-unlink"});
 
   // reset getopt()
   optind = 0;
@@ -149,7 +130,7 @@ int determine_default_core() {
   int ret = pthread_getaffinity_np(pthread_self(), sizeof(set), &set);
   if (ret < 0) {
     PLOG(WARNING) << "pthread_getaffinity_np()";
-    return 0;  // Core 0 as a fallback
+    return 0; // Core 0 as a fallback
   }
 
   // Choose the last core available
@@ -166,19 +147,9 @@ int determine_default_core() {
 
 bool is_initialized = false;
 
-}  // namespace
-
-/*
-bool IsDpdkInitialized() {
-  return is_initialized;
-}
- */
+} // namespace
 
 void InitDpdk(int dpdk_mb_per_socket) {
-  /*
-  current_worker.SetNonWorker();
-   */
-
   if (!is_initialized) {
     is_initialized = true;
     LOG(INFO) << "Initializing DPDK";
@@ -186,4 +157,4 @@ void InitDpdk(int dpdk_mb_per_socket) {
   }
 }
 
-}  // namespace xlb
+} // namespace xlb

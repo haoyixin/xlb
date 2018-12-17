@@ -6,7 +6,8 @@
 #include "utils/time.h"
 
 class Random {
- public:
+  // TODO: using rte_rand
+public:
   Random() : seed_(rdtsc()) {}
   explicit Random(uint64_t seed) : seed_(seed) {}
 
@@ -17,7 +18,7 @@ class Random {
   double GetReal();
   double GetRealNonzero();
 
- private:
+private:
   uint64_t seed_;
 };
 
@@ -70,4 +71,4 @@ inline double Random::GetRealNonzero() {
   return 2.0 - tmp.d;
 }
 
-#endif  // XLB_UTILS_RANDOM_H_
+#endif // XLB_UTILS_RANDOM_H_

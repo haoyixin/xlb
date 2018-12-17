@@ -18,10 +18,10 @@ namespace ports {
 typedef uint16_t dpdk_port_t;
 
 // This driver binds a port to a device using DPDK.
-class PMDPort final : public Port {
+class PMD final : public Port {
 public:
-  PMDPort(std::string &name);
-  ~PMDPort();
+  PMD(std::string &&name);
+  ~PMD();
 
   bool GetStats(Port::Stats &stats) override;
 
@@ -29,13 +29,13 @@ public:
 
   int SendPackets(queue_t qid, Packet **pkts, int cnt) override;
 
-  uint64_t GetFlags() const override {
-    return DRIVER_FLAG_SELF_INC_STATS | DRIVER_FLAG_SELF_OUT_STATS;
+  uint64_t GetFlags() const override { // TODO: offload flags
+    return 0;
   }
 
   LinkStatus GetLinkStatus() override;
 
-  int UpdateConf(const Conf &conf) override;
+  //  int UpdateConf(const Conf &conf) override;
 
   int GetNode() const { return node_; }
 

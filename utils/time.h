@@ -7,6 +7,8 @@
 
 #include <sys/time.h>
 
+//TODO: using rte_cycles
+
 extern uint64_t tsc_hz;
 
 static inline uint64_t rdtsc(void) {

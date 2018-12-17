@@ -1,5 +1,6 @@
 #include "ports/pmd.h"
 
+#include <headers/ip.h>
 #include <rte_ethdev.h>
 #include <rte_ethdev_pci.h>
 
@@ -8,13 +9,6 @@
 #include "config.h"
 #include "headers/ether.h"
 #include "utils/format.h"
-
-/*!
- * The following are deprecated. Ignore us.
- */
-#define SN_TSO_SG 0
-#define SN_HW_RXCSUM 0
-#define SN_HW_TXCSUM 0
 
 #define _FAILED LOG(FATAL) << "Failed to initial PMDPort: "
 
@@ -26,25 +20,23 @@
 namespace xlb {
 namespace ports {
 
-PMDPort::PMDPort(std::string &name)
+PMD::PMD(std::string &&name)
     : Port(name), dpdk_port_id_(DPDK_PORT_UNKNOWN), node_(SOCKET_ID_ANY) {
   InitDriver();
   Init();
 }
 
-PMDPort::~PMDPort() {
-  DeInit();
-}
+PMD::~PMD() { DeInit(); }
 
 static const struct rte_eth_conf
 default_eth_conf(struct rte_eth_dev_info &dev_info) {
   struct rte_eth_conf ret = {0};
-  auto &cfg = Config::All();
+  //  auto &cfg = Config::All();
 
   // TODO: support software offload
   if (~dev_info.rx_offload_capa &
       (DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_TCP_CKSUM |
-       DEV_RX_OFFLOAD_CRC_STRIP | DEV_RX_OFFLOAD_VLAN_STRIP))
+       DEV_RX_OFFLOAD_VLAN_STRIP))
     _FAILED << "unsupported device (" << dev_info.driver_name
             << ") with limited rx offload capability";
 
@@ -71,7 +63,25 @@ default_eth_conf(struct rte_eth_dev_info &dev_info) {
   return ret;
 }
 
-void PMDPort::InitDriver() {
+void filter_add(uint16_t port_id, const std::string &dst_ip, queue_t qid) {
+  _RTE_FAILED(eth_dev_filter_supported, port_id, RTE_ETH_FILTER_NTUPLE);
+  // TODO: support RTE_ETH_FILTER_FDIR
+
+  struct rte_eth_ntuple_filter ntuple = {0};
+  utils::be32_t dst;
+  headers::ParseIpv4Address(dst_ip, &dst);
+
+  ntuple.flags = RTE_5TUPLE_FLAGS;
+  ntuple.dst_ip = dst.raw_value();
+  ntuple.dst_ip_mask = UINT32_MAX;
+  ntuple.priority = 1;
+  ntuple.queue = qid;
+
+  _RTE_FAILED(eth_dev_filter_ctrl, port_id, RTE_ETH_FILTER_NTUPLE,
+              RTE_ETH_FILTER_ADD, &ntuple);
+}
+
+void PMD::InitDriver() {
   dpdk_port_t num_dpdk_ports = rte_eth_dev_count();
 
   if (num_dpdk_ports == 0)
@@ -108,25 +118,6 @@ void PMDPort::InitDriver() {
   }
 }
 
-// Find a port attached to DPDK by its integral id.
-// returns 0 and sets *ret_port_id to "port_id" if the port is valid and
-// available.
-// returns > 0 on error.
-/*
-static CommandResponse find_dpdk_port_by_id(dpdk_port_t port_id,
-                                            dpdk_port_t *ret_port_id) {
-  if (port_id >= RTE_MAX_ETHPORTS) {
-    return CommandFailure(EINVAL, "Invalid port id %d", port_id);
-  }
-  if (rte_eth_devices[port_id].state != RTE_ETH_DEV_ATTACHED) {
-    return CommandFailure(ENODEV, "Port id %d is not available", port_id);
-  }
-
-  *ret_port_id = port_id;
-  return CommandSuccess();
-}
- */
-
 // Find a port attached to DPDK by its PCI address.
 // returns true and sets *ret_port_id to the port_id of the port at PCI address
 // "pci" if it is valid and available.
@@ -149,94 +140,13 @@ static bool find_dpdk_port_by_pci_addr(const std::string &pci,
   return false;
 }
 
-/*
-static CommandResponse find_dpdk_port_by_pci_addr(const std::string &pci,
-                                                  dpdk_port_t *ret_port_id,
-                                                  bool *ret_hot_plugged) {
-  dpdk_port_t port_id = DPDK_PORT_UNKNOWN;
-  struct rte_pci_addr addr;
-
-  if (pci.length() == 0) {
-    return CommandFailure(EINVAL, "No PCI address specified");
-  }
-
-  if (eal_parse_pci_DomBDF(pci.c_str(), &addr) != 0 &&
-      eal_parse_pci_BDF(pci.c_str(), &addr) != 0) {
-    return CommandFailure(EINVAL, "PCI address must be like "
-                                  "dddd:bb:dd.ff or bb:dd.ff");
-  }
-
-  dpdk_port_t num_dpdk_ports = rte_eth_dev_count();
-  for (dpdk_port_t i = 0; i < num_dpdk_ports; i++) {
-    struct rte_eth_dev_info dev_info;
-    rte_eth_dev_info_get(i, &dev_info);
-
-    if (dev_info.pci_dev) {
-      if (rte_eal_compare_pci_addr(&addr, &dev_info.pci_dev->addr) == 0) {
-        port_id = i;
-        break;
-      }
-    }
-  }
-
-  // If still not found, maybe the device has not been attached yet
-  if (port_id == DPDK_PORT_UNKNOWN) {
-    int ret;
-    char name[RTE_ETH_NAME_MAX_LEN];
-    snprintf(name, RTE_ETH_NAME_MAX_LEN, "%08x:%02x:%02x.%02x", addr.domain,
-             addr.bus, addr.devid, addr.function);
-
-    ret = rte_eth_dev_attach(name, &port_id);
-
-    if (ret < 0) {
-      return CommandFailure(ENODEV, "Cannot attach PCI device %s", name);
-    }
-
-    *ret_hot_plugged = true;
-  }
-
-  *ret_port_id = port_id;
-  return CommandSuccess();
-}
- */
-
-// Find a DPDK vdev by name.
-// returns 0 and sets *ret_port_id to the port_id of "vdev" if it is valid and
-// available. *ret_hot_plugged is set to true if the device was attached to
-// DPDK as a result of calling this function.
-// returns > 0 on error.
-/*
-static CommandResponse find_dpdk_vdev(const std::string &vdev,
-                                      dpdk_port_t *ret_port_id,
-                                      bool *ret_hot_plugged) {
-  dpdk_port_t port_id = DPDK_PORT_UNKNOWN;
-
-  if (vdev.length() == 0) {
-    return CommandFailure(EINVAL, "No vdev specified");
-  }
-
-  const char *name = vdev.c_str();
-  int ret = rte_eth_dev_attach(name, &port_id);
-
-  if (ret < 0) {
-    return CommandFailure(ENODEV, "Cannot attach vdev %s", name);
-  }
-
-  *ret_hot_plugged = true;
-  *ret_port_id = port_id;
-  return CommandSuccess();
-}
- */
-
-void PMDPort::Init() {
+void PMD::Init() {
   dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
 
   auto cfg = Config::All();
 
   uint8_t num_txq, num_rxq = num_queues[PACKET_DIR_INC] =
                        num_queues[PACKET_DIR_OUT] = cfg.worker_cores.size();
-
-  //  int numa_node = -1;
 
   if (!find_dpdk_port_by_pci_addr(cfg.nic.pci_address, &ret_port_id))
     _FAILED << "can not find device by 'nic.pci_address'";
@@ -272,7 +182,10 @@ void PMDPort::Init() {
 
   _RTE_FAILED(eth_dev_set_vlan_offload, ret_port_id, ETH_VLAN_STRIP_OFFLOAD);
 
-  // TODO: config fdir rule before start
+  for (auto i : utils::range(0, cfg.nic.local_ips.size())) {
+    filter_add(ret_port_id, cfg.nic.local_ips[i], i % cfg.worker_cores.size());
+  }
+
   _RTE_FAILED(eth_dev_start, ret_port_id);
 
   dpdk_port_id_ = ret_port_id;
@@ -285,53 +198,9 @@ void PMDPort::Init() {
   _RTE_FAILED(eth_stats_reset, dpdk_port_id_);
 }
 
-int PMDPort::UpdateConf(const Conf &conf) {
-  rte_eth_dev_stop(dpdk_port_id_);
+void PMD::DeInit() { rte_eth_dev_stop(dpdk_port_id_); }
 
-  if (conf_.mtu != conf.mtu && conf.mtu != 0) {
-    int ret = rte_eth_dev_set_mtu(dpdk_port_id_, conf.mtu);
-    if (ret == 0) {
-      conf_.mtu = conf_.mtu;
-    } else {
-      LOG(WARNING) << "rte_eth_dev_set_mtu() failed: " << rte_strerror(-ret);
-      return ret;
-    }
-  }
-
-  if (conf_.mac_addr != conf.mac_addr && !conf.mac_addr.IsZero()) {
-    ether_addr tmp;
-    ether_addr_copy(reinterpret_cast<const ether_addr *>(&conf.mac_addr.bytes),
-                    &tmp);
-    int ret = rte_eth_dev_default_mac_addr_set(dpdk_port_id_, &tmp);
-    if (ret == 0) {
-      conf_.mac_addr = conf.mac_addr;
-    } else {
-      LOG(WARNING) << "rte_eth_dev_default_mac_addr_set() failed: "
-                   << rte_strerror(-ret);
-      return ret;
-    }
-  }
-
-  if (conf.admin_up) {
-    int ret = rte_eth_dev_start(dpdk_port_id_);
-    if (ret == 0) {
-      conf_.admin_up = true;
-    } else {
-      LOG(WARNING) << "rte_eth_dev_start() failed: " << rte_strerror(-ret);
-      return ret;
-    }
-  }
-
-  return 0;
-}
-
-void PMDPort::DeInit() {
-  rte_eth_dev_stop(dpdk_port_id_);
-}
-
-// void PMDPort::ResetStatus() { rte_eth_stats_reset(dpdk_port_id_); }
-
-bool PMDPort::GetStats(Port::Stats &stats) {
+bool PMD::GetStats(Port::Stats &stats) {
   struct rte_eth_stats phy_stats {
     0
   };
@@ -372,18 +241,18 @@ bool PMDPort::GetStats(Port::Stats &stats) {
   // TODO: status per queue
 }
 
-int PMDPort::RecvPackets(queue_t qid, Packet **pkts, int cnt) {
+int PMD::RecvPackets(queue_t qid, Packet **pkts, int cnt) {
   return rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
 }
 
-int PMDPort::SendPackets(queue_t qid, Packet **pkts, int cnt) {
+int PMD::SendPackets(queue_t qid, Packet **pkts, int cnt) {
   int sent = rte_eth_tx_burst(dpdk_port_id_, qid,
                               reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
   queue_stats[PACKET_DIR_OUT][qid].dropped += (cnt - sent);
   return sent;
 }
 
-Port::LinkStatus PMDPort::GetLinkStatus() {
+Port::LinkStatus PMD::GetLinkStatus() {
   struct rte_eth_link status;
   // rte_eth_link_get() may block up to 9 seconds, so use _nowait() variant.
   rte_eth_link_get_nowait(dpdk_port_id_, &status);
@@ -394,7 +263,7 @@ Port::LinkStatus PMDPort::GetLinkStatus() {
                     .link_up = static_cast<bool>(status.link_status)};
 }
 
-DEFINE_PORT(PMDPort);
-
 } // namespace ports
 } // namespace xlb
+
+DEFINE_PORT(PMD);

@@ -10,18 +10,17 @@
 #include <memory>
 #include <string>
 
-//#include "message.h"
-//#include "module.h"
 #include "packet.h"
-//#include "pb/port_msg.pb.h"
 #include "headers/ether.h"
 #include "packet_batch.h"
 #include "utils/common.h"
 
 #define MAX_QUEUES_PER_DIR 32 /* [0, 31] (for each RX/TX) */
 
+/*
 #define DRIVER_FLAG_SELF_INC_STATS 0x0001
 #define DRIVER_FLAG_SELF_OUT_STATS 0x0002
+ */
 
 #define MAX_QUEUE_SIZE 4096
 
@@ -122,10 +121,10 @@ public:
 
 // TODO: support multi port
 
-#define DEFINE_PORT(_PORT) _PORT *PORTS_##_PORT
+#define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
 
-#define DECLARE_PORT(_PORT) extern _PORT *PORTS_##_PORT
+#define DECLARE_PORT(_PORT) extern xlb::ports::_PORT *PORTS_##_PORT
 
-#define PORT_INIT(_PORT, ...) PORTS_##_PORT = new _PORT(#_PORT, __VA_ARGS__)
+#define PORT_INIT(_PORT, ...) PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ## __VA_ARGS__)
 
 #endif // XLB_PORT_H

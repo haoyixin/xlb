@@ -23,7 +23,7 @@ public:
     // `addr` is a gRPC url.
     void Listen(const std::string &addr);
 
-    // Runs the API server until it is shutdown by KillBess RPC.
+    // Runs the API server.
     void Run();
 
 private:

@@ -9,10 +9,9 @@
 #include <rte_atomic.h>
 #include <rte_config.h>
 #include <rte_mbuf.h>
+#include <utils/simd.h>
 
-//#include "metadata.h"
 #include "xbuf_layout.h"
-//#include "worker.h"
 #include "packet_batch.h"
 
 /* NOTE: NEVER use rte_pktmbuf_*() directly,
@@ -166,10 +165,7 @@ public:
   // All pointers in pkts must not be nullptr.
   // cnt must be [0, PacketBatch::kMaxBurst]
 
-  static inline void Free(Packet **pkts, size_t cnt) {
-    for (size_t i = 0; i < cnt; i++)
-      Free(pkts[i]);
-  }
+  static inline void Free(Packet **pkts, size_t cnt);
 
   // batch must not be nullptr
   static void Free(PacketBatch *batch) { Free(batch->pkts(), batch->cnt()); }
@@ -296,44 +292,88 @@ private:
 static_assert(std::is_standard_layout<Packet>::value, "Incorrect class Packet");
 static_assert(sizeof(Packet) == XBUF_SIZE, "Incorrect class Packet");
 
-#if __AVX__
-/*
-#include "packet_avx.h"
- */
-#else
-/*
+// for packets to be processed in the fast path, all packets must:
+// 1. share the same mempool
+// 2. single segment
+// 3. reference counter == 1
+// 4. the data buffer is embedded in the mbuf
 inline void Packet::Free(Packet **pkts, size_t cnt) {
-  DCHECK_LE(cnt, PacketBatch::kMaxBurst);
+  DCHECK(cnt <= PacketBatch::kMaxBurst);
 
   // rte_mempool_put_bulk() crashes when called with cnt == 0
   if (unlikely(cnt <= 0)) {
     return;
   }
 
-  struct rte_mempool *pool = pkts[0]->pool_;
+  struct rte_mempool *_pool = pkts[0]->pool_;
 
-  for (size_t i = 0; i < cnt; i++) {
+  // broadcast
+  __m128i offset = _mm_set1_epi64x(XBUF_HEADROOM_OFF);
+  __m128i info_mask = _mm_set1_epi64x(0x0000ffffffff0000UL);
+  __m128i info_simple = _mm_set1_epi64x(0x0000000100010000UL);
+  __m128i pool = _mm_set1_epi64x((uintptr_t)_pool);
+
+  size_t i;
+
+  for (i = 0; i < (cnt & ~1); i += 2) {
+    auto *mbuf0 = pkts[i];
+    auto *mbuf1 = pkts[i + 1];
+
+    __m128i buf_addrs_derived;
+    __m128i buf_addrs_actual;
+    __m128i info;
+    __m128i pools;
+    __m128i vcmp1, vcmp2, vcmp3;
+
+    __m128i mbuf_ptrs = _mm_set_epi64x(reinterpret_cast<uintptr_t>(mbuf1),
+                                       reinterpret_cast<uintptr_t>(mbuf0));
+
+    buf_addrs_actual = gather_m128i(&mbuf0->buf_addr_, &mbuf1->buf_addr_);
+    buf_addrs_derived = _mm_add_epi64(mbuf_ptrs, offset);
+
+    /* refcnt and nb_segs must be 1 */
+    info = gather_m128i(&mbuf0->rearm_data_, &mbuf1->rearm_data_);
+    info = _mm_and_si128(info, info_mask);
+
+    pools = gather_m128i(&mbuf0->pool_, &mbuf1->pool_);
+
+    vcmp1 = _mm_cmpeq_epi64(buf_addrs_derived, buf_addrs_actual);
+    vcmp2 = _mm_cmpeq_epi64(info, info_simple);
+    vcmp3 = _mm_cmpeq_epi64(pool, pools);
+
+    vcmp1 = _mm_and_si128(vcmp1, vcmp2);
+    vcmp1 = _mm_and_si128(vcmp1, vcmp3);
+
+    if (unlikely(_mm_movemask_epi8(vcmp1) != 0xffff))
+      goto slow_path;
+  }
+
+  if (i < cnt) {
     const Packet *pkt = pkts[i];
 
-    if (unlikely(pkt->pool_ != pool || !pkt->is_simple() ||
-                 pkt->refcnt() != 1)) {
+    if (unlikely(pkt->pool_ != _pool || pkt->next_ != nullptr ||
+                 pkt->refcnt_ != 1 || pkt->buf_addr_ != pkt->headroom_)) {
       goto slow_path;
     }
   }
 
-  /* NOTE: it seems that zeroing the refcnt of mbufs is not necessary.
-   *   (allocators will reset them) */
-rte_mempool_put_bulk(pool, reinterpret_cast<void **>(pkts), cnt);
-return;
+  // When a rte_mbuf is returned to a mempool, the following conditions
+  // must hold:
+  for (i = 0; i < cnt; i++) {
+    Packet *pkt = pkts[i];
+    DCHECK_EQ(pkt->mbuf_.refcnt, 1);
+    DCHECK_EQ(pkt->mbuf_.nb_segs, 1);
+    DCHECK_EQ(pkt->mbuf_.next, static_cast<struct rte_mbuf *>(nullptr));
+  }
 
-slow_path :
-    // slow path: packets are not homogeneous or simple enough
-    for (size_t i = 0; i < cnt; i++) {
-  Free(pkts[i]);
+  rte_mempool_put_bulk(_pool, reinterpret_cast<void **>(pkts), cnt);
+  return;
+
+slow_path:
+  for (i = 0; i < cnt; i++) {
+    Free(pkts[i]);
+  }
 }
-}
-* /
-#endif
 
 } // namespace xlb
 

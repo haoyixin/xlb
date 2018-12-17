@@ -9,6 +9,8 @@
 
 #include "utils/copy.h"
 
+#include "headers/common.h"
+
 namespace xlb {
 namespace headers {
 
@@ -81,12 +83,12 @@ struct [[gnu::packed]] Ethernet {
 
   Address dst_addr;
   Address src_addr;
-  utils::be16_t ether_type;
+  be16_t ether_type;
 };
 
 struct [[gnu::packed]] Vlan {
-  utils::be16_t tci;
-  utils::be16_t ether_type;
+  be16_t tci;
+  be16_t ether_type;
 };
 
 static_assert(std::is_pod<Ethernet>::value, "not a POD type");

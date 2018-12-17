@@ -1,14 +1,17 @@
 #include "config.h"
 
 #define CONFIGURU_IMPLEMENTATION 1
+
 #include "3rdparty/configuru.hpp"
 
 #include <glog/logging.h>
 #include <iostream>
 #include <rte_pci.h>
-#include <utils/numa.h>
+#include "utils/numa.h"
+#include "utils/endian.h"
 
 #include "headers/ether.h"
+#include "headers/ip.h"
 #include "opts.h"
 
 namespace xlb {
@@ -41,24 +44,31 @@ void Config::validate() {
   _NON_EMPTY(nic.local_ips);
   _NON_EMPTY(nic.name);
   _NON_EMPTY(nic.pci_address);
-  _NON_EMPTY(nic.mac_address);
+
   _NON_EMPTY(nic.gateway);
   _NON_EMPTY(nic.netmask);
-
-  auto mac_addr = headers::Ethernet::Address(nic.mac_address);
-
-  if (mac_addr.IsZero() || mac_addr.IsBroadcast())
-    _FAILED << "'nic.mac_address' is invalid";
 
   if (worker_cores.size() > 32)
     _FAILED << "size of 'worker_cores' cannot exceed 32";
 
-  for (auto& w : worker_cores)
-    if (!utils::IsValidCore(w))
+  for (auto &w : worker_cores)
+    if (!utils::is_valid_core(w))
       _FAILED << "core(" << w << ") in 'worker_cores' is invalid";
 
-  if (nic.local_ips.size() % worker_cores.size() != 0)
-    _FAILED << "number of 'local_ip' must be a multiple of 'worker_cores'";
+  std::sort(nic.local_ips.begin(), nic.local_ips.end());
+
+  if (nic.local_ips.empty() || nic.local_ips.size() % worker_cores.size() != 0)
+    _FAILED << "size of 'local_ips' must be a multiple of 'worker_cores'";
+
+  if (std::unique(nic.local_ips.begin(), nic.local_ips.end()) !=
+      nic.local_ips.end())
+    _FAILED << "element of 'local_ips' must be unique";
+
+  utils::be32_t _dummy;
+
+  for(auto &ip : nic.local_ips)
+    if (!headers::ParseIpv4Address(ip, &_dummy))
+      _FAILED << "ip(" << ip << ") in 'local_ips' is invalid";
 
   struct rte_pci_addr pci = {0};
   if (eal_parse_pci_DomBDF(nic.pci_address.c_str(), &pci) != 0 &&

@@ -77,10 +77,10 @@ static inline void deadend(Context *ctx, PacketBatch *batch) {
 
 // TODO: maybe a module builder is necessary
 
-#define DEFINE_MODULE(_MOD) _MOD *MODULES_##_MOD
+#define DEFINE_MODULE(_MOD) xlb::modules::_MOD *MODULES_##_MOD
 
-#define DECLARE_MODULE(_MOD) extern _MOD *MODULES_##_MOD
+#define DECLARE_MODULE(_MOD) extern xlb::modules::_MOD *MODULES_##_MOD
 
-#define MODULE_INIT(_MOD, ...) MODULES_##_MOD = new _MOD(#_MOD, __VA_ARGS__)
+#define MODULE_INIT(_MOD, ...) MODULES_##_MOD = new xlb::modules::_MOD(#_MOD, ## __VA_ARGS__)
 
 #endif // XLB_MODULE_H

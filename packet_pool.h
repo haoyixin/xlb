@@ -33,6 +33,7 @@ public:
     return pkt;
   }
 
+  // TODO: implement it
   // Allocate multiple packets. Note that this function has no partial success;
   // it allocates either all "count" packets (returns true) or none (false).
   /*
@@ -45,7 +46,7 @@ public:
   // The number of available packets in the pool. Approximate by nature.
   size_t Size() const { return rte_mempool_avail_count(pool_); }
 
-  // Note: It would be ideal to not expose this
+  // TODO: not to expose this
   rte_mempool *pool() { return pool_; }
 
 protected:
@@ -55,7 +56,7 @@ protected:
   // socket_id == -1 means "I don't care".
   PacketPool(size_t capacity = kDefaultCapacity, int socket_id = -1);
 
-  // Child classes are expected to call this function in their constructor
+  // Subclasses are expected to call this function in their constructor
   void PostPopulate();
 
   std::string name_;

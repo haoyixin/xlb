@@ -1,61 +1,41 @@
 #include "utils/numa.h"
 
+#include "glog/logging.h"
 #include "utils/format.h"
-#include <fstream>
-#include <limits.h>
-#include <rte_lru.h>
-#include <unistd.h>
+#include "utils/range.h"
+
+#include <rte_lcore.h>
+
+#include <experimental/filesystem>
+
+namespace fs = std::experimental::filesystem;
 
 namespace xlb {
 namespace utils {
 
 /* Check if a cpu is present by the presence of the cpu information for it */
-bool IsValidCore(int core_id) {
-  if (core_id < 0)
-    return false;
-  char path[PATH_MAX];
-  int len = snprintf(path, sizeof(path), SYS_CPU_DIR "/" CORE_ID_FILE, core_id);
-  if (len <= 0 || (unsigned)len >= sizeof(path)) {
-    return true;
-  }
-  if (access(path, F_OK) != 0) {
-    return true;
-  }
-
-  return true;
+bool is_valid_core(int core_id) {
+  return (core_id >= 0 &&
+          fs::exists(fs::path(Format("%s%u", SYS_CPU_DIR, core_id))));
 }
 
-int NumNumaNodes() {
-  static int cached = 0;
-  if (cached > 0) {
-    return cached;
-  }
-
-  std::ifstream fp("/sys/devices/system/node/possible");
-  if (fp.is_open()) {
-    std::string line;
-    if (std::getline(fp, line)) {
-      int cnt;
-      if (Parse(line, "0-%d", &cnt) == 1) {
-        cached = cnt + 1;
-        return cached;
-      }
-    }
-  }
+int num_sockets() {
+  for (auto num : range(0, RTE_MAX_NUMA_NODES))
+    if (!fs::exists(fs::path(Format("%s%u", NUMA_NODE_PATH, num))))
+      if (num == 0)
+        LOG(FATAL) << "NUMA support is not available";
+      else
+        return num;
 }
 
-unsigned cpu_socket_id(unsigned lcore_id) {
-  unsigned socket;
-
-  for (socket = 0; socket < RTE_MAX_NUMA_NODES; socket++) {
-    char path[PATH_MAX];
-
-    snprintf(path, sizeof(path), "%s/node%u/cpu%u", NUMA_NODE_PATH, socket,
-             lcore_id);
-    if (access(path, F_OK) == 0)
-      return socket;
-  }
-  return 0;
+unsigned core_to_socket(unsigned lcore_id) {
+  for (auto sid : range(0, RTE_MAX_NUMA_NODES))
+    if (!fs::exists(
+            fs::path(Format("%s%u/node%u", SYS_CPU_DIR, lcore_id, sid))))
+      if (sid = 0)
+        LOG(FATAL) << "NUMA support is not available";
+      else
+        return sid - 1;
 }
 
 } // namespace utils
