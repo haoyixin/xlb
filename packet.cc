@@ -172,6 +172,7 @@ std::string Packet::Dump() {
   return dump.str();
 }
 
+/*
 #define check_offset(field)                                    \
   static_assert(                                               \
       offsetof(Packet, field##_) == offsetof(rte_mbuf, field), \
@@ -195,5 +196,6 @@ void Packet::CheckSanity() {
 }
 
 #undef check_offset
+ */
 
 }  // namespace xlb

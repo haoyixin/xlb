@@ -98,9 +98,8 @@ public:
     size_t slot_idx_;
   };
 
-  CuckooMap(size_t reserve_buckets = kInitNumBucket,
-            size_t reserve_entries = kInitNumEntries,
-            int socket = SOCKET_ID_ANY)
+  CuckooMap(int socket = SOCKET_ID_ANY, size_t reserve_buckets = kInitNumBucket,
+            size_t reserve_entries = kInitNumEntries)
       : bucket_mask_(reserve_buckets - 1), num_entries_(0), allocator_(socket),
         buckets_(reserve_buckets, &allocator_),
         entries_(reserve_entries, &allocator_), free_entry_indices_() {

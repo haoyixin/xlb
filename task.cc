@@ -19,7 +19,7 @@ struct task_result Task::operator()(Context *ctx) const {
 
 utils::CuckooMap<std::string, TaskProto> *Task::TaskProtos() {
   if (!task_protos_)
-    task_protos_ = new utils::CuckooMap<std::string, TaskProto>();
+    task_protos_ = new utils::CuckooMap<std::string, TaskProto>(CONFIG.nic.socket);
 
   return task_protos_;
 }

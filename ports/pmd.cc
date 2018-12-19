@@ -10,13 +10,6 @@
 #include "headers/ether.h"
 #include "utils/format.h"
 
-#define _FAILED LOG(FATAL) << "Failed to initial PMDPort: "
-
-#define _RTE_FAILED(_FUNC, ...)                                                \
-  if (rte_##_FUNC(__VA_ARGS__)) {                                              \
-    _FAILED << #_FUNC << " failed";                                            \
-  }
-
 namespace xlb {
 namespace ports {
 
@@ -31,19 +24,14 @@ PMD::~PMD() { DeInit(); }
 static const struct rte_eth_conf
 default_eth_conf(struct rte_eth_dev_info &dev_info) {
   struct rte_eth_conf ret = {0};
-  //  auto &cfg = Config::All();
 
   // TODO: support software offload
-  if (~dev_info.rx_offload_capa &
-      (DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_TCP_CKSUM |
-       DEV_RX_OFFLOAD_VLAN_STRIP))
-    _FAILED << "unsupported device (" << dev_info.driver_name
-            << ") with limited rx offload capability";
+  CHECK_NE(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM, 0);
+  CHECK_NE(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_CKSUM, 0);
+  CHECK_NE(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_VLAN_STRIP, 0);
 
-  if (~dev_info.tx_offload_capa &
-      (DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM))
-    _FAILED << "unsupported device (" << dev_info.driver_name
-            << ") with limited tx offload capability";
+  CHECK_NE(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM, 0);
+  CHECK_NE(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM, 0);
 
   ret.rxmode.mq_mode = ETH_MQ_RX_RSS;
   ret.rxmode.offloads = (DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_TCP_CKSUM |
@@ -64,7 +52,7 @@ default_eth_conf(struct rte_eth_dev_info &dev_info) {
 }
 
 void filter_add(uint16_t port_id, const std::string &dst_ip, queue_t qid) {
-  _RTE_FAILED(eth_dev_filter_supported, port_id, RTE_ETH_FILTER_NTUPLE);
+  CHECK(!rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_NTUPLE));
   // TODO: support RTE_ETH_FILTER_FDIR
 
   struct rte_eth_ntuple_filter ntuple = {0};
@@ -77,15 +65,14 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, queue_t qid) {
   ntuple.priority = 1;
   ntuple.queue = qid;
 
-  _RTE_FAILED(eth_dev_filter_ctrl, port_id, RTE_ETH_FILTER_NTUPLE,
-              RTE_ETH_FILTER_ADD, &ntuple);
+  CHECK(!rte_eth_dev_filter_ctrl(port_id, RTE_ETH_FILTER_NTUPLE,
+                                 RTE_ETH_FILTER_ADD, &ntuple));
 }
 
 void PMD::InitDriver() {
   dpdk_port_t num_dpdk_ports = rte_eth_dev_count();
 
-  if (num_dpdk_ports == 0)
-    _FAILED << "no device have been recognized";
+  CHECK_NE(num_dpdk_ports, 0);
 
   LOG(INFO) << static_cast<int>(num_dpdk_ports)
             << " nics have been recognized:";
@@ -143,19 +130,15 @@ static bool find_dpdk_port_by_pci_addr(const std::string &pci,
 void PMD::Init() {
   dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
 
-  auto cfg = Config::All();
+  uint8_t num_q = CONFIG.worker_cores.size();
 
-  uint8_t num_txq, num_rxq = num_queues[PACKET_DIR_INC] =
-                       num_queues[PACKET_DIR_OUT] = cfg.worker_cores.size();
-
-  if (!find_dpdk_port_by_pci_addr(cfg.nic.pci_address, &ret_port_id))
-    _FAILED << "can not find device by 'nic.pci_address'";
+  CHECK(find_dpdk_port_by_pci_addr(CONFIG.nic.pci_address, &ret_port_id));
 
   struct rte_eth_dev_info dev_info;
   rte_eth_dev_info_get(ret_port_id, &dev_info);
 
   struct rte_eth_conf eth_conf = default_eth_conf(dev_info);
-  _RTE_FAILED(eth_dev_configure, ret_port_id, num_rxq, num_txq, &eth_conf);
+  CHECK(!rte_eth_dev_configure(ret_port_id, num_q, num_q, &eth_conf));
 
   rte_eth_promiscuous_enable(ret_port_id);
 
@@ -170,40 +153,43 @@ void PMD::Init() {
   eth_txconf.offloads = eth_conf.txmode.offloads;
   eth_rxconf.offloads = eth_conf.rxmode.offloads;
 
-  for (auto i : utils::range(0, num_txq)) {
-    _RTE_FAILED(eth_tx_queue_setup, ret_port_id, i, dev_info.tx_desc_lim.nb_max,
-                sid, &eth_txconf);
+  // TODO: configurable queue size
+  for (auto i : utils::range(0, num_q))
+    CHECK(!rte_eth_tx_queue_setup(ret_port_id, i, dev_info.tx_desc_lim.nb_max,
+                                  sid, &eth_txconf));
+
+  for (auto i : utils::range(0, num_q))
+    CHECK(!rte_eth_rx_queue_setup(ret_port_id, i, dev_info.rx_desc_lim.nb_max,
+                                  sid, &eth_rxconf,
+                                  PacketPool::GetPool(sid)->pool()));
+
+  CHECK(!rte_eth_dev_set_vlan_offload(ret_port_id, ETH_VLAN_STRIP_OFFLOAD));
+
+  for (auto i : utils::range(0, CONFIG.nic.local_ips.size())) {
+    filter_add(ret_port_id, CONFIG.nic.local_ips[i],
+               i % CONFIG.worker_cores.size());
   }
 
-  for (auto i : utils::range(0, num_rxq)) {
-    _RTE_FAILED(eth_rx_queue_setup, ret_port_id, i, dev_info.rx_desc_lim.nb_max,
-                sid, &eth_rxconf, PacketPool::GetPool(sid)->pool())
-  }
-
-  _RTE_FAILED(eth_dev_set_vlan_offload, ret_port_id, ETH_VLAN_STRIP_OFFLOAD);
-
-  for (auto i : utils::range(0, cfg.nic.local_ips.size())) {
-    filter_add(ret_port_id, cfg.nic.local_ips[i], i % cfg.worker_cores.size());
-  }
-
-  _RTE_FAILED(eth_dev_start, ret_port_id);
+  CHECK(!rte_eth_dev_start(ret_port_id));
 
   dpdk_port_id_ = ret_port_id;
   node_ = sid;
 
   rte_eth_macaddr_get(dpdk_port_id_,
                       reinterpret_cast<ether_addr *>(conf_.mac_addr.bytes));
+  CHECK(!rte_eth_dev_set_mtu(dpdk_port_id_, CONFIG.nic.mtu));
+
+  conf_.mtu = CONFIG.nic.mtu;
+  conf_.admin_up = true;
 
   // Reset hardware stat counters, as they may still contain previous data
-  _RTE_FAILED(eth_stats_reset, dpdk_port_id_);
+  CHECK(!rte_eth_stats_reset(dpdk_port_id_));
 }
 
 void PMD::DeInit() { rte_eth_dev_stop(dpdk_port_id_); }
 
 bool PMD::GetStats(Port::Stats &stats) {
-  struct rte_eth_stats phy_stats {
-    0
-  };
+  struct rte_eth_stats phy_stats = {0};
 
   int ret = rte_eth_stats_get(dpdk_port_id_, &phy_stats);
   if (ret < 0) {
@@ -232,7 +218,7 @@ bool PMD::GetStats(Port::Stats &stats) {
   packet_dir_t dir = PACKET_DIR_OUT;
   uint64_t odroped = 0;
 
-  for (queue_t qid = 0; qid < num_queues[dir]; qid++)
+  for (queue_t qid = 0; qid < CONFIG.worker_cores.size(); qid++)
     odroped += queue_stats[dir][qid].dropped;
 
   stats.out.dropped = odroped;

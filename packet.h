@@ -164,7 +164,6 @@ public:
 
   // All pointers in pkts must not be nullptr.
   // cnt must be [0, PacketBatch::kMaxBurst]
-
   static inline void Free(Packet **pkts, size_t cnt);
 
   // batch must not be nullptr

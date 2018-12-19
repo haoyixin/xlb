@@ -33,6 +33,9 @@ public:
   void deallocate(T *p, std::size_t n) noexcept { rte_free(p); }
 };
 
+// Stateful allocator support in std is like a shit, so we use pmr in C++ 17.
+// Fortunately, the frequency of calling allocate/do_allocate is not very high
+// in our project, so we can bear the overhead of a virtual function.
 class MemoryResource : public std::experimental::pmr::memory_resource {
 public:
   explicit MemoryResource(int socket) : socket_(socket) {}

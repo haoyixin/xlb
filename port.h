@@ -10,17 +10,12 @@
 #include <memory>
 #include <string>
 
-#include "packet.h"
 #include "headers/ether.h"
+#include "packet.h"
 #include "packet_batch.h"
 #include "utils/common.h"
 
 #define MAX_QUEUES_PER_DIR 32 /* [0, 31] (for each RX/TX) */
-
-/*
-#define DRIVER_FLAG_SELF_INC_STATS 0x0001
-#define DRIVER_FLAG_SELF_OUT_STATS 0x0002
- */
 
 #define MAX_QUEUE_SIZE 4096
 
@@ -59,7 +54,7 @@ public:
 
   struct Conf {
     headers::Ethernet::Address mac_addr;
-    uint32_t mtu;
+    uint16_t mtu;
     bool admin_up;
   };
 
@@ -99,7 +94,8 @@ public:
   const Conf &conf() const { return conf_; }
 
 protected:
-  Port(std::string &name) : name_(name), conf_(), num_queues(), queue_size() {}
+  explicit Port(std::string &name)
+      : name_(name), conf_(), queue_stats() {}
 
   // Current configuration
   Conf conf_;
@@ -111,20 +107,18 @@ private:
 
 public:
   // TODO: more encapsulated
-  queue_t num_queues[PACKET_DIRS];
-  size_t queue_size[PACKET_DIRS];
-
   struct QueueStats queue_stats[PACKET_DIRS][MAX_QUEUES_PER_DIR];
 };
 
 } // namespace xlb
 
-// TODO: support multi port
+// TODO: support multi port, builder ?
 
 #define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
 
 #define DECLARE_PORT(_PORT) extern xlb::ports::_PORT *PORTS_##_PORT
 
-#define PORT_INIT(_PORT, ...) PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ## __VA_ARGS__)
+#define PORT_INIT(_PORT, ...)                                                  \
+  PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ##__VA_ARGS__)
 
 #endif // XLB_PORT_H

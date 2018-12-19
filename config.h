@@ -20,8 +20,7 @@ public:
     std::string gateway;
 
     int mtu;
-    int rxq_size;
-    int txq_size;
+    int socket;
     // TODO: offload & vlan
   };
 
@@ -31,6 +30,7 @@ public:
   int hugepage;
   int packet_pool;
 
+  // TODO: only support one numa node now
   Nic nic;
 
   static const Config &All() { return all_; }
@@ -44,10 +44,12 @@ private:
   static Config all_;
 };
 
+#define CONFIG Config::All()
+
 } // namespace xlb
 
 VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, netmask,
-                 gateway, mtu, rxq_size, txq_size);
+                 gateway, mtu);
 VISITABLE_STRUCT(xlb::Config, grpc_url, worker_cores, hugepage, packet_pool,
                  nic);
 

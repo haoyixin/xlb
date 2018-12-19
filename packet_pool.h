@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "packet.h"
+#include "config.h"
 
 namespace xlb {
 
@@ -13,7 +14,7 @@ class PacketPool {
 public:
   static PacketPool *GetPool(int node) { return pools_[node]; }
 
-  static void CreatePools(size_t capacity = kDefaultCapacity);
+  static void CreatePools(size_t capacity = CONFIG.packet_pool);
 
   virtual ~PacketPool();
 
@@ -28,7 +29,7 @@ public:
       pkt->pkt_len_ = len;
       pkt->data_len_ = len;
 
-      // TODO: sanity check
+      // TODO: check
     }
     return pkt;
   }

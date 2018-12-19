@@ -33,6 +33,10 @@
 
 #include "utils/simd.h"
 
+#include "headers/tcp.h"
+
+#include "utils/lock_less_queue.h"
+
 //#include "ports/pmd.h"
 
 DECLARE_PORT(PMD);
