@@ -32,6 +32,7 @@ public:
   explicit Worker(int core);
 
   WorkerState State() { return state_; }
+  int Id() { return id_; }
   int Core() { return core_; }
   int Socket() { return socket_; }
   Scheduler *Sched() { return scheduler_; }
@@ -61,6 +62,7 @@ private:
   void SetStatus(WorkerState state) { state_ = state; }
 
   WorkerState state_;
+  int id_;
   int core_;
   int socket_;
   cpu_set_t cpu_set_;
@@ -76,6 +78,7 @@ private:
 
   //  static utils::CuckooMap<int, std::thread *> *threads_;
   static utils::CuckooMap<int, Worker> *workers_;
+  static std::atomic<int> num_workers_;
 
   //  static std::shared_mutex mutex_;
   static __thread Worker *current_worker_;

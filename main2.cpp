@@ -39,6 +39,12 @@
 
 //#include "ports/pmd.h"
 
+#include "utils/rcu.h"
+
+#include "control.h"
+
+static std::atomic<int> _i;
+
 DECLARE_PORT(PMD);
 
 int main() {

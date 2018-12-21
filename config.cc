@@ -37,7 +37,8 @@ void Config::validate() {
   for (auto &w : worker_cores)
     CHECK(utils::core_present(w));
 
-  CHECK_NE(grpc_url, "");
+  // TODO: validate legality
+  CHECK_NE(rpc_ip_port, "");
 
   CHECK_NE(nic.name, "");
   CHECK_NE(nic.pci_address, "");

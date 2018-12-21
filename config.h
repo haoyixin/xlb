@@ -24,7 +24,7 @@ public:
     // TODO: offload & vlan
   };
 
-  std::string grpc_url;
+  std::string rpc_ip_port;
   std::vector<int> worker_cores;
 
   int hugepage;
@@ -50,7 +50,7 @@ private:
 
 VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, netmask,
                  gateway, mtu);
-VISITABLE_STRUCT(xlb::Config, grpc_url, worker_cores, hugepage, packet_pool,
+VISITABLE_STRUCT(xlb::Config, rpc_ip_port, worker_cores, hugepage, packet_pool,
                  nic);
 
 #endif // XLB_CONFIG_H

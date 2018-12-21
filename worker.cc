@@ -11,6 +11,8 @@ namespace xlb {
 // utils::CuckooMap<int, std::thread> Worker::threads_;
 utils::CuckooMap<int, Worker> *Worker::workers_;
 
+std::atomic<int> Worker::num_workers_;
+
 // std::shared_mutex Worker::mutex_;
 
 __thread Worker *Worker::current_worker_;
@@ -57,7 +59,8 @@ void *Worker::Run() {
 }
 
 Worker::Worker(int core)
-    : core_(core), state_(WORKER_RUNNING), socket_(utils::core_socket_id(core_)),
+    : id_(num_workers_.fetch_add(1)), core_(core), state_(WORKER_RUNNING),
+      socket_(utils::core_socket_id(core_)),
       packet_pool_(PacketPool::GetPool(socket_)), silent_drops_(0),
       current_tsc_(0), current_ns_(0) {
   CPU_ZERO(&cpu_set_);

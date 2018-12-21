@@ -3,8 +3,11 @@ project(xlb)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(GTEST_SRC googletest/googletest)
+set(GTEST_SRC googletest)
+#set(BRPC_SRC brpc)
+
 add_subdirectory(${GTEST_SRC})
+#add_subdirectory(${BRPC_SRC})
 
 add_compile_options(-O0 -msse4 -mavx)
 
@@ -14,13 +17,18 @@ set(DPDK_LIBS
         "-Wl,--no-whole-archive"
         )
 
-set(SYS_LIBS
-        stdc++fs
+set(3RD_PARTY_LIBS
+        protobuf
+        brpc
         gflags
         glog
+        )
+
+set(SYS_LIBS
+        stdc++fs
         pthread
         numa
-        ${CMAKE_DL_LIBS}
+        dl
         )
 
 set(GTEST_LIBS
@@ -64,8 +72,11 @@ set(OBJS
         headers/ip.cc
         headers/ether.cc
         ports/pmd.cc
+        control.cc
+        pb/xlb.pb.cc
         )
 
+link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
 
 #add_executable(runHashTests tests/hash.cc clibs/c_hash.c)
@@ -75,9 +86,9 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
 #target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
 
 #add_executable(xlb main.cpp)
-add_executable(xlb2 main2.cpp ${OBJS})
+add_executable(xlb3 main3.cc ${OBJS})
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
-target_link_libraries(xlb2 ${DPDK_LIBS} ${SYS_LIBS} ${CMAKE_DL_LIBS})
+target_link_libraries(xlb3 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})

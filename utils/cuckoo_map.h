@@ -237,8 +237,8 @@ public:
 
 protected:
   // Tunable macros
-  static const int kInitNumBucket = 4;
-  static const int kInitNumEntries = 16;
+  static const int kInitNumBucket = 8;
+  static const int kInitNumEntries = 32;
   static const int kEntriesPerBucket = 4; // 4-way set associative
 
   // 4^kMaxCuckooPath buckets will be considered to make a empty slot,

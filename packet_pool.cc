@@ -38,14 +38,14 @@ void PacketPool::CreatePools(size_t capacity) {
   rte_dump_physmem_layout(stdout);
 
   // TODO: only support one numa node now
-  for (int sid = 0; sid < utils::num_sockets(); sid++) {
-    LOG(INFO) << "Creating DpdkPacketPool for " << capacity
-              << " packets on node " << sid;
-    pools_[sid] = new DpdkPacketPool(capacity, sid);
+  //  for (int sid = 0; sid < utils::num_sockets(); sid++) {
+  int sid = CONFIG.nic.socket;
+  LOG(INFO) << "Creating DpdkPacketPool for " << capacity << " packets on node "
+            << sid;
+  pools_[sid] = new DpdkPacketPool(capacity, sid);
 
-    CHECK(pools_[sid]) << "Packet pool allocation on node " << sid
-                       << " failed!";
-  }
+  CHECK(pools_[sid]) << "Packet pool allocation on node " << sid << " failed!";
+  //  }
 }
 
 PacketPool::PacketPool(size_t capacity, int socket_id) {
