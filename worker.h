@@ -1,14 +1,7 @@
 #ifndef XLB_WORKER_H
 #define XLB_WORKER_H
 
-#include <glog/logging.h>
-
-#include <cstdint>
-#include <map>
-#include <shared_mutex>
-#include <string>
 #include <thread>
-#include <type_traits>
 
 #include "utils/common.h"
 #include "utils/cuckoo_map.h"
@@ -16,29 +9,28 @@
 
 namespace xlb {
 
-typedef enum {
-  WORKER_RUNNING = 0,
-  WORKER_QUITTING,
-} WorkerState;
-
 class Scheduler;
 class PacketPool;
-
 class Task;
 
 class Worker {
 public:
+  typedef enum {
+    RUNNING = 0,
+    QUITTING,
+  } State;
+
   Worker() = default;
   explicit Worker(int core);
 
-  WorkerState State() { return state_; }
-  int Id() { return id_; }
-  int Core() { return core_; }
-  int Socket() { return socket_; }
-  Scheduler *Sched() { return scheduler_; }
-  PacketPool *PktPool() { return packet_pool_; }
-  Random *Rand() const { return random_; }
-  std::thread *Thread() const { return thread_; }
+  State state() { return state_; }
+  int id() { return id_; }
+  int core() { return core_; }
+  int socket() { return socket_; }
+  Scheduler *scheduler() { return scheduler_; }
+  PacketPool *packet_pool() { return packet_pool_; }
+  Random *random() const { return random_; }
+  std::thread *thread() const { return thread_; }
 
   uint64_t silent_drops() { return silent_drops_; }
   void set_silent_drops(uint64_t drops) { silent_drops_ = drops; }
@@ -50,7 +42,7 @@ public:
 
   static void Launch(int core);
   static void DestroyAll();
-  static Worker *Current() { return current_worker_; }
+  static Worker *current() { return current_worker_; }
 
 private:
   // The entry point of worker threads.
@@ -59,9 +51,9 @@ private:
   // There is currently no need to modify the worker state from the outside,
   // except for DestroyAll and Launch.
   void Destroy();
-  void SetStatus(WorkerState state) { state_ = state; }
+  void set_state(State state) { state_ = state; }
 
-  WorkerState state_;
+  State state_;
   int id_;
   int core_;
   int socket_;

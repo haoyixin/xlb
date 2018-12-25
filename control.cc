@@ -71,7 +71,7 @@ public:
 void ApiServer::Run() {
   brpc::Server server;
   ControlImpl control_impl;
-  CHECK_EQ(server.AddService(&control_impl, brpc::SERVER_OWNS_SERVICE), 0);
+  CHECK_EQ(server.AddService(&control_impl, brpc::SERVER_DOESNT_OWN_SERVICE), 0);
 
   // TODO: ssl options
   brpc::ServerOptions options;

@@ -39,7 +39,7 @@
 
 //#include "ports/pmd.h"
 
-#include "utils/rcu.h"
+#include "utils/thread_local.h"
 
 #include "control.h"
 

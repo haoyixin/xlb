@@ -188,6 +188,7 @@ void PMD::Init() {
 
 void PMD::DeInit() { rte_eth_dev_stop(dpdk_port_id_); }
 
+// TODO: using bvar
 bool PMD::GetStats(Port::Stats &stats) {
   struct rte_eth_stats phy_stats = {0};
 

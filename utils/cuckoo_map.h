@@ -106,6 +106,7 @@ public:
     // the number of buckets must be a power of 2
     CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
+    // TODO: using utils::range
     for (int i = reserve_entries - 1; i >= 0; --i) {
       free_entry_indices_.push(i);
     }
@@ -510,6 +511,7 @@ protected:
   // Stack of free entries (I don't know why using hugepage here will cause
   // performance degradation.)
   std::stack<EntryIndex> free_entry_indices_;
+  // TODO: using utils::UnsafePool
 };
 
 } // namespace utils

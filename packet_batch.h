@@ -50,7 +50,7 @@ public:
   iterator begin() { return iterator(*this, 0); }
   iterator end() { return iterator(*this, cnt_); }
 
-  int cnt() const { return cnt_; }
+  uint64_t cnt() const { return cnt_; }
   void set_cnt(int cnt) { cnt_ = cnt; }
   void incr_cnt(int n = 1) { cnt_ += n; }
 

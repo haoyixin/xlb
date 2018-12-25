@@ -74,6 +74,8 @@ set(OBJS
         ports/pmd.cc
         control.cc
         pb/xlb.pb.cc
+        utils/thread_local.cc
+        modules/port_inc.cc
         )
 
 link_directories(/usr/local/lib)

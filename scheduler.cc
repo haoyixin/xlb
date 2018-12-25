@@ -1,7 +1,6 @@
 #include "scheduler.h"
 
 #include "module.h"
-#include "task.h"
 #include "worker.h"
 
 namespace xlb {
@@ -10,14 +9,14 @@ void Scheduler::ScheduleLoop() {
   uint64_t now = rdtsc();
 
   this->checkpoint_ = now;
-  Worker::Current()->set_silent_drops(0);
+  Worker::current()->set_silent_drops(0);
 
   Context ctx = {};
-  ctx.wid = Worker::Current()->Core();
+  ctx.wid = Worker::current()->core();
 
   // The main scheduling, running, accounting loop.
   for (uint64_t round = 0;; ++round) {
-    if (Worker::Current()->State() == WORKER_QUITTING)
+    if (Worker::current()->state() == Worker::State::QUITTING)
       break;
 
     ctx.task = Next();
@@ -25,12 +24,12 @@ void Scheduler::ScheduleLoop() {
     ctx.current_ns = this->checkpoint_ * this->ns_per_cycle_;
     ctx.silent_drops = 0;
 
-    Worker::Current()->set_current_tsc(ctx.current_tsc);
-    Worker::Current()->set_current_ns(ctx.current_ns);
+    Worker::current()->set_current_tsc(ctx.current_tsc);
+    Worker::current()->set_current_ns(ctx.current_ns);
 
     auto idle = !ScheduleOnce(&ctx);
 
-    Worker::Current()->incr_silent_drops(ctx.silent_drops);
+    Worker::current()->incr_silent_drops(ctx.silent_drops);
 
     now = rdtsc();
 
@@ -44,7 +43,7 @@ void Scheduler::ScheduleLoop() {
 
 bool DefaultScheduler::ScheduleOnce(Context *ctx) {
   // Run.
-  return (*ctx->task)(ctx).packets != 0;
+  return ctx->task->Run(ctx).packets != 0;
 }
 
 Task *DefaultScheduler::Next() {
@@ -55,7 +54,7 @@ Task *DefaultScheduler::Next() {
 }
 
 DefaultScheduler::DefaultScheduler() : Scheduler() {
-  for (auto &t : *Task::TaskProtos())
+  for (auto &t : *Task::protos())
     tasks_.emplace_back(t.second.Clone());
 
   CHECK_GT(tasks_.size(), 0);

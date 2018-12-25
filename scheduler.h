@@ -15,15 +15,16 @@ class Task;
 class Context;
 
 // TODO: histogram with more metrics
-struct sched_stats {
-  uint64_t cnt_idle;
-  uint64_t cycles_idle;
-};
 
 // The non-instantiable base class for schedulers.  Implements common routines
 // needed for scheduling.
 class Scheduler {
 public:
+  struct Stats {
+    uint64_t cnt_idle;
+    uint64_t cycles_idle;
+  };
+
   virtual ~Scheduler() = default;
 
   // Runs the scheduler loop forever.
@@ -38,7 +39,7 @@ protected:
   virtual bool ScheduleOnce(Context *ctx) = 0;
 
 private:
-  struct sched_stats stats_;
+  Stats stats_;
 
   uint64_t checkpoint_;
 
