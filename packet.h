@@ -3,16 +3,17 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iomanip>
 #include <string>
 #include <type_traits>
 
 #include <rte_atomic.h>
 #include <rte_config.h>
 #include <rte_mbuf.h>
+#include <utils/copy.h>
 #include <utils/simd.h>
 
 #include "xbuf_layout.h"
-#include "packet_batch.h"
 
 /* NOTE: NEVER use rte_pktmbuf_*() directly,
  *       unless you know what you are doing */
@@ -27,11 +28,17 @@ static_assert(XBUF_METADATA_OFF == 192, "Packet metadata offset must by 192");
 static_assert(XBUF_SCRATCHPAD_OFF == 320,
               "Packet scratchpad offset must be 320");
 
-namespace xlb {
+#define check_offset(field)                                                    \
+  static_assert(                                                               \
+      offsetof(Packet, field##_) == offsetof(rte_mbuf, field),                 \
+      "Incompatibility detected between class Packet and struct rte_mbuf")
 
+namespace xlb {
 // For the layout of xbuf, see xbuf_layout.h
 class alignas(64) Packet {
 public:
+  static const size_t kMaxBurst = 32;
+
   Packet() = delete; // Packet must be allocated from PacketPool
 
   Packet *vaddr() const { return vaddr_; }
@@ -139,23 +146,75 @@ public:
 
   // Duplicate a new Packet object, allocated from the same PacketPool as src.
   // Returns nullptr if memory allocation failed
-  static Packet *copy(const Packet *src);
+  static Packet *Copy(const Packet *src) {
+    DCHECK(src->is_linear());
+
+    Packet *dst = reinterpret_cast<Packet *>(rte_pktmbuf_alloc(src->pool_));
+    if (!dst) {
+      return nullptr; // FAIL.
+    }
+
+    utils::CopyInlined(dst->append(src->total_len()), src->head_data(),
+                       src->total_len(), true);
+
+    return dst;
+  }
 
   phys_addr_t dma_addr() { return buf_physaddr_ + data_off_; }
 
-  std::string Dump();
+  std::string Dump() {
+    std::ostringstream dump;
+    Packet *pkt;
+    uint32_t dump_len = total_len();
+    uint32_t nb_segs;
+    uint32_t len;
 
-  void CheckSanity();
+    dump << "refcnt chain: ";
+    for (pkt = this; pkt; pkt = pkt->next_) {
+      dump << pkt->refcnt_ << ' ';
+    }
+    dump << std::endl;
 
-  /*
-  static Packet *from_paddr(phys_addr_t paddr);
-   */
+    dump << "pool chain: ";
+    for (pkt = this; pkt; pkt = pkt->next_) {
+      int i;
+      dump << pkt->pool_ << "(" << ") ";
+      // TODO: pool chain ?
+    }
+    dump << std::endl;
 
-  /*
-  static int mt_offset_to_databuf_offset(xlb::metadata::mt_offset_t offset) {
-    return offset + offsetof(Packet, metadata_) - offsetof(Packet, headroom_);
+    dump << "dump packet at " << this << ", phys=" << buf_physaddr_
+         << ", buf_len=" << buf_len_ << std::endl;
+    dump << "  pkt_len=" << pkt_len_ << ", ol_flags=" << std::hex
+         << mbuf_.ol_flags << ", nb_segs=" << std::dec << nb_segs_
+         << ", in_port=" << mbuf_.port << std::endl;
+
+    nb_segs = nb_segs_;
+    pkt = this;
+    while (pkt && nb_segs != 0) {
+      __rte_mbuf_sanity_check(&pkt->mbuf_, 0);
+
+      dump << "  segment at " << pkt << ", data=" << pkt->head_data()
+           << ", data_len=" << std::dec << unsigned{data_len_} << std::endl;
+
+      len = total_len();
+      if (len > data_len_) {
+        len = data_len_;
+      }
+
+      if (len != 0) {
+        dump << HexDump(head_data(), len);
+      }
+
+      dump_len -= len;
+      pkt = pkt->next_;
+      nb_segs--;
+    }
+
+    return dump.str();
   }
-   */
+
+  // TODO: multi metadata
 
   // pkt may be nullptr
   static void Free(Packet *pkt) {
@@ -164,10 +223,132 @@ public:
 
   // All pointers in pkts must not be nullptr.
   // cnt must be [0, PacketBatch::kMaxBurst]
-  static inline void Free(Packet **pkts, size_t cnt);
+  // for packets to be processed in the fast path, all packets must:
+  // 1. share the same mempool
+  // 2. single segment
+  // 3. reference counter == 1
+  // 4. the data buffer is embedded in the mbuf
+  static inline void Free(Packet **pkts, size_t cnt) {
+    DCHECK(cnt <= kMaxBurst);
 
-  // batch must not be nullptr
-  static void Free(PacketBatch *batch) { Free(batch->pkts(), batch->cnt()); }
+    // rte_mempool_put_bulk() crashes when called with cnt == 0
+    if (unlikely(cnt <= 0)) {
+      return;
+    }
+
+    struct rte_mempool *_pool = pkts[0]->pool_;
+
+    // broadcast
+    __m128i offset = _mm_set1_epi64x(XBUF_HEADROOM_OFF);
+    __m128i info_mask = _mm_set1_epi64x(0x0000ffffffff0000UL);
+    __m128i info_simple = _mm_set1_epi64x(0x0000000100010000UL);
+    __m128i pool = _mm_set1_epi64x((uintptr_t)_pool);
+
+    size_t i;
+
+    for (i = 0; i < (cnt & ~1); i += 2) {
+      auto *mbuf0 = pkts[i];
+      auto *mbuf1 = pkts[i + 1];
+
+      __m128i buf_addrs_derived;
+      __m128i buf_addrs_actual;
+      __m128i info;
+      __m128i pools;
+      __m128i vcmp1, vcmp2, vcmp3;
+
+      __m128i mbuf_ptrs = _mm_set_epi64x(reinterpret_cast<uintptr_t>(mbuf1),
+                                         reinterpret_cast<uintptr_t>(mbuf0));
+
+      buf_addrs_actual = gather_m128i(&mbuf0->buf_addr_, &mbuf1->buf_addr_);
+      buf_addrs_derived = _mm_add_epi64(mbuf_ptrs, offset);
+
+      /* refcnt and nb_segs must be 1 */
+      info = gather_m128i(&mbuf0->rearm_data_, &mbuf1->rearm_data_);
+      info = _mm_and_si128(info, info_mask);
+
+      pools = gather_m128i(&mbuf0->pool_, &mbuf1->pool_);
+
+      vcmp1 = _mm_cmpeq_epi64(buf_addrs_derived, buf_addrs_actual);
+      vcmp2 = _mm_cmpeq_epi64(info, info_simple);
+      vcmp3 = _mm_cmpeq_epi64(pool, pools);
+
+      vcmp1 = _mm_and_si128(vcmp1, vcmp2);
+      vcmp1 = _mm_and_si128(vcmp1, vcmp3);
+
+      if (unlikely(_mm_movemask_epi8(vcmp1) != 0xffff))
+        goto slow_path;
+    }
+
+    if (i < cnt) {
+      const Packet *pkt = pkts[i];
+
+      if (unlikely(pkt->pool_ != _pool || pkt->next_ != nullptr ||
+                   pkt->refcnt_ != 1 || pkt->buf_addr_ != pkt->headroom_)) {
+        goto slow_path;
+      }
+    }
+
+    // When a rte_mbuf is returned to a mempool, the following conditions
+    // must hold:
+    for (i = 0; i < cnt; i++) {
+      Packet *pkt = pkts[i];
+      DCHECK_EQ(pkt->mbuf_.refcnt, 1);
+      DCHECK_EQ(pkt->mbuf_.nb_segs, 1);
+      DCHECK_EQ(pkt->mbuf_.next, static_cast<struct rte_mbuf *>(nullptr));
+    }
+
+    rte_mempool_put_bulk(_pool, reinterpret_cast<void **>(pkts), cnt);
+    return;
+
+  slow_path:
+    for (i = 0; i < cnt; i++) {
+      Free(pkts[i]);
+    }
+  }
+
+  // basically rte_hexdump() from eal_common_hexdump.c
+  static std::string HexDump(const void *buffer, size_t len) {
+    std::ostringstream dump;
+    size_t i, ofs;
+    const char *data = reinterpret_cast<const char *>(buffer);
+
+    dump << "Dump data at [" << buffer << "], len=" << len << std::endl;
+    ofs = 0;
+    while (ofs < len) {
+      dump << std::setfill('0') << std::setw(8) << std::hex << ofs << ":";
+      for (i = 0; ((ofs + i) < len) && (i < 16); i++) {
+        dump << " " << std::setfill('0') << std::setw(2) << std::hex
+             << (data[ofs + i] & 0xFF);
+      }
+      for (; i <= 16; i++) {
+        dump << " | ";
+      }
+      for (i = 0; (ofs < len) && (i < 16); i++, ofs++) {
+        char c = data[ofs];
+        if ((c < ' ') || (c > '~')) {
+          c = '.';
+        }
+        dump << c;
+      }
+      dump << std::endl;
+    }
+    return dump.str();
+  }
+
+  void CheckSanity() {
+    static_assert(offsetof(Packet, mbuf_) == 0, "mbuf_ must be at offset 0");
+    check_offset(buf_addr);
+    check_offset(rearm_data);
+    check_offset(data_off);
+    check_offset(refcnt);
+    check_offset(nb_segs);
+    check_offset(rx_descriptor_fields1);
+    check_offset(pkt_len);
+    check_offset(data_len);
+    check_offset(buf_len);
+    check_offset(pool);
+    check_offset(next);
+  }
 
 private:
   union {
@@ -274,10 +455,9 @@ private:
       };
 
       // Dynamic metadata.
-      // Each attribute value is stored in host order
       char metadata_[XBUF_METADATA];
 
-      // Used for module/driver-specific data
+      // Used for module/port-specific data
       char scratchpad_[XBUF_SCRATCHPAD];
     };
   };
@@ -290,89 +470,6 @@ private:
 
 static_assert(std::is_standard_layout<Packet>::value, "Incorrect class Packet");
 static_assert(sizeof(Packet) == XBUF_SIZE, "Incorrect class Packet");
-
-// for packets to be processed in the fast path, all packets must:
-// 1. share the same mempool
-// 2. single segment
-// 3. reference counter == 1
-// 4. the data buffer is embedded in the mbuf
-inline void Packet::Free(Packet **pkts, size_t cnt) {
-  DCHECK(cnt <= PacketBatch::kMaxBurst);
-
-  // rte_mempool_put_bulk() crashes when called with cnt == 0
-  if (unlikely(cnt <= 0)) {
-    return;
-  }
-
-  struct rte_mempool *_pool = pkts[0]->pool_;
-
-  // broadcast
-  __m128i offset = _mm_set1_epi64x(XBUF_HEADROOM_OFF);
-  __m128i info_mask = _mm_set1_epi64x(0x0000ffffffff0000UL);
-  __m128i info_simple = _mm_set1_epi64x(0x0000000100010000UL);
-  __m128i pool = _mm_set1_epi64x((uintptr_t)_pool);
-
-  size_t i;
-
-  for (i = 0; i < (cnt & ~1); i += 2) {
-    auto *mbuf0 = pkts[i];
-    auto *mbuf1 = pkts[i + 1];
-
-    __m128i buf_addrs_derived;
-    __m128i buf_addrs_actual;
-    __m128i info;
-    __m128i pools;
-    __m128i vcmp1, vcmp2, vcmp3;
-
-    __m128i mbuf_ptrs = _mm_set_epi64x(reinterpret_cast<uintptr_t>(mbuf1),
-                                       reinterpret_cast<uintptr_t>(mbuf0));
-
-    buf_addrs_actual = gather_m128i(&mbuf0->buf_addr_, &mbuf1->buf_addr_);
-    buf_addrs_derived = _mm_add_epi64(mbuf_ptrs, offset);
-
-    /* refcnt and nb_segs must be 1 */
-    info = gather_m128i(&mbuf0->rearm_data_, &mbuf1->rearm_data_);
-    info = _mm_and_si128(info, info_mask);
-
-    pools = gather_m128i(&mbuf0->pool_, &mbuf1->pool_);
-
-    vcmp1 = _mm_cmpeq_epi64(buf_addrs_derived, buf_addrs_actual);
-    vcmp2 = _mm_cmpeq_epi64(info, info_simple);
-    vcmp3 = _mm_cmpeq_epi64(pool, pools);
-
-    vcmp1 = _mm_and_si128(vcmp1, vcmp2);
-    vcmp1 = _mm_and_si128(vcmp1, vcmp3);
-
-    if (unlikely(_mm_movemask_epi8(vcmp1) != 0xffff))
-      goto slow_path;
-  }
-
-  if (i < cnt) {
-    const Packet *pkt = pkts[i];
-
-    if (unlikely(pkt->pool_ != _pool || pkt->next_ != nullptr ||
-                 pkt->refcnt_ != 1 || pkt->buf_addr_ != pkt->headroom_)) {
-      goto slow_path;
-    }
-  }
-
-  // When a rte_mbuf is returned to a mempool, the following conditions
-  // must hold:
-  for (i = 0; i < cnt; i++) {
-    Packet *pkt = pkts[i];
-    DCHECK_EQ(pkt->mbuf_.refcnt, 1);
-    DCHECK_EQ(pkt->mbuf_.nb_segs, 1);
-    DCHECK_EQ(pkt->mbuf_.next, static_cast<struct rte_mbuf *>(nullptr));
-  }
-
-  rte_mempool_put_bulk(_pool, reinterpret_cast<void **>(pkts), cnt);
-  return;
-
-slow_path:
-  for (i = 0; i < cnt; i++) {
-    Free(pkts[i]);
-  }
-}
 
 } // namespace xlb
 

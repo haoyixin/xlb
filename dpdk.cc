@@ -1,7 +1,6 @@
 #include "dpdk.h"
 
-#include <syslog.h>
-#include <unistd.h>
+#include "utils/numa.h"
 
 #include <glog/logging.h>
 #include <rte_config.h>
@@ -9,14 +8,9 @@
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <numa.h>
-#include <string>
-
-#include "utils/numa.h"
+#include <syslog.h>
+#include <unistd.h>
 
 namespace xlb {
 namespace {
@@ -68,10 +62,12 @@ void init_eal(int dpdk_mb_per_socket, int default_core) {
   // TODO: clean useless args
   CmdLineOpts rte_args{
       "xlb",
+      /*
       "--master-lcore",
       std::to_string(RTE_MAX_LCORE - 1),
       "--lcore",
       std::to_string(RTE_MAX_LCORE - 1) + "@" + std::to_string(default_core),
+       */
       // Do not bother with /var/run/.rte_config and .rte_hugepage_info,
       // since we don't want to interfere with other DPDK applications.
       "--no-shconf",
@@ -114,6 +110,8 @@ void init_eal(int dpdk_mb_per_socket, int default_core) {
                << rte_strerror(rte_errno) << ")";
   }
 
+  CHECK_EQ(rte_eal_hpet_init(1), 0);
+
   enable_syslog();
   fclose(stdout);
   stdout = org_stdout;
@@ -121,9 +119,10 @@ void init_eal(int dpdk_mb_per_socket, int default_core) {
   rte_openlog_stream(fopencookie(nullptr, "w", dpdk_log_funcs));
 }
 
-// Returns the last core ID of all cores, as the default core all threads will
-// run on. If the process was run with a limited set of cores (by `taskset`),
+// Returns the last core ID of all cores.
+// If the process was run with a limited set of cores (by `taskset`),
 // the last one among them will be picked.
+// TODO: maybe useless
 int determine_default_core() {
   cpu_set_t set;
 
@@ -144,8 +143,6 @@ int determine_default_core() {
   PLOG(WARNING) << "No core is allowed for the process?";
   return 0;
 }
-
-bool is_initialized = false;
 
 } // namespace
 

@@ -26,8 +26,7 @@ public:
   // the workload to next modules. It can also get per-module specific 'arg'
   // as input. 'batch' is pre-allocated for efficiency.
   // It returns info about generated workloads, 'Task::Result'.
-  virtual struct Task::Result RunTask(Context *ctx, PacketBatch *batch,
-                                      void *arg) {
+  virtual Task::Result RunTask(Context *ctx, PacketBatch *batch, void *arg) {
     CHECK(0);
   }
 
@@ -41,22 +40,19 @@ protected:
   explicit Module(std::string &name) : name_(name), registered_(false) {}
 
   template <typename T>
-  inline void NextModule(T *mod, Context *ctx, PacketBatch *batch) {
+  void NextModule(T *mod, Context *ctx, PacketBatch *batch) {
     static_assert(std::is_base_of<Module, T>::value);
     mod->ProcessBatch(ctx, batch);
   }
 
   // With the contexts('ctx'), drop a packet. Dropped packets will be freed.
   inline void DropPacket(Context *ctx, Packet *pkt) {
-    ctx->task->dead_batch()->add(pkt);
-    if (static_cast<size_t>(ctx->task->dead_batch()->cnt()) >=
-        PacketBatch::kMaxBurst) {
-      deadend(ctx, ctx->task->dead_batch());
-    }
+    ctx->task()->DropPacket(pkt);
+    ctx->incr_silent_drops(1);
   }
 
   // Register a task.
-  void RegisterTask(void *arg) {
+  inline void RegisterTask(void *arg) {
     if (!registered_) {
       Task::protos()->Emplace(name_, this, arg);
       registered_ = true;
@@ -72,6 +68,12 @@ private:
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Module);
 };
+
+// Decyclization of include
+inline Task::Result Task::Run(Context *ctx) const {
+  // Start from the module (task module)
+  return module()->RunTask(ctx, AllocBatch().raw(), arg_);
+}
 
 } // namespace xlb
 

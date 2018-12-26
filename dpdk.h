@@ -3,14 +3,12 @@
 
 namespace xlb {
 
-    /*
-bool IsDpdkInitialized();
-     */
+extern bool is_initialized;
 
 // Initialize DPDK, with the specified amount of hugepage memory.
 // Safe to call multiple times.
 void InitDpdk(int dpdk_mb_per_socket);
 
-}  // namespace xlb
+} // namespace xlb
 
-#endif  // XLB_DPDK_H
+#endif // XLB_DPDK_H

@@ -30,22 +30,19 @@ void InitPacket(rte_mempool *mp, void *, void *mbuf, unsigned index) {
 
 } // namespace
 
-PacketPool *PacketPool::pools_[RTE_MAX_NUMA_NODES];
-
 void PacketPool::CreatePools(size_t capacity) {
   InitDpdk(CONFIG.hugepage);
 
   rte_dump_physmem_layout(stdout);
 
   // TODO: only support one numa node now
-  //  for (int sid = 0; sid < utils::num_sockets(); sid++) {
+
   int sid = CONFIG.nic.socket;
   LOG(INFO) << "Creating DpdkPacketPool for " << capacity << " packets on node "
             << sid;
   pools_[sid] = new DpdkPacketPool(capacity, sid);
 
   CHECK(pools_[sid]) << "Packet pool allocation on node " << sid << " failed!";
-  //  }
 }
 
 PacketPool::PacketPool(size_t capacity, int socket_id) {

@@ -8,8 +8,7 @@
  *  - 0		128	mbuf (XBUF_MBUF == sizeof(struct rte_mbuf))
  *  - 128	64	some read-only/immutable fields
  *  - 192	128	static/dynamic metadata fields
- *  - 320	64	private area for module/driver's internal use
- *                        (currently used for vport RX/TX descriptors)
+ *  - 320	64	private area for module/port's internal use
  *  - 384	128	_headroom (XBUF_HEADROOM == RTE_PKTMBUF_HEADROOM)
  *  - 512	2048	_data (XBUF_DATA)
  *

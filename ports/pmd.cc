@@ -1,25 +1,25 @@
 #include "ports/pmd.h"
 
-#include <headers/ip.h>
-#include <rte_ethdev.h>
-#include <rte_ethdev_pci.h>
+#include "config.h"
 
+#include "headers/ether.h"
+#include "headers/ip.h"
+
+#include "utils/format.h"
 #include "utils/range.h"
 
-#include "config.h"
-#include "headers/ether.h"
-#include "utils/format.h"
+#include <rte_ethdev_pci.h>
 
 namespace xlb {
 namespace ports {
 
 PMD::PMD(std::string &&name)
-    : Port(name), dpdk_port_id_(DPDK_PORT_UNKNOWN), node_(SOCKET_ID_ANY) {
+    : Port(name), dpdk_port_id_(kDpdkPortUnknown) {
   InitDriver();
-  Init();
+  InitPort();
 }
 
-PMD::~PMD() { DeInit(); }
+PMD::~PMD() { Destroy(); }
 
 static const struct rte_eth_conf
 default_eth_conf(struct rte_eth_dev_info &dev_info) {
@@ -127,8 +127,8 @@ static bool find_dpdk_port_by_pci_addr(const std::string &pci,
   return false;
 }
 
-void PMD::Init() {
-  dpdk_port_t ret_port_id = DPDK_PORT_UNKNOWN;
+void PMD::InitPort() {
+  dpdk_port_t ret_port_id = kDpdkPortUnknown;
 
   uint8_t num_q = CONFIG.worker_cores.size();
 
@@ -173,23 +173,21 @@ void PMD::Init() {
   CHECK(!rte_eth_dev_start(ret_port_id));
 
   dpdk_port_id_ = ret_port_id;
-  node_ = sid;
 
   rte_eth_macaddr_get(dpdk_port_id_,
                       reinterpret_cast<ether_addr *>(conf_.mac_addr.bytes));
   CHECK(!rte_eth_dev_set_mtu(dpdk_port_id_, CONFIG.nic.mtu));
 
   conf_.mtu = CONFIG.nic.mtu;
-  conf_.admin_up = true;
 
   // Reset hardware stat counters, as they may still contain previous data
   CHECK(!rte_eth_stats_reset(dpdk_port_id_));
 }
 
-void PMD::DeInit() { rte_eth_dev_stop(dpdk_port_id_); }
+void PMD::Destroy() { rte_eth_dev_stop(dpdk_port_id_); }
 
 // TODO: using bvar
-bool PMD::GetStats(Port::Stats &stats) {
+bool PMD::GetStats(Port::Counters &stats) {
   struct rte_eth_stats phy_stats = {0};
 
   int ret = rte_eth_stats_get(dpdk_port_id_, &phy_stats);
@@ -216,27 +214,17 @@ bool PMD::GetStats(Port::Stats &stats) {
   stats.out.packets = phy_stats.opackets;
   stats.out.bytes = phy_stats.obytes;
 
-  packet_dir_t dir = PACKET_DIR_OUT;
+  Direction dir = OUT;
   uint64_t odroped = 0;
 
+  // As we are loadbalancer, tx drop mean that dropping by application
   for (queue_t qid = 0; qid < CONFIG.worker_cores.size(); qid++)
-    odroped += queue_stats[dir][qid].dropped;
+    odroped += queue_counters_[dir][qid].dropped;
 
   stats.out.dropped = odroped;
 
   return true;
   // TODO: status per queue
-}
-
-int PMD::RecvPackets(queue_t qid, Packet **pkts, int cnt) {
-  return rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
-}
-
-int PMD::SendPackets(queue_t qid, Packet **pkts, int cnt) {
-  int sent = rte_eth_tx_burst(dpdk_port_id_, qid,
-                              reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
-  queue_stats[PACKET_DIR_OUT][qid].dropped += (cnt - sent);
-  return sent;
 }
 
 Port::LinkStatus PMD::GetLinkStatus() {

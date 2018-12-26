@@ -1,13 +1,6 @@
 #ifndef XLB_PORT_H
 #define XLB_PORT_H
 
-#include <glog/logging.h>
-#include <gtest/gtest_prod.h>
-
-#include <cstdint>
-#include <functional>
-#include <map>
-#include <memory>
 #include <string>
 
 #include "headers/ether.h"
@@ -15,36 +8,25 @@
 #include "packet_batch.h"
 #include "utils/common.h"
 
-#define MAX_QUEUES_PER_DIR 32 /* [0, 31] (for each RX/TX) */
-
-#define MAX_QUEUE_SIZE 4096
-
-#define ETH_ALEN 6
-
 namespace xlb {
 
 typedef uint8_t queue_t;
-/* The term RX/TX could be very confusing for a virtual port.
- * Instead, we use the "incoming/outgoing" convention:
- * - incoming: outside -> XLB
- * - outgoing: XLB -> outside */
-typedef enum {
-  PACKET_DIR_INC = 0,
-  PACKET_DIR_OUT = 1,
-  PACKET_DIRS
-} packet_dir_t;
-
-class Port;
-
-struct QueueStats {
-  uint64_t packets;
-  uint64_t dropped;
-  uint64_t errors;
-  uint64_t bytes; // It doesn't include Ethernet overhead
-};
 
 class Port {
 public:
+  /* The term RX/TX could be very confusing for a virtual port.
+   * Instead, we use the "incoming/outgoizng" convention:
+   * - incoming: outside -> XLB
+   * - outgoing: XLB -> outside */
+  typedef enum { INC = 0, OUT = 1, DIRS } Direction;
+
+  struct QueueCounters {
+    uint64_t packets;
+    uint64_t dropped;
+    uint64_t errors;
+    uint64_t bytes; // It doesn't include Ethernet overhead
+  };
+
   struct LinkStatus {
     uint32_t speed;   // speed in mbps: 1000, 40000, etc. 0 for vports
     bool full_duplex; // full-duplex enabled?
@@ -55,15 +37,15 @@ public:
   struct Conf {
     headers::Ethernet::Address mac_addr;
     uint16_t mtu;
-    bool admin_up;
   };
 
-  struct Stats {
-    QueueStats inc;
-    QueueStats out;
+  struct Counters {
+    QueueCounters inc;
+    QueueCounters out;
   };
 
   static const uint32_t kDefaultMtu = 1500;
+  static const uint32_t kMaxQueues = 32;
 
   // overide this section to create a new driver -----------------------------
 
@@ -72,21 +54,10 @@ public:
   virtual int RecvPackets(queue_t qid, Packet **pkts, int cnt) = 0;
   virtual int SendPackets(queue_t qid, Packet **pkts, int cnt) = 0;
 
-  virtual uint64_t GetFlags() const { return 0; }
-
-  virtual LinkStatus GetLinkStatus() {
-    return LinkStatus{
-        .speed = 0,
-        .full_duplex = true,
-        .autoneg = true,
-        .link_up = true,
-    };
-  }
-
-  virtual int UpdateConf(const Conf &) { return -ENOTSUP; }
+  virtual LinkStatus GetLinkStatus() = 0;
 
   // return false if failed
-  virtual bool GetStats(Port::Stats &stats) = 0;
+  virtual bool GetStats(Port::Counters &stats) = 0;
 
   // TODO: reset status
 
@@ -94,8 +65,7 @@ public:
   const Conf &conf() const { return conf_; }
 
 protected:
-  explicit Port(std::string &name)
-      : name_(name), conf_(), queue_stats() {}
+  explicit Port(std::string &name) : name_(name), conf_(), queue_counters_() {}
 
   // Current configuration
   Conf conf_;
@@ -107,7 +77,7 @@ private:
 
 public:
   // TODO: more encapsulated
-  struct QueueStats queue_stats[PACKET_DIRS][MAX_QUEUES_PER_DIR];
+  struct QueueCounters queue_counters_[DIRS][kMaxQueues];
 };
 
 } // namespace xlb

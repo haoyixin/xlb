@@ -1,11 +1,12 @@
 #ifndef XLB_WORKER_H
 #define XLB_WORKER_H
 
-#include <thread>
-
 #include "utils/common.h"
 #include "utils/cuckoo_map.h"
 #include "utils/random.h"
+#include "utils/time.h"
+
+#include <thread>
 
 namespace xlb {
 
@@ -15,6 +16,8 @@ class Task;
 
 class Worker {
 public:
+  using Map = utils::CuckooMap<int, Worker>;
+
   typedef enum {
     RUNNING = 0,
     QUITTING,
@@ -36,9 +39,12 @@ public:
   void set_silent_drops(uint64_t drops) { silent_drops_ = drops; }
   void incr_silent_drops(uint64_t drops) { silent_drops_ += drops; }
   uint64_t current_tsc() const { return current_tsc_; }
-  void set_current_tsc(uint64_t tsc) { current_tsc_ = tsc; }
   uint64_t current_ns() const { return current_ns_; }
-  void set_current_ns(uint64_t ns) { current_ns_ = ns; }
+
+  void update_tsc() {
+    current_tsc_ = rdtsc();
+    current_ns_ = tsc_to_ns(current_ns_);
+  }
 
   static void Launch(int core);
   static void DestroyAll();
@@ -69,7 +75,7 @@ private:
   uint64_t current_ns_;
 
   //  static utils::CuckooMap<int, std::thread *> *threads_;
-  static utils::CuckooMap<int, Worker> *workers_;
+  static Map *workers_;
   static std::atomic<int> num_workers_;
 
   //  static std::shared_mutex mutex_;

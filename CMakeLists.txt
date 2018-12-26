@@ -54,28 +54,23 @@ set(GTEST_INCS
         )
 
 set(OBJS
-        packet.cc
+        global_variable.cc
         packet_pool.cc
-        opts.cc
         dpdk.cc
-        task.cc
-        module.cc
         worker.cc
-        scheduler.cc
         config.cc
+        modules.cc
+        control.cc
+        pb/xlb.pb.cc
         utils/copy.cc
         utils/simd.cc
         utils/numa.cc
         utils/format.cc
-        utils/time.cc
         utils/endian.cc
+        utils/thread_local.cc
         headers/ip.cc
         headers/ether.cc
         ports/pmd.cc
-        control.cc
-        pb/xlb.pb.cc
-        utils/thread_local.cc
-        modules/port_inc.cc
         )
 
 link_directories(/usr/local/lib)
@@ -88,7 +83,7 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
 #target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
 
 #add_executable(xlb main.cpp)
-add_executable(xlb3 main3.cc ${OBJS})
+add_executable(xlb3 tests/main3.cc ${OBJS})
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 

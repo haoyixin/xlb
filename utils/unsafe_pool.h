@@ -5,6 +5,7 @@
 #include "utils/range.h"
 
 #include "functional"
+#include "iostream"
 #include "stack"
 #include "vector"
 
@@ -23,14 +24,16 @@ public:
     ~guard_ptr() { pool_->Put(obj_); }
 
     T *operator->() { return obj_; }
+    T *raw() { return  obj_; }
 
   private:
     UnsafePool *pool_;
     T *obj_;
   };
 
-  explicit UnsafePool(size_t size, int socket = SOCKET_ID_ANY,
-                std::function<void(size_t, T *)> init_func = default_init_func)
+  explicit UnsafePool(
+      size_t size, int socket = SOCKET_ID_ANY,
+      std::function<void(size_t, T *)> init_func = default_init_func)
       : allocator_(socket), entries_(size, &allocator_), free_entry_indices_() {
     T *obj;
     for (auto i : range(1, size + 1)) {

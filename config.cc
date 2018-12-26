@@ -6,17 +6,16 @@
 
 #include "utils/endian.h"
 #include "utils/numa.h"
-#include <glog/logging.h>
-#include <rte_pci.h>
+#include "utils/numa.h"
 
 #include "headers/ether.h"
 #include "headers/ip.h"
 #include "opts.h"
-#include "utils/numa.h"
+
+#include <glog/logging.h>
+#include <rte_pci.h>
 
 namespace xlb {
-
-Config Config::all_;
 
 void Config::error_reporter(std::string str) {
   LOG(FATAL) << "Failed to parse config: " << str;

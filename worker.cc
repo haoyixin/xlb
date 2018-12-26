@@ -3,15 +3,12 @@
 #include <rte_lcore.h>
 #include <glog/logging.h>
 
-#include "module.h"
+#include "packet_pool.h"
 #include "scheduler.h"
 #include "utils/numa.h"
 
 namespace xlb {
 
-utils::CuckooMap<int, Worker> *Worker::workers_;
-std::atomic<int> Worker::num_workers_;
-__thread Worker *Worker::current_worker_;
 
 void Worker::Destroy() { set_state(QUITTING); }
 
@@ -65,7 +62,7 @@ Worker::Worker(int core)
 
 void Worker::Launch(int core) {
   if (!workers_)
-    workers_ = new utils::CuckooMap<int, Worker>(CONFIG.nic.socket);
+    workers_ = new Map(CONFIG.nic.socket);
 
   auto worker = &workers_->Emplace(core, core)->second;
   worker->thread_ = new std::thread([=]() { worker->Run(); });

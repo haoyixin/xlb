@@ -6,23 +6,22 @@
 #include <ctime>
 
 #include <sys/time.h>
+#include <rte_cycles.h>
 
 //TODO: using rte_cycles
 
 extern uint64_t tsc_hz;
 
 static inline uint64_t rdtsc(void) {
-  uint32_t hi, lo;
-  __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
-  return (uint64_t)lo | ((uint64_t)hi << 32);
+  return rte_get_timer_cycles();
 }
 
 static inline uint64_t tsc_to_ns(uint64_t cycles) {
-  return cycles * 1000000000.0 / tsc_hz;
+  return cycles * 1e9 / rte_get_timer_hz();
 }
 
 static inline double tsc_to_us(uint64_t cycles) {
-  return cycles * 1000000.0 / tsc_hz;
+  return cycles * 1e6 / rte_get_timer_hz();
 }
 
 /* Return current time in seconds since the Epoch.

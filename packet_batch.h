@@ -1,11 +1,12 @@
 #ifndef XLB_PACKET_BATCH_H
 #define XLB_PACKET_BATCH_H
 
+#include "packet.h"
 #include "utils/copy.h"
 
 namespace xlb {
 
-class Packet;
+// class Packet;
 
 class PacketBatch {
 public:
@@ -51,8 +52,8 @@ public:
   iterator end() { return iterator(*this, cnt_); }
 
   uint64_t cnt() const { return cnt_; }
-  void set_cnt(int cnt) { cnt_ = cnt; }
-  void incr_cnt(int n = 1) { cnt_ += n; }
+  void set_cnt(size_t cnt) { cnt_ = cnt; }
+  void incr_cnt(size_t n = 1) { cnt_ += n; }
 
   Packet *const *pkts() const { return pkts_; }
   Packet **pkts() { return pkts_; }
@@ -71,18 +72,25 @@ public:
 
   bool empty() { return (cnt_ == 0); }
 
-  bool full() { return (cnt_ == kMaxBurst); }
+  bool full() { return (cnt_ == Packet::kMaxBurst); }
 
   void Copy(const PacketBatch *src) {
     cnt_ = src->cnt_;
     xlb::utils::CopyInlined(pkts_, src->pkts_, cnt_ * sizeof(Packet *));
   }
 
-  static const size_t kMaxBurst = 32;
+  void Free() {
+    if (!empty())
+      Packet::Free(pkts(), cnt());
+
+    clear();
+  }
+
+//  static const size_t kMaxBurst = 32;
 
 private:
-  int cnt_;
-  Packet *pkts_[kMaxBurst];
+  size_t cnt_;
+  Packet *pkts_[Packet::kMaxBurst];
 };
 
 static_assert(std::is_pod<PacketBatch>::value, "PacketBatch is not a POD Type");

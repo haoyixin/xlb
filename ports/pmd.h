@@ -10,8 +10,6 @@
 #include "module.h"
 #include "port.h"
 
-#define DPDK_PORT_UNKNOWN RTE_MAX_ETHPORTS
-
 namespace xlb {
 namespace ports {
 
@@ -20,35 +18,34 @@ typedef uint16_t dpdk_port_t;
 // This driver binds a port to a device using DPDK.
 class PMD final : public Port {
 public:
+  static const int kDpdkPortUnknown = RTE_MAX_ETHPORTS;
+
   PMD(std::string &&name);
   ~PMD();
 
-  bool GetStats(Port::Stats &stats) override;
+  bool GetStats(Port::Counters &stats) override;
 
-  int RecvPackets(queue_t qid, Packet **pkts, int cnt) override;
+  // This should be inline
+  int RecvPackets(queue_t qid, Packet **pkts, int cnt) override {
+    return rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
+  }
 
-  int SendPackets(queue_t qid, Packet **pkts, int cnt) override;
-
-  uint64_t GetFlags() const override { // TODO: offload flags
-    return 0;
+  int SendPackets(queue_t qid, Packet **pkts, int cnt) override {
+    int sent = rte_eth_tx_burst(
+        dpdk_port_id_, qid, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
+    queue_counters_[OUT][qid].dropped += (cnt - sent);
+    return sent;
   }
 
   LinkStatus GetLinkStatus() override;
-
-  //  int UpdateConf(const Conf &conf) override;
-
-  int GetNode() const { return node_; }
 
 private:
   // The DPDK port ID number (set after binding).
   dpdk_port_t dpdk_port_id_;
 
-  // The NUMA node to which device is attached
-  int node_;
-
   static void InitDriver();
-  void Init();
-  void DeInit();
+  void InitPort();
+  void Destroy();
 };
 
 } // namespace ports

@@ -3,8 +3,9 @@
 
 #include "config.h"
 #include "packet_batch.h"
+
 #include "utils/unsafe_pool.h"
-#include <utils/cuckoo_map.h>
+#include "utils/cuckoo_map.h"
 
 namespace xlb {
 
@@ -43,13 +44,21 @@ public:
 
   ~Task() = default;
 
-  Result Run(Context *ctx) const;
+  // This func is define in module.h for decyclization
+  inline Result Run(Context *ctx) const;
 
-  BatchPool::guard_ptr AllocBatch() const { return batch_pool_.GetGuard(); }
+  // RVO maybe has be done by compiler, you should not use it outside stack
+  BatchPool::guard_ptr AllocBatch() const { return batch_pool()->GetGuard(); }
+
+  void DropPacket(Packet *pkt) {
+    dead_batch()->add(pkt);
+    if (dead_batch()->cnt() > Packet::kMaxBurst)
+      dead_batch()->Free();
+  }
 
   Module *module() const { return module_; }
   PacketBatch *dead_batch() const { return &dead_batch_; }
-//  BatchPool *batch_pool() const { return &batch_pool_; }
+  BatchPool *batch_pool() const { return &batch_pool_; }
 
   static ProtoMap *protos() {
     if (!protos_)

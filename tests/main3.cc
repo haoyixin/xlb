@@ -4,10 +4,13 @@
 #include "task.h"
 #include "scheduler.h"
 #include "utils/unsafe_pool.h"
+#include "port.h"
 
 int main() {
+    /*
     FLAGS_alsologtostderr = 1;
     google::InitGoogleLogging("xlb");
     xlb::Config::Load();
     xlb::ApiServer::Run();
+     */
 };

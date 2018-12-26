@@ -20,7 +20,7 @@ public:
 
   Task::Result RunTask(Context *ctx, PacketBatch *batch, void *arg) override {
     batch->set_cnt(port_->RecvPackets(Worker::current()->id(), batch->pkts(),
-                                      PacketBatch::kMaxBurst));
+                                      Packet::kMaxBurst));
     return {.packets = batch->cnt()};
   }
 
