@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(GTEST_SRC googletest)
 #set(BRPC_SRC brpc)
 
-add_subdirectory(${GTEST_SRC})
+#add_subdirectory(${GTEST_SRC})
 #add_subdirectory(${BRPC_SRC})
 
 add_compile_options(-O0 -msse4 -mavx)
@@ -74,7 +74,7 @@ set(OBJS
         )
 
 link_directories(/usr/local/lib)
-include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${GTEST_INC})
+include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS})
 
 #add_executable(runHashTests tests/hash.cc clibs/c_hash.c)
 #target_link_libraries(runHashTests ${GTEST_LIBS})

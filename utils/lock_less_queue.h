@@ -45,22 +45,22 @@ public:
   // error codes: -1 is Quota exceeded. The objects have been enqueued,
   // but the high water mark is exceeded. -2 is not enough room in the
   // ring to enqueue; no object is enqueued.
-  int Push(T obj) override {
+  int push(T obj) override {
     return llring_enqueue(ring_, reinterpret_cast<void *>(obj));
   }
 
-  int Push(T *objs, size_t count) override {
+  int push(T *objs, size_t count) override {
     if (!llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
       return count;
     }
     return 0;
   }
 
-  int Pop(T &obj) override {
+  int pop(T &obj) override {
     return llring_dequeue(ring_, reinterpret_cast<void **>(&obj));
   }
 
-  int Pop(T *objs, size_t count) override {
+  int pop(T *objs, size_t count) override {
     if (!llring_dequeue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
       return count;
     }
@@ -68,16 +68,16 @@ public:
   }
 
   // capacity will be one less than specified
-  size_t Capacity() override { return capacity_; }
+  size_t capacity() override { return capacity_; }
 
-  size_t Size() override { return llring_count(ring_); }
+  size_t size() override { return llring_count(ring_); }
 
-  bool Empty() override { return llring_empty(ring_); }
+  bool empty() override { return llring_empty(ring_); }
 
-  bool Full() override { return llring_full(ring_); }
+  bool full() override { return llring_full(ring_); }
 
   int Resize(size_t new_capacity) override {
-    if (new_capacity <= Size() || (new_capacity & (new_capacity - 1))) {
+    if (new_capacity <= size() || (new_capacity & (new_capacity - 1))) {
       return -1;
     }
 

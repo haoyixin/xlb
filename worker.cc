@@ -1,7 +1,7 @@
 #include "worker.h"
 
-#include <rte_lcore.h>
 #include <glog/logging.h>
+#include <rte_lcore.h>
 
 #include "packet_pool.h"
 #include "scheduler.h"
@@ -9,28 +9,19 @@
 
 namespace xlb {
 
-
-void Worker::Destroy() { set_state(QUITTING); }
-
-void Worker::DestroyAll() {
-  for (auto &[_, w] : *workers_) {
-    w.Destroy();
-  }
-}
-
 /* The entry point of worker threads */
 void *Worker::Run() {
   random_ = new Random();
   rte_thread_set_affinity(&cpu_set_);
 
   /* DPDK lcore ID == worker ID (0, 1, 2, 3, ...) */
-  RTE_PER_LCORE(_lcore_id) = core_;
+  //  RTE_PER_LCORE(_lcore_id) = core_;
 
   CHECK_GE(socket_, 0); // shouldn't be SOCKET_ID_ANY (-1)
 
   CHECK_NOTNULL(packet_pool_);
 
-  current_worker_ = this;
+  //  current_worker_ = this;
 
   LOG(INFO) << "Worker "
             << "(" << this << ") "
@@ -46,13 +37,12 @@ void *Worker::Run() {
 
   delete scheduler_;
   delete random_;
-  delete thread_;
 
   return nullptr;
 }
 
-Worker::Worker(int core)
-    : id_(num_workers_.fetch_add(1)), core_(core), state_(RUNNING),
+Worker::Worker(size_t core)
+    : id_(num_workers_.fetch_add(1)), core_(core),
       socket_(utils::core_socket_id(core_)),
       packet_pool_(PacketPool::GetPool(socket_)), silent_drops_(0),
       current_tsc_(0), current_ns_(0) {
@@ -60,13 +50,16 @@ Worker::Worker(int core)
   CPU_SET(core_, &cpu_set_);
 }
 
-void Worker::Launch(int core) {
-  if (!workers_)
-    workers_ = new Map(CONFIG.nic.socket);
+void Worker::Launch() {
+  for (auto core : CONFIG.worker_cores)
+    threads_.emplace_back([=]() { (new (current()) Worker(core))->Run(); })
+        .detach();
+}
 
-  auto worker = &workers_->Emplace(core, core)->second;
-  worker->thread_ = new std::thread([=]() { worker->Run(); });
-  worker->thread()->detach();
+void Worker::Quit() {
+  quit_ = true;
+  for (auto &thread : threads_)
+    thread.join();
 }
 
 } // namespace xlb

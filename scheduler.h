@@ -47,7 +47,7 @@ public:
 
     // The main scheduling, running, accounting loop.
     for (uint64_t round = 0;; ++round) {
-      if (ctx.worker()->state() == Worker::State::QUITTING)
+      if (Worker::quitting())
         break;
 
       ctx.reset(Next());

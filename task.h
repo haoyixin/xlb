@@ -15,7 +15,7 @@ struct Context;
 // Functor used by a Worker's Scheduler to run a task in a module.
 class Task {
 public:
-  static const size_t kBatchPoolSize = 16;
+  static const size_t kBatchPoolSize = 512;
   using BatchPool = utils::UnsafePool<PacketBatch>;
 
   struct Result {
@@ -48,7 +48,7 @@ public:
   inline Result Run(Context *ctx) const;
 
   // RVO maybe has be done by compiler, you should not use it outside stack
-  BatchPool::guard_ptr AllocBatch() const { return batch_pool()->GetGuard(); }
+  auto AllocBatch() const { return batch_pool()->get_shared(); }
 
   void DropPacket(Packet *pkt) {
     dead_batch()->add(pkt);
@@ -62,9 +62,9 @@ public:
 
   static ProtoMap *protos() {
     if (!protos_)
-      protos_ = new Task::ProtoMap(CONFIG.nic.socket);
+        protos_ = std::make_shared<ProtoMap>(CONFIG.nic.socket);
 
-    return protos_;
+    return protos_.get();
   }
 
 private:
@@ -77,7 +77,7 @@ private:
 
   mutable BatchPool batch_pool_;
 
-  static ProtoMap *protos_;
+  static std::shared_ptr<ProtoMap> protos_;
 };
 
 } // namespace xlb

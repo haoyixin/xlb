@@ -66,7 +66,6 @@ template <typename T> struct range_proxy {
         return copy;
       }
 
-      // Loses commutativity. Iterator-based ranges are simply broken. :-(
       bool operator==(iter const &other) const {
         return step > 0 ? current >= other.current : current < other.current;
       }
@@ -91,7 +90,9 @@ template <typename T> struct range_proxy {
 
   range_proxy(T begin, T end) : begin_(begin), end_(end) {}
 
-  step_range_proxy step(T step) { return {*begin_, *end_, step}; }
+  template <typename S> step_range_proxy step(S step) {
+    return {S(*begin_), S(*end_), step};
+  }
 
   iterator begin() const { return begin_; }
 
@@ -149,7 +150,9 @@ template <typename T> struct infinite_range_proxy {
 
   infinite_range_proxy(T begin) : begin_(begin) {}
 
-  step_range_proxy step(T step) { return step_range_proxy(*begin_, step); }
+  template <typename S> step_range_proxy step(S step) {
+    return step_range_proxy(static_cast<S>(*begin_), step);
+  }
 
   iterator begin() const { return begin_; }
 
@@ -164,7 +167,7 @@ template <typename T> range_proxy<T> range(T begin, T end) {
 }
 
 template <typename T1, typename T2> range_proxy<T2> range(T1 begin, T2 end) {
-  return {static_cast<T2>(begin), end};
+  return {T2(begin), end};
 }
 
 template <typename T> infinite_range_proxy<T> range(T begin) { return {begin}; }

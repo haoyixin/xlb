@@ -40,7 +40,7 @@ void PacketPool::CreatePools(size_t capacity) {
   int sid = CONFIG.nic.socket;
   LOG(INFO) << "Creating DpdkPacketPool for " << capacity << " packets on node "
             << sid;
-  pools_[sid] = new DpdkPacketPool(capacity, sid);
+  pools_[sid] = std::make_shared<DpdkPacketPool>(capacity, sid);
 
   CHECK(pools_[sid]) << "Packet pool allocation on node " << sid << " failed!";
 }
@@ -54,15 +54,9 @@ PacketPool::PacketPool(size_t capacity, int socket_id) {
   pool_ = rte_mempool_create_empty(name_.c_str(), capacity, sizeof(Packet),
                                    capacity > 1024 ? kMaxCacheSize : 0,
                                    sizeof(PoolPrivate), socket_id, 0);
-  if (!pool_) {
-    LOG(FATAL) << "rte_mempool_create() failed: " << rte_strerror(rte_errno)
-               << " (rte_errno=" << rte_errno << ")";
-  }
+  CHECK_NOTNULL(pool_);
 
-  int ret = rte_mempool_set_ops_byname(pool_, "ring_mp_mc", NULL);
-  if (ret < 0) {
-    LOG(FATAL) << "rte_mempool_set_ops_byname() returned " << ret;
-  }
+  CHECK_EQ(rte_mempool_set_ops_byname(pool_, "ring_mp_mc", NULL), 0);
 }
 
 PacketPool::~PacketPool() { rte_mempool_free(pool_); }
@@ -75,26 +69,14 @@ void PacketPool::PostPopulate() {
 
   rte_pktmbuf_pool_init(pool_, &priv.dpdk_priv);
   rte_mempool_obj_iter(pool_, InitPacket, nullptr);
+  CHECK_NE(capacity(), 0);
 
-  LOG(INFO) << name_ << " has been created with " << Capacity() << " packets";
-  if (Capacity() == 0) {
-    LOG(FATAL) << name_ << " has no packets allocated\n"
-               << "Troubleshooting:\n"
-               << "  - Check 'ulimit -l'\n"
-               << "  - Do you have enough memory on the machine?\n"
-               << "  - Maybe memory is too fragmented. Try rebooting.\n";
-  }
+  LOG(INFO) << name_ << " has been created with " << capacity() << " packets";
 }
 
 DpdkPacketPool::DpdkPacketPool(size_t capacity, int socket_id)
     : PacketPool(capacity, socket_id) {
-  int ret = rte_mempool_populate_default(pool_);
-  if (ret < static_cast<ssize_t>(pool_->size)) {
-    LOG(WARNING) << "rte_mempool_populate_default() returned " << ret
-                 << " (rte_errno=" << rte_errno << ", "
-                 << rte_strerror(rte_errno) << ")";
-  }
-
+  CHECK_GE(rte_mempool_populate_default(pool_), 0);
   PostPopulate();
 }
 

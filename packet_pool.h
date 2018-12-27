@@ -1,9 +1,10 @@
 #ifndef XLB_PACKET_POOL_H
 #define XLB_PACKET_POOL_H
 
+#include "config.h"
 #include "memory.h"
 #include "packet.h"
-#include "config.h"
+#include <memory>
 
 namespace xlb {
 
@@ -12,7 +13,7 @@ namespace xlb {
 // Alloc() and Free() are thread-safe.
 class PacketPool {
 public:
-  static PacketPool *GetPool(int node) { return pools_[node]; }
+  static PacketPool *GetPool(int node) { return pools_[node].get(); }
 
   static void CreatePools(size_t capacity = CONFIG.packet_pool);
 
@@ -35,17 +36,15 @@ public:
   }
 
   // TODO: implement it
-  // Allocate multiple packets. Note that this function has no partial success;
-  // it allocates either all "count" packets (returns true) or none (false).
   /*
   bool AllocBulk(Packet **pkts, size_t count, size_t len = 0);
    */
 
   // The number of total packets in the pool. 0 if initialization failed.
-  size_t Capacity() const { return pool_->populated_size; }
+  size_t capacity() const { return pool_->populated_size; }
 
   // The number of available packets in the pool. Approximate by nature.
-  size_t Size() const { return rte_mempool_avail_count(pool_); }
+  size_t size() const { return rte_mempool_avail_count(pool_); }
 
   // TODO: not to expose this
   rte_mempool *pool() { return pool_; }
@@ -65,7 +64,7 @@ protected:
 
 private:
   // Per-node packet pools
-  static PacketPool *pools_[RTE_MAX_NUMA_NODES];
+  static std::shared_ptr<PacketPool> pools_[RTE_MAX_NUMA_NODES];
 
   friend class Packet;
 };

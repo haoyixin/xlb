@@ -138,25 +138,25 @@ public:
     Register(0);
   }
 
-  // Best case is core id equal to tid
+  // Best case is core equal to tid
   void Register(size_t tid) {
     // If our thread didn't call this, tid will be zero (for default usage)
     CHECK_GE(tid, 0);
     tid_ = tid;
 
     auto offset = registered_num_.fetch_add(1);
-    data_pointer_[tid] = data_ + offset;
-    task_queue_pointer_[tid] = task_queue_ + offset;
+    data_pointer_[tid] = &data_[offset];
+    task_queue_pointer_[tid] = &task_queue_[offset];
   }
 
   void Map(VoidFunc void_func) {
     for (auto &queue : task_queue_)
-      queue.Push(new VoidTask(this, void_func));
+      queue.push(new VoidTask(this, void_func));
   }
 
   void MapAndMerge(MapFunc map_func, MergeFunc merge_func) {
     for (auto &queue : task_queue_)
-      queue.Push(new MapTask(this, map_func, merge_func));
+      queue.push(new MapTask(this, map_func, merge_func));
   }
 
   // This will hardly fail, but there may be places that are not well thought
@@ -164,7 +164,7 @@ public:
   void Sync() {
     for (;;) {
       TaskBase *task;
-      if (task_queue_pointer_[tid_]->Pop(task) != 0)
+      if (task_queue_pointer_[tid_]->pop(task) != 0)
         break;
 
       task->Run();

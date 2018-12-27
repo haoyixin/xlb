@@ -34,7 +34,7 @@ void Address::Randomize() {
   Random rng;
 
   for (size_t i = 0; i < Address::kSize; i++) {
-    bytes[i] = rng.Get() & 0xff;
+    bytes[i] = rng.integer() & 0xff;
   }
 
   bytes[0] &= 0xfe;  // not broadcast/multicast

@@ -58,16 +58,10 @@ private:
   std::vector<char *> argv_;
 };
 
-void init_eal(int dpdk_mb_per_socket, int default_core) {
+void init_eal(int dpdk_mb_per_socket) {
   // TODO: clean useless args
   CmdLineOpts rte_args{
       "xlb",
-      /*
-      "--master-lcore",
-      std::to_string(RTE_MAX_LCORE - 1),
-      "--lcore",
-      std::to_string(RTE_MAX_LCORE - 1) + "@" + std::to_string(default_core),
-       */
       // Do not bother with /var/run/.rte_config and .rte_hugepage_info,
       // since we don't want to interfere with other DPDK applications.
       "--no-shconf",
@@ -103,13 +97,7 @@ void init_eal(int dpdk_mb_per_socket, int default_core) {
   stdout = fopencookie(nullptr, "w", dpdk_log_init_funcs);
 
   disable_syslog();
-  int ret = rte_eal_init(rte_args.Argc(), rte_args.Argv());
-  if (ret < 0) {
-    LOG(FATAL) << "rte_eal_init() failed: ret = " << ret
-               << " rte_errno = " << rte_errno << " ("
-               << rte_strerror(rte_errno) << ")";
-  }
-
+  CHECK_GE(rte_eal_init(rte_args.Argc(), rte_args.Argv()), 0);
   CHECK_EQ(rte_eal_hpet_init(1), 0);
 
   enable_syslog();
@@ -150,7 +138,7 @@ void InitDpdk(int dpdk_mb_per_socket) {
   if (!is_initialized) {
     is_initialized = true;
     LOG(INFO) << "Initializing DPDK";
-    init_eal(dpdk_mb_per_socket, determine_default_core());
+    init_eal(dpdk_mb_per_socket);
   }
 }
 

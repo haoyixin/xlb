@@ -5,6 +5,8 @@
 #include "task.h"
 #include "worker.h"
 
+#include <memory>
+
 DEFINE_string(config, "/mnt/haoyixin/CLionProjects/xlb/config.json",
               "Path of config file.");
 
@@ -14,12 +16,14 @@ bool is_initialized = false;
 
 Config Config::all_;
 
-Task::ProtoMap *Task::protos_;
+std::shared_ptr<Task::ProtoMap> Task::protos_;
 
-Worker::Map *Worker::workers_;
-std::atomic<int> Worker::num_workers_;
-__thread Worker *Worker::current_worker_;
+std::atomic<size_t> Worker::num_workers_;
+std::vector<std::thread> Worker::threads_;
+bool Worker::quit_;
 
-PacketPool *PacketPool::pools_[RTE_MAX_NUMA_NODES];
+__thread Worker Worker::current_worker_ = {};
+
+std::shared_ptr<PacketPool> PacketPool::pools_[RTE_MAX_NUMA_NODES];
 
 } // namespace xlb

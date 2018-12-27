@@ -46,10 +46,12 @@ protected:
   }
 
   // With the contexts('ctx'), drop a packet. Dropped packets will be freed.
-  inline void DropPacket(Context *ctx, Packet *pkt) {
+  void DropPacket(Context *ctx, Packet *pkt) {
     ctx->task()->DropPacket(pkt);
     ctx->incr_silent_drops(1);
   }
+
+  auto AllocBatch(Context *ctx) { return ctx->task()->AllocBatch(); }
 
   // Register a task.
   inline void RegisterTask(void *arg) {
@@ -72,7 +74,7 @@ private:
 // Decyclization of include
 inline Task::Result Task::Run(Context *ctx) const {
   // Start from the module (task module)
-  return module()->RunTask(ctx, AllocBatch().raw(), arg_);
+  return module()->RunTask(ctx, AllocBatch().get(), arg_);
 }
 
 } // namespace xlb

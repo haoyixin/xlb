@@ -4,10 +4,11 @@
 #include "utils/allocator.h"
 #include "utils/range.h"
 
-#include "functional"
-#include "iostream"
-#include "stack"
-#include "vector"
+#include "glog/logging.h"
+
+#include <functional>
+#include <stack>
+#include <vector>
 
 namespace xlb {
 namespace utils {
@@ -17,56 +18,39 @@ template <typename T> class UnsafePool {
   static_assert(std::is_pod<T>::value);
 
 public:
-  // simple guard pointer for raii
-  class guard_ptr {
-  public:
-    explicit guard_ptr(UnsafePool *pool, T *obj) : pool_(pool), obj_(obj) {}
-    ~guard_ptr() { pool_->Put(obj_); }
-
-    T *operator->() { return obj_; }
-    T *raw() { return  obj_; }
-
-  private:
-    UnsafePool *pool_;
-    T *obj_;
-  };
-
   explicit UnsafePool(
       size_t size, int socket = SOCKET_ID_ANY,
       std::function<void(size_t, T *)> init_func = default_init_func)
-      : allocator_(socket), entries_(size, &allocator_), free_entry_indices_() {
-    T *obj;
-    for (auto i : range(1, size + 1)) {
-      obj = &entries_[size - i];
-      init_func(size - i, obj);
-      free_entry_indices_.push(obj);
+      : allocator_(socket), entries_(size, &allocator_), free_entry_pointer_() {
+    CHECK_GT(size, 0);
+    for (auto i : range(size - 1, 0).step(-1)) {
+      init_func(i, &entries_[i]);
+      free_entry_pointer_.push(&entries_[i]);
     }
   }
 
   // Get from a empty pool is UB
-  T *Get() {
-    T *obj = free_entry_indices_.top();
-    free_entry_indices_.pop();
+  T *get() {
+    T *obj = free_entry_pointer_.top();
+    free_entry_pointer_.pop();
     return obj;
   }
 
-  guard_ptr GetGuard() {
-    T *obj = free_entry_indices_.top();
-    free_entry_indices_.pop();
-    return guard_ptr(this, obj);
+  auto get_shared() {
+    return std::shared_ptr<T>(get(), [this](T *p) { put(p); });
   }
 
   // Put a pointer outside entries into pool is UB
-  void Put(T *obj) { free_entry_indices_.push(obj); }
+  void put(T *obj) { free_entry_pointer_.push(obj); }
 
-  bool Empty() { return free_entry_indices_.empty(); }
+  bool empty() { return free_entry_pointer_.empty(); }
 
 private:
   static void default_init_func(size_t, T *) {}
 
   MemoryResource allocator_;
   std::vector<T, std::experimental::pmr::polymorphic_allocator<T>> entries_;
-  std::stack<T *> free_entry_indices_;
+  std::stack<T *> free_entry_pointer_;
 };
 
 } // namespace utils

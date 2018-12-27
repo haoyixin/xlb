@@ -202,7 +202,7 @@ VISIT_STRUCT_CXX14_CONSTEXPR auto apply_visitor(V && v) ->
 }
 
 
-// Get value by index (like std::get for tuples)
+// get value by index (like std::get for tuples)
 template <int idx, typename S>
 VISIT_STRUCT_CONSTEXPR auto get(S && s) ->
   typename std::enable_if<
@@ -213,7 +213,7 @@ VISIT_STRUCT_CONSTEXPR auto get(S && s) ->
   return traits::visitable<traits::clean_t<S>>::get_value(std::integral_constant<int, idx>{}, std::forward<S>(s));
 }
 
-// Get name of field, by index
+// get name of field, by index
 template <int idx, typename S>
 VISIT_STRUCT_CONSTEXPR auto get_name() ->
   typename std::enable_if<
@@ -229,7 +229,7 @@ VISIT_STRUCT_CONSTEXPR auto get_name(S &&) -> decltype(get_name<idx, S>()) {
   return get_name<idx, S>();
 }
 
-// Get member pointer, by index
+// get member pointer, by index
 template <int idx, typename S>
 VISIT_STRUCT_CONSTEXPR auto get_pointer() ->
   typename std::enable_if<
@@ -245,7 +245,7 @@ VISIT_STRUCT_CONSTEXPR auto get_pointer(S &&) -> decltype(get_pointer<idx, S>())
   return get_pointer<idx, S>();
 }
 
-// Get member accessor, by index
+// get member accessor, by index
 template <int idx, typename S>
 VISIT_STRUCT_CONSTEXPR auto get_accessor() ->
   typename std::enable_if<
@@ -261,7 +261,7 @@ VISIT_STRUCT_CONSTEXPR auto get_accessor(S &&) -> decltype(get_accessor<idx, S>(
   return get_accessor<idx, S>();
 }
 
-// Get type, by index
+// get type, by index
 template <int idx, typename S>
 struct type_at_s {
   using type_c = decltype(traits::visitable<traits::clean_t<S>>::type_at(std::integral_constant<int, idx>{}));
@@ -271,7 +271,7 @@ struct type_at_s {
 template <int idx, typename S>
 using type_at = typename type_at_s<idx, S>::type;
 
-// Get name of structure
+// get name of structure
 template <typename S>
 VISIT_STRUCT_CONSTEXPR auto get_name() ->
   typename std::enable_if<

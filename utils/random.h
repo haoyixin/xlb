@@ -13,22 +13,22 @@ public:
 
   void SetSeed(uint64_t seed) { this->seed_ = seed; };
 
-  uint32_t Get();
-  uint32_t GetRange(uint32_t range);
-  double GetReal();
-  double GetRealNonzero();
+  uint32_t integer();
+  uint32_t range(uint32_t range);
+  double real();
+  double real_non_zero();
 
 private:
   uint64_t seed_;
 };
 
-inline uint32_t Random::Get() {
+inline uint32_t Random::integer() {
   seed_ = seed_ * 1103515245 + 12345;
   return seed_ >> 32;
 }
 
 /* returns [0, range) with no integer modulo operation */
-inline uint32_t Random::GetRange(uint32_t range) {
+inline uint32_t Random::range(uint32_t range) {
   union {
     uint64_t i;
     double d;
@@ -48,7 +48,7 @@ inline uint32_t Random::GetRange(uint32_t range) {
 }
 
 /* returns [0.0, 1.0) */
-inline double Random::GetReal() {
+inline double Random::real() {
   union {
     uint64_t i;
     double d;
@@ -60,7 +60,7 @@ inline double Random::GetReal() {
 }
 
 /* returns (0.0, 1.0] (note it includes 1.0) */
-inline double Random::GetRealNonzero() {
+inline double Random::real_non_zero() {
   union {
     uint64_t i;
     double d;
