@@ -12,17 +12,19 @@ DEFINE_string(config, "/mnt/haoyixin/CLionProjects/xlb/config.json",
 
 namespace xlb {
 
+// TODO: google style
+
 bool is_initialized = false;
 
 Config Config::all_;
 
-std::shared_ptr<Task::ProtoMap> Task::protos_;
+//std::shared_ptr<Task::ProtoMap> Task::protos_;
 
-std::atomic<size_t> Worker::num_workers_;
-std::vector<std::thread> Worker::threads_;
-bool Worker::quit_;
+//std::atomic<size_t> Worker::num_workers_;
+//std::vector<std::thread> Worker::threads_;
+bool Worker::quitting_;
 
-__thread Worker Worker::current_worker_ = {};
+__thread Worker Worker::current_ = {};
 
 std::shared_ptr<PacketPool> PacketPool::pools_[RTE_MAX_NUMA_NODES];
 

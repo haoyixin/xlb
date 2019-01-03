@@ -1,20 +1,19 @@
 #ifndef XLB_UTILS_LOCK_LESS_QUEUE_H
 #define XLB_UTILS_LOCK_LESS_QUEUE_H
 
+#include <rte_malloc.h>
+#include <rte_memory.h>
+
 #include <glog/logging.h>
 
 #include "3rdparty/llring.h"
-#include "utils/queue.h"
-
-#include <rte_memory.h>
-#include <rte_malloc.h>
 
 namespace xlb {
 namespace utils {
 
 // A wrapper class for llring that extends the abstract class Queue. Takes a
 // template argument T which is the type to be enqueued and dequeued.
-template <typename T> class LockLessQueue final : public Queue<T> {
+template <typename T> class LockLessQueue {
   static_assert(std::is_pointer<T>::value,
                 "LockLessQueue only supports pointer types");
 
@@ -34,7 +33,8 @@ public:
     ring_ = reinterpret_cast<struct llring *>(rte_malloc_socket(
         NULL, llring_bytes_with_slots(capacity_), alignof(llring), socket_));
     CHECK_NOTNULL(ring_);
-    CHECK_EQ(llring_init(ring_, capacity_, single_producer, single_consumer), 0);
+    CHECK_EQ(llring_init(ring_, capacity_, single_producer, single_consumer),
+             0);
   }
 
   virtual ~LockLessQueue() {
@@ -45,22 +45,22 @@ public:
   // error codes: -1 is Quota exceeded. The objects have been enqueued,
   // but the high water mark is exceeded. -2 is not enough room in the
   // ring to enqueue; no object is enqueued.
-  int push(T obj) override {
+  int Push(T obj) {
     return llring_enqueue(ring_, reinterpret_cast<void *>(obj));
   }
 
-  int push(T *objs, size_t count) override {
+  int Push(T *objs, size_t count) {
     if (!llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
       return count;
     }
     return 0;
   }
 
-  int pop(T &obj) override {
+  int Pop(T &obj) {
     return llring_dequeue(ring_, reinterpret_cast<void **>(&obj));
   }
 
-  int pop(T *objs, size_t count) override {
+  int Pop(T *objs, size_t count) {
     if (!llring_dequeue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
       return count;
     }
@@ -68,15 +68,15 @@ public:
   }
 
   // capacity will be one less than specified
-  size_t capacity() override { return capacity_; }
+  size_t capacity() { return capacity_; }
 
-  size_t size() override { return llring_count(ring_); }
+  size_t size() { return llring_count(ring_); }
 
-  bool empty() override { return llring_empty(ring_); }
+  bool empty() { return llring_empty(ring_); }
 
-  bool full() override { return llring_full(ring_); }
+  bool full() { return llring_full(ring_); }
 
-  int Resize(size_t new_capacity) override {
+  int Resize(size_t new_capacity) {
     if (new_capacity <= size() || (new_capacity & (new_capacity - 1))) {
       return -1;
     }

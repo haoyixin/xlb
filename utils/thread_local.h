@@ -1,20 +1,22 @@
 #ifndef XLB_UTILS_RCU_H
 #define XLB_UTILS_RCU_H
 
-#include "cuckoo_map.h"
+#include <functional>
+#include <shared_mutex>
+
+#include <bthread/bthread.h>
+#include <rte_lru.h>
+
 #include "utils/lock_less_queue.h"
 #include "utils/range.h"
-#include <bthread/bthread.h>
-#include <functional>
-#include <rte_lru.h>
-#include <shared_mutex>
+
+#include "cuckoo_map.h"
 
 namespace xlb {
 namespace utils {
 
 template <typename T, typename R> class alignas(64) ThreadLocal {
-
-public:
+private:
   using MapResults = CuckooMap<size_t, R>;
   using TaskFunc = std::function<void()>;
   using VoidFunc = std::function<void(T *)>;
@@ -118,6 +120,7 @@ public:
     MapResults *results_;
   };
 
+public:
   // This must be big enough, we are not currently dealing with queue full
   static const size_t kDefaultOpsLength = 4096;
   static const size_t kMaxThread = 32;
@@ -151,12 +154,12 @@ public:
 
   void Map(VoidFunc void_func) {
     for (auto &queue : task_queue_)
-      queue.push(new VoidTask(this, void_func));
+      queue.Push(new VoidTask(this, void_func));
   }
 
   void MapAndMerge(MapFunc map_func, MergeFunc merge_func) {
     for (auto &queue : task_queue_)
-      queue.push(new MapTask(this, map_func, merge_func));
+      queue.Push(new MapTask(this, map_func, merge_func));
   }
 
   // This will hardly fail, but there may be places that are not well thought
@@ -164,14 +167,14 @@ public:
   void Sync() {
     for (;;) {
       TaskBase *task;
-      if (task_queue_pointer_[tid_]->pop(task) != 0)
+      if (task_queue_pointer_[tid_]->Pop(task) != 0)
         break;
 
       task->Run();
     }
   }
 
-  // TODO: safe may not be here
+  // TODO: safe should not be here
 
   void SyncSafe() {
     std::lock_guard<std::shared_mutex> guard(rwlock_);

@@ -5,30 +5,33 @@
 
 #include "utils/time.h"
 
+namespace xlb {
+namespace utils {
+
 class Random {
   // TODO: using rte_rand
 public:
-  Random() : seed_(rdtsc()) {}
+  Random() : seed_(Rdtsc()) {}
   explicit Random(uint64_t seed) : seed_(seed) {}
 
   void SetSeed(uint64_t seed) { this->seed_ = seed; };
 
-  uint32_t integer();
-  uint32_t range(uint32_t range);
-  double real();
-  double real_non_zero();
+  uint32_t Integer();
+  uint32_t Range(uint32_t range);
+  double Real();
+  double RealNonZero();
 
 private:
   uint64_t seed_;
 };
 
-inline uint32_t Random::integer() {
+inline uint32_t Random::Integer() {
   seed_ = seed_ * 1103515245 + 12345;
   return seed_ >> 32;
 }
 
 /* returns [0, range) with no integer modulo operation */
-inline uint32_t Random::range(uint32_t range) {
+inline uint32_t Random::Range(uint32_t range) {
   union {
     uint64_t i;
     double d;
@@ -48,7 +51,7 @@ inline uint32_t Random::range(uint32_t range) {
 }
 
 /* returns [0.0, 1.0) */
-inline double Random::real() {
+inline double Random::Real() {
   union {
     uint64_t i;
     double d;
@@ -60,7 +63,7 @@ inline double Random::real() {
 }
 
 /* returns (0.0, 1.0] (note it includes 1.0) */
-inline double Random::real_non_zero() {
+inline double Random::RealNonZero() {
   union {
     uint64_t i;
     double d;
@@ -71,4 +74,7 @@ inline double Random::real_non_zero() {
   return 2.0 - tmp.d;
 }
 
-#endif // XLB_UTILS_RANDOM_H_
+} // namespace utils
+} // namespace xlb
+
+#endif // XLB_UTILS_RANDOM_H

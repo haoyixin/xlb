@@ -10,8 +10,6 @@
 
 namespace xlb {
 
-typedef uint8_t queue_t;
-
 class Port {
 public:
   /* The term RX/TX could be very confusing for a virtual port.
@@ -47,12 +45,13 @@ public:
   static const uint32_t kDefaultMtu = 1500;
   static const uint32_t kMaxQueues = 32;
 
-  // overide this section to create a new driver -----------------------------
+  // TODO: more encapsulated
+  struct QueueCounters queue_counters_[DIRS][kMaxQueues];
 
   virtual ~Port() {}
 
-  virtual int RecvPackets(queue_t qid, Packet **pkts, int cnt) = 0;
-  virtual int SendPackets(queue_t qid, Packet **pkts, int cnt) = 0;
+  virtual size_t RecvPackets(uint16_t qid, Packet **pkts, int cnt) = 0;
+  virtual size_t SendPackets(uint16_t qid, Packet **pkts, int cnt) = 0;
 
   virtual LinkStatus GetLinkStatus() = 0;
 
@@ -76,13 +75,11 @@ private:
   DISALLOW_COPY_AND_ASSIGN(Port);
 
 public:
-  // TODO: more encapsulated
-  struct QueueCounters queue_counters_[DIRS][kMaxQueues];
 };
 
 } // namespace xlb
 
-// TODO: support multi port, builder ?
+// TODO: builder ?
 
 #define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
 

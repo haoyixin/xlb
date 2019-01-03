@@ -1,14 +1,14 @@
 #include "ports/pmd.h"
 
-#include "config.h"
-
-#include "headers/ether.h"
-#include "headers/ip.h"
+#include <rte_ethdev_pci.h>
 
 #include "utils/format.h"
 #include "utils/range.h"
 
-#include <rte_ethdev_pci.h>
+#include "headers/ether.h"
+#include "headers/ip.h"
+
+#include "config.h"
 
 namespace xlb {
 namespace ports {
@@ -51,7 +51,7 @@ default_eth_conf(struct rte_eth_dev_info &dev_info) {
   return ret;
 }
 
-void filter_add(uint16_t port_id, const std::string &dst_ip, queue_t qid) {
+void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
   CHECK(!rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_NTUPLE));
   // TODO: support RTE_ETH_FILTER_FDIR
 
@@ -108,6 +108,7 @@ void PMD::InitDriver() {
 // Find a port attached to DPDK by its PCI address.
 // returns true and sets *ret_port_id to the port_id of the port at PCI address
 // "pci" if it is valid and available.
+// TODO: google style
 static bool find_dpdk_port_by_pci_addr(const std::string &pci,
                                        dpdk_port_t *ret_port_id) {
   dpdk_port_t port_id = 0;
@@ -218,7 +219,7 @@ bool PMD::GetStats(Port::Counters &stats) {
   uint64_t odroped = 0;
 
   // As we are loadbalancer, tx drop mean that dropping by application
-  for (queue_t qid = 0; qid < CONFIG.worker_cores.size(); qid++)
+  for (uint16_t qid = 0; qid < CONFIG.worker_cores.size(); qid++)
     odroped += queue_counters_[dir][qid].dropped;
 
   stats.out.dropped = odroped;

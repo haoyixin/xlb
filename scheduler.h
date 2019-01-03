@@ -1,21 +1,17 @@
 #ifndef XLB_SCHEDULER_H
 #define XLB_SCHEDULER_H
 
-#include "context.h"
-// Task::Run() is defined in module.h
-#include "module.h"
-#include "task.h"
-#include "worker.h"
-
-#include "utils/common.h"
-#include "utils/time.h"
-
 #include <vector>
 
-namespace xlb {
+#include "utils/common.h"
+#include "utils/singleton.h"
+#include "utils/time.h"
 
-class Task;
-class Context;
+#include "task.h"
+#include "worker.h"
+#include "types.h"
+
+namespace xlb {
 
 // TODO: histogram with more metrics
 
@@ -23,42 +19,35 @@ class Context;
 // needed for scheduling.
 class Scheduler {
 public:
-  struct Stats {
-    uint64_t cycles_idle;
-    uint64_t cycles_busy;
-  };
-
-  struct Usage {
-    // this is 5 seconds by default
-    // TODO: maybe this should be in CONFIG
-    static const uint64_t kDefaultInterval = 5e9;
-    double ratio;
-    uint64_t checkpoint;
-  };
-
   virtual ~Scheduler() = default;
 
   // Runs the scheduler loop forever.
   void ScheduleLoop() {
-    Context ctx(Worker::current());
+    Context ctx = {
+        .task = nullptr, .worker = Worker::current(), .silent_drops = 0};
+
     bool idle = false;
     uint64_t cycles = 0;
-    checkpoint_ = usage_.checkpoint = ctx.worker()->current_tsc();
+    checkpoint_ = usage_.checkpoint = ctx.worker->current_tsc();
 
     // The main scheduling, running, accounting loop.
     for (uint64_t round = 0;; ++round) {
       if (Worker::quitting())
         break;
 
-      ctx.reset(Next());
-      cycles = ctx.worker()->current_tsc() - checkpoint_;
+      ctx.task = Next();
+      ctx.worker->UpdateTsc();
+      ctx.worker->IncrSilentDrops(ctx.silent_drops);
+      ctx.silent_drops = 0;
+
+      cycles = ctx.worker->current_tsc() - checkpoint_;
 
       if (idle)
         stats_.cycles_idle += cycles;
       else
         stats_.cycles_busy += cycles;
 
-      checkpoint_ = ctx.worker()->current_tsc();
+      checkpoint_ = ctx.worker->current_tsc();
       if (checkpoint_ - usage_.checkpoint > Usage::kDefaultInterval) {
         usage_.ratio = double(stats_.cycles_busy) /
                        (stats_.cycles_busy + stats_.cycles_idle);
@@ -85,6 +74,19 @@ protected:
   virtual bool ScheduleOnce(Context *ctx) = 0;
 
 private:
+  struct Stats {
+    uint64_t cycles_idle;
+    uint64_t cycles_busy;
+  };
+
+  struct Usage {
+    // this is 5 seconds by default
+    // TODO: maybe this should be in CONFIG
+    static const uint64_t kDefaultInterval = 5e9;
+    double ratio;
+    uint64_t checkpoint;
+  };
+
   Stats stats_;
   Usage usage_;
 
@@ -98,8 +100,8 @@ private:
 class DefaultScheduler : public Scheduler {
 public:
   explicit DefaultScheduler() : Scheduler() {
-    for (auto &t : *Task::protos())
-      tasks_.emplace_back(t.second.Clone());
+    for (auto &t : utils::Singleton<TaskFuncs>::Get())
+      tasks_.emplace_back(t);
 
     CHECK_GT(tasks_.size(), 0);
 
@@ -109,7 +111,7 @@ public:
   ~DefaultScheduler() override = default;
 
   bool ScheduleOnce(Context *ctx) override {
-    return ctx->task()->Run(ctx).packets != 0;
+    return ctx->task->Run(ctx).packets != 0;
   }
 
   Task *Next() override {

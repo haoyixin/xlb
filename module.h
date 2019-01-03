@@ -9,35 +9,25 @@
 
 #include "utils/cuckoo_map.h"
 
+#include <functional>
 #include <string>
+#include <utils/singleton.h>
+
+#include "types.h"
 
 namespace xlb {
 
 class Module {
-  // overide this section to create a new module -----------------------------
 public:
-  virtual ~Module() {
-    if (registered_)
-      Task::protos()->Remove(name_);
-  }
-
-  // Initiates a new task with 'ctx', generating a new workload (a set of
-  // packets in 'batch') and forward the workloads to be processed and forward
-  // the workload to next modules. It can also get per-module specific 'arg'
-  // as input. 'batch' is pre-allocated for efficiency.
-  // It returns info about generated workloads, 'Task::Result'.
-  virtual Task::Result RunTask(Context *ctx, PacketBatch *batch, void *arg) {
-    CHECK(0);
-  }
+  virtual ~Module() = default;
 
   // Process a set of packets in packet batch with the contexts 'ctx'.
   // A module should handle all packets in a batch properly as follows:
   // 1) forwards to the next modules, or 2) free
-  virtual void ProcessBatch(Context *ctx, PacketBatch *batch) { CHECK(0); }
+  virtual void ProcessBatch(Context *ctx, PacketBatch *batch) = 0;
 
-  // -------------------------------------------------------------------------
 protected:
-  explicit Module(std::string &name) : name_(name), registered_(false) {}
+  explicit Module(std::string &name) : name_(name) {}
 
   template <typename T>
   void NextModule(T *mod, Context *ctx, PacketBatch *batch) {
@@ -45,37 +35,33 @@ protected:
     mod->ProcessBatch(ctx, batch);
   }
 
+  // Register a new task by a ModuleFunc, the latter should generate a set of
+  // packets in 'batch' and forward them to next modules by NextModule. It can
+  // also get per-task specific 'arg' as input. 'batch' is pre-allocated for
+  // efficiency. It returns info about generated workloads, 'TaskResult'.
+  template <typename T>
+  void RegisterTask(ModuleFunc<T> module_func, void *arg) {
+    static_assert(std::is_base_of<Module, T>::value);
+    utils::Singleton<TaskFuncs>::Get().emplace_back(
+        std::bind(module_func, static_cast<T *>(this), std::placeholders::_1,
+                  std::placeholders::_2, arg));
+  }
+
   // With the contexts('ctx'), drop a packet. Dropped packets will be freed.
   void DropPacket(Context *ctx, Packet *pkt) {
-    ctx->task()->DropPacket(pkt);
-    ctx->incr_silent_drops(1);
+    ctx->task->DropPacket(pkt);
+    ctx->silent_drops += 1;
   }
 
-  auto AllocBatch(Context *ctx) { return ctx->task()->AllocBatch(); }
-
-  // Register a task.
-  inline void RegisterTask(void *arg) {
-    if (!registered_) {
-      Task::protos()->Emplace(name_, this, arg);
-      registered_ = true;
-    }
-  }
+  auto AllocBatch(Context *ctx) { return ctx->task->AllocBatch(); }
 
   const std::string &name() const { return name_; }
 
 private:
   std::string name_;
 
-  bool registered_;
-
   DISALLOW_IMPLICIT_CONSTRUCTORS(Module);
 };
-
-// Decyclization of include
-inline Task::Result Task::Run(Context *ctx) const {
-  // Start from the module (task module)
-  return module()->RunTask(ctx, AllocBatch().get(), arg_);
-}
 
 } // namespace xlb
 

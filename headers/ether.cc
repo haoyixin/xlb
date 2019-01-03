@@ -31,10 +31,10 @@ std::string Address::ToString() const {
 }
 
 void Address::Randomize() {
-  Random rng;
+  utils::Random rng;
 
   for (size_t i = 0; i < Address::kSize; i++) {
-    bytes[i] = rng.integer() & 0xff;
+    bytes[i] = rng.Integer() & 0xff;
   }
 
   bytes[0] &= 0xfe;  // not broadcast/multicast

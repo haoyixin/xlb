@@ -26,11 +26,11 @@ public:
   bool GetStats(Port::Counters &stats) override;
 
   // This should be inline
-  int RecvPackets(queue_t qid, Packet **pkts, int cnt) override {
+  size_t RecvPackets(uint16_t qid, Packet **pkts, int cnt) override {
     return rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
   }
 
-  int SendPackets(queue_t qid, Packet **pkts, int cnt) override {
+  size_t SendPackets(uint16_t qid, Packet **pkts, int cnt) override {
     int sent = rte_eth_tx_burst(
         dpdk_port_id_, qid, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
     queue_counters_[OUT][qid].dropped += (cnt - sent);

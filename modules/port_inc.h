@@ -1,9 +1,9 @@
 #ifndef XLB_MODULES_PORT_INC_H
 #define XLB_MODULES_PORT_INC_H
 
+#include "ports/pmd.h"
 #include "module.h"
 #include "port.h"
-#include "ports/pmd.h"
 #include "worker.h"
 
 DECLARE_PORT(PMD);
@@ -11,15 +11,15 @@ DECLARE_PORT(PMD);
 namespace xlb {
 namespace modules {
 
-class PortInc final : Module {
+class PortInc final : public Module {
 
 public:
   PortInc(std::string &name, Port *port) : Module(name), port_(port) {
-    RegisterTask(nullptr);
+    RegisterTask(&PortInc::RecvTask, nullptr);
   }
 
-  Task::Result RunTask(Context *ctx, PacketBatch *batch, void *arg) override {
-    batch->set_cnt(port_->RecvPackets(Worker::current()->id(), batch->pkts(),
+  TaskResult RecvTask(Context *ctx, PacketBatch *batch, void *arg) {
+    batch->set_cnt(port_->RecvPackets(ctx->worker->current()->id(), batch->pkts(),
                                       Packet::kMaxBurst));
     return {.packets = batch->cnt()};
   }

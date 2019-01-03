@@ -18,6 +18,8 @@ template <typename T> class UnsafePool {
   static_assert(std::is_pod<T>::value);
 
 public:
+  using Shared = std::shared_ptr<T>;
+
   explicit UnsafePool(
       size_t size, int socket = SOCKET_ID_ANY,
       std::function<void(size_t, T *)> init_func = default_init_func)
@@ -30,14 +32,14 @@ public:
   }
 
   // Get from a empty pool is UB
-  T *get() {
+  T *Get() {
     T *obj = free_entry_pointer_.top();
     free_entry_pointer_.pop();
     return obj;
   }
 
-  auto get_shared() {
-    return std::shared_ptr<T>(get(), [this](T *p) { put(p); });
+  Shared GetShared() {
+    return Shared(Get(), [this](T *p) { put(p); });
   }
 
   // Put a pointer outside entries into pool is UB
