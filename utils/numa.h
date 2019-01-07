@@ -1,24 +1,31 @@
 #ifndef XLB_UTILS_NUMA_H
 #define XLB_UTILS_NUMA_H
 
+#include <set>
 #include <string>
-
-#define CORE_PATH "/sys/devices/system/cpu/cpu%u"
-#define NUMA_PATH "/sys/devices/system/node/node%u"
-#define CORE_SOCKET_PATH "/sys/devices/system/cpu/cpu%u/node%u"
-#define PCI_NUMA_PATH "/sys/bus/pci/devices/%s/numa_node"
+#include <vector>
+#include <optional>
 
 namespace xlb {
 namespace utils {
 
-/* Check if a cpu is present by the presence of the cpu information for it */
-bool core_present(int core_id);
+struct Node {
+  uint32_t id;
+  std::set<uint32_t> logical_cpus;
+  std::set<std::string> pci_devices;
+  std::vector<uint32_t> distance;
+};
 
-int num_sockets();
+using TopologyBase = std::vector<Node>;
 
-unsigned core_socket_id(unsigned core_id);
+inline bool operator<(Node const &lhs, Node const &rhs) noexcept {
+  return lhs.id < rhs.id;
+}
 
-unsigned pci_socket_id(std::string &pci_addr);
+TopologyBase &Topology();
+
+std::optional<uint32_t> CoreSocketId(uint32_t core_id);
+std::optional<uint32_t> PciSocketId(const std::string &pci_addr);
 
 } // namespace utils
 } // namespace xlb

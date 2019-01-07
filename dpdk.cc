@@ -1,16 +1,17 @@
 #include "dpdk.h"
 
-#include "utils/numa.h"
-
-#include <glog/logging.h>
-#include <rte_config.h>
-#include <rte_cycles.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-
 #include <cstring>
+#include <string>
 #include <syslog.h>
 #include <unistd.h>
+
+#include <rte_cycles.h>
+#include <rte_eal.h>
+
+#include <glog/logging.h>
+
+#include "utils/numa.h"
+#include "utils/boost.h"
 
 namespace xlb {
 namespace {
@@ -67,10 +68,12 @@ void init_eal(int dpdk_mb_per_socket) {
       "--no-shconf",
   };
 
-  std::string opt_socket_mem = std::to_string(dpdk_mb_per_socket);
-  int n = utils::num_sockets();
-  for (int i = 1; i < n; i++) {
-    opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
+  std::string opt_socket_mem;
+  for (auto i : utils::irange(utils::Topology().size())) {
+    if (i == 0)
+      opt_socket_mem += std::to_string(dpdk_mb_per_socket);
+    else
+      opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
   }
 
   rte_args.Append({"--socket-mem", opt_socket_mem});

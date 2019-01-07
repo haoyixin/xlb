@@ -64,6 +64,7 @@ protected:
 
 private:
   // Per-node packet pools
+  // TODO: singleton
   static std::shared_ptr<PacketPool> pools_[RTE_MAX_NUMA_NODES];
 
   friend class Packet;

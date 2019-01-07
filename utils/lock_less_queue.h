@@ -8,6 +8,7 @@
 
 #include "3rdparty/llring.h"
 
+
 namespace xlb {
 namespace utils {
 
@@ -68,16 +69,16 @@ public:
   }
 
   // capacity will be one less than specified
-  size_t capacity() { return capacity_; }
+  size_t Capacity() { return capacity_; }
 
-  size_t size() { return llring_count(ring_); }
+  size_t Size() { return llring_count(ring_); }
 
-  bool empty() { return llring_empty(ring_); }
+  bool Empty() { return llring_empty(ring_); }
 
-  bool full() { return llring_full(ring_); }
+  bool Full() { return llring_full(ring_); }
 
   int Resize(size_t new_capacity) {
-    if (new_capacity <= size() || (new_capacity & (new_capacity - 1))) {
+    if (new_capacity <= Size() || (new_capacity & (new_capacity - 1))) {
       return -1;
     }
 

@@ -44,9 +44,8 @@ void *Worker::Run() {
 
 Worker::Worker(size_t core)
     : id_(utils::Singleton<Counter>::Get().fetch_add(1)), core_(core),
-      socket_(utils::core_socket_id(core_)),
-      packet_pool_(PacketPool::GetPool(socket_)), silent_drops_(0),
-      current_tsc_(0), current_ns_(0) {
+      socket_(CONFIG.nic.socket), packet_pool_(PacketPool::GetPool(socket_)),
+      silent_drops_(0), current_tsc_(0), current_ns_(0) {
   CPU_ZERO(&cpu_set_);
   CPU_SET(core_, &cpu_set_);
 }

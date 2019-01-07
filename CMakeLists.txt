@@ -22,6 +22,8 @@ set(3RD_PARTY_LIBS
         brpc
         gflags
         glog
+        boost_fiber_numa
+        boost_fiber
         )
 
 set(SYS_LIBS
@@ -84,6 +86,7 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS})
 
 #add_executable(xlb main.cpp)
 add_executable(xlb3 tests/main3.cc ${OBJS})
+add_executable(xlb4 tests/main4.cc)
 #add_executable(xlb3 tests/main3.cc)
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)

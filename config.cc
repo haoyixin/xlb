@@ -4,16 +4,20 @@
 
 #include "3rdparty/configuru.hpp"
 
+#include "utils/boost.h"
 #include "utils/endian.h"
-#include "utils/numa.h"
 #include "utils/numa.h"
 
 #include "headers/ether.h"
 #include "headers/ip.h"
 #include "opts.h"
 
+#include <boost/algorithm/cxx11/any_of.hpp>
+#include <boost/fiber/numa/topology.hpp>
 #include <glog/logging.h>
 #include <rte_pci.h>
+
+namespace al = boost::algorithm;
 
 namespace xlb {
 
@@ -33,8 +37,17 @@ void Config::validate() {
   CHECK(!worker_cores.empty());
   CHECK_LE(worker_cores.size(), 32);
 
-  for (auto &w : worker_cores)
-    CHECK(utils::core_present(w));
+  //  auto topo = utils::Topology();
+
+  auto socket = utils::PciSocketId(nic.pci_address);
+  CHECK(socket.has_value());
+  nic.socket = socket.value();
+
+  for (auto &w : worker_cores) {
+    auto socket_id = utils::CoreSocketId(w);
+    CHECK(socket_id.has_value());
+    CHECK_EQ(nic.socket, socket_id.value());
+  }
 
   // TODO: validate legality
   CHECK_NE(rpc_ip_port, "");
@@ -63,15 +76,6 @@ void Config::validate() {
 
   for (auto &ip : nic.local_ips)
     CHECK(headers::ParseIpv4Address(ip, &_dummy));
-
-  struct rte_pci_addr pci = {0};
-  CHECK(!eal_parse_pci_DomBDF(nic.pci_address.c_str(), &pci) ||
-        !eal_parse_pci_BDF(nic.pci_address.c_str(), &pci));
-
-  nic.socket = utils::pci_socket_id(nic.pci_address);
-
-  for (auto &w : worker_cores)
-    CHECK_EQ(utils::core_socket_id(w), nic.socket);
 }
 
 } // namespace xlb

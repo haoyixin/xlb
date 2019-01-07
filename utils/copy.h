@@ -1,10 +1,10 @@
 #ifndef XLB_UTILS_COPY_H_
 #define XLB_UTILS_COPY_H_
 
-#include <glog/logging.h>
 #include <x86intrin.h>
-
 #include <cstring>
+
+#include <glog/logging.h>
 
 #include "common.h"
 

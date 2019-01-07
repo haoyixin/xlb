@@ -20,30 +20,7 @@ public:
   static const size_t kBatchPoolSize = 512;
   using BatchPool = utils::UnsafePool<PacketBatch>;
 
-  //  struct Result {
-  //    uint64_t packets;
-  //  };
-  //
-  //  class Proto {
-  //  public:
-  //    Proto() = default;
-  //    Proto(Module *m, void *arg) : modules_(m), arg_(arg) {}
-  //    Task Clone() { return Task(modules_, arg_); }
-  //
-  //  private:
-  //    Module *modules_;
-  //    void *arg_;
-  //  };
-
-  //  using ProtoMap = utils::CuckooMap<std::string, Proto>;
-
   Task() = default;
-  // When this task is scheduled it will execute 'm' with 'arg'.
-  //  Task(Module *m, void *arg)
-  //      : module_(m), arg_(arg), batch_pool_(kBatchPoolSize,
-  //      CONFIG.nic.socket) {
-  //    dead_batch_.clear();
-  //  }
 
   Task(TaskFunc task_func)
       : task_func_(task_func), batch_pool_(kBatchPoolSize, CONFIG.nic.socket) {
@@ -65,28 +42,14 @@ public:
       dead_batch_.Free();
   }
 
-  //  PacketBatch *dead_batch() const { return &dead_batch_; }
-  //  BatchPool *batch_pool() const { return &batch_pool_; }
-
-  //  static ProtoMap *protos() {
-  //    if (!protos_)
-  //      protos_ = std::make_shared<ProtoMap>(CONFIG.nic.socket);
-  //
-  //    return protos_.get();
-  //  }
-
 private:
   // Used by Run()
-  //  Module *module_;
   TaskFunc task_func_;
-  // Auxiliary value passed to Module::RunTask()
-  //  void *arg_;
+
   // A packet batch for storing packets to free
   mutable PacketBatch dead_batch_;
 
   mutable BatchPool batch_pool_;
-
-  //  static std::shared_ptr<ProtoMap> protos_;
 };
 
 } // namespace xlb
