@@ -1,8 +1,9 @@
 #ifndef XLB_UTILS_CUCKOO_MAP_H
 #define XLB_UTILS_CUCKOO_MAP_H
 
-#include <algorithm>
+#include <array>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <stack>
 #include <type_traits>
@@ -13,19 +14,20 @@
 
 #include "common.h"
 #include "utils/allocator.h"
+#include "utils/boost.h"
 
 namespace xlb {
 namespace utils {
 
-typedef uint32_t HashResult;
-typedef uint32_t EntryIndex;
-
-// A Hash table implementation using cuckoo hashing
+// A Hash table implementation using cuckoo hashing on hugepage
+// Note: this is not thread-safe
 template <typename K, typename V, typename H = std::hash<K>,
           typename E = std::equal_to<K>>
 class CuckooMap {
 public:
-  typedef std::pair<K, V> Entry;
+  using Entry = std::pair<K, V>;
+  using HashResult = uint32_t;
+  using EntryIndex = uint32_t;
 
   class iterator {
   public:
@@ -106,10 +108,8 @@ public:
     // the number of buckets must be a power of 2
     CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
-    // TODO: using utils::range
-    for (int i = reserve_entries - 1; i >= 0; --i) {
+    for (auto i : irange(int(reserve_entries - 1), -1, -1))
       free_entry_indices_.push(i);
-    }
   }
 
   // Not allowing copying for now
@@ -122,38 +122,6 @@ public:
 
   iterator begin() { return iterator(*this, 0, 0); }
   iterator end() { return iterator(*this, buckets_.size(), 0); }
-
-  template <typename... Args>
-  Entry *DoEmplace(const K &key, const H &hasher, const E &eq,
-                   Args &&... args) {
-    Entry *entry;
-    HashResult primary = Hash(key, hasher);
-
-    EntryIndex idx = FindWithHash(primary, key, eq);
-    if (idx != kInvalidEntryIdx) {
-      entry = &entries_[idx];
-      new (&entry->second) V(std::forward<Args>(args)...);
-      return entry;
-    }
-
-    HashResult secondary = HashSecondary(primary);
-
-    int trials = 0;
-
-    while ((entry = EmplaceEntry(primary, secondary, key, hasher,
-                                 std::forward<Args>(args)...)) == nullptr) {
-      if (++trials >= 3) {
-        LOG_FIRST_N(WARNING, 1)
-            << "CuckooMap: Excessive hash colision detected:\n";
-        return nullptr;
-      }
-
-      // expand the table as the last resort
-      ExpandBuckets<std::conditional_t<std::is_move_constructible<V>::value,
-                                       V &&, const V &>>(hasher, eq);
-    }
-    return entry;
-  }
 
   // Insert/update a key value pair
   // On success returns a pointer to the inserted entry, nullptr otherwise.
@@ -228,9 +196,8 @@ public:
     buckets_.resize(kInitNumBucket);
     entries_.resize(kInitNumEntries);
 
-    for (int i = kInitNumEntries - 1; i >= 0; --i) {
+    for (auto i : irange(int(kInitNumEntries - 1), -1, -1))
       free_entry_indices_.push(i);
-    }
   }
 
   // Return the number of stored entries
@@ -253,13 +220,37 @@ protected:
       std::numeric_limits<EntryIndex>::max();
 
   struct Bucket {
-    HashResult hash_values[kEntriesPerBucket];
-    EntryIndex entry_indices[kEntriesPerBucket];
+    std::array<HashResult, kEntriesPerBucket> hash_values;
+    std::array<EntryIndex, kEntriesPerBucket> entry_indices;
 
     Bucket() : hash_values(), entry_indices() {}
   };
 
-  // Push an unused entry index back to the  stack
+  template <typename... Args>
+  Entry *DoEmplace(const K &key, const H &hasher, const E &eq,
+                   Args &&... args) {
+    Entry *entry;
+    HashResult primary = Hash(key, hasher);
+    HashResult secondary = HashSecondary(primary);
+
+    int trials = 0;
+
+    while ((entry = EmplaceEntry(primary, secondary, key, hasher,
+                                 std::forward<Args>(args)...)) == nullptr) {
+      if (++trials >= 3) {
+        LOG_FIRST_N(WARNING, 1)
+            << "CuckooMap: Excessive hash colision detected:\n";
+        return nullptr;
+      }
+
+      // expand the table as the last resort
+      ExpandBuckets<std::conditional_t<std::is_move_constructible<V>::value,
+                                       V &&, const V &>>(hasher, eq);
+    }
+    return entry;
+  }
+
+  // Push an unused entry index back to the stack
   void PushFreeEntryIndex(EntryIndex idx) { free_entry_indices_.push(idx); }
 
   // Pop a free entry index from stack and return the index
@@ -267,9 +258,33 @@ protected:
     if (free_entry_indices_.empty()) {
       ExpandEntries();
     }
-    size_t idx = free_entry_indices_.top();
+    EntryIndex idx = free_entry_indices_.top();
     free_entry_indices_.pop();
     return idx;
+  }
+
+  template <typename... Args>
+  Entry *EmplaceInBucket(Bucket &bucket, int slot_idx, const K &key,
+                         const H &hasher, Args &&... args) {
+    HashResult &hash_val = bucket.hash_values[slot_idx];
+    EntryIndex &entry_idx = bucket.entry_indices[slot_idx];
+    Entry *entry;
+
+    // why use likely here cause performance degradation ?
+    if (hash_val == 0) {
+      entry_idx = PopFreeEntryIndex();
+      entry = &entries_[entry_idx];
+      entry->first = key;
+      hash_val = Hash(key, hasher);
+      num_entries_++;
+    } else {
+      entry = &entries_[entry_idx];
+      entry->second.~V();
+    }
+
+    new (&entry->second) V(std::forward<Args>(args)...);
+
+    return entry;
   }
 
   // Try to add (key, value) to the bucket indexed by bucket_idx
@@ -278,22 +293,14 @@ protected:
   Entry *EmplaceInBucket(HashResult bucket_idx, const K &key, const H &hasher,
                          Args &&... args) {
     Bucket &bucket = buckets_[bucket_idx];
+
     int slot_idx = FindEmptySlot(bucket);
     if (slot_idx == -1) {
       return nullptr;
     }
 
-    EntryIndex free_idx = PopFreeEntryIndex();
-
-    bucket.hash_values[slot_idx] = Hash(key, hasher);
-    bucket.entry_indices[slot_idx] = free_idx;
-
-    Entry &entry = entries_[free_idx];
-    entry.first = key;
-    new (&entry.second) V(std::forward<Args>(args)...);
-
-    num_entries_++;
-    return &entry;
+    return EmplaceInBucket(bucket, slot_idx, key, hasher,
+                           std::forward<Args>(args)...);
   }
 
   // Remove key from the bucket indexed by bucket_idx
@@ -310,7 +317,7 @@ protected:
     bucket.hash_values[slot_idx] = 0;
 
     EntryIndex idx = bucket.entry_indices[slot_idx];
-    entries_[idx] = Entry();
+    entries_[idx].~Entry();
     PushFreeEntryIndex(idx);
 
     num_entries_--;
@@ -341,7 +348,7 @@ protected:
                       const H &hasher, Args &&... args) {
     HashResult primary_bucket_index, secondary_bucket_index;
     Entry *entry = nullptr;
-  again:
+
     primary_bucket_index = primary & bucket_mask_;
     if ((entry = EmplaceInBucket(primary_bucket_index, key, hasher,
                                  std::forward<Args>(args)...)) != nullptr) {
@@ -354,12 +361,16 @@ protected:
       return entry;
     }
 
-    if (MakeSpace(primary_bucket_index, 0, hasher) >= 0) {
-      goto again;
+    int slot_idx = MakeSpace(primary_bucket_index, 0, hasher);
+    if (slot_idx >= 0) {
+      return EmplaceInBucket(buckets_[primary_bucket_index], slot_idx, key,
+                             hasher, std::forward<Args>(args)...);
     }
 
-    if (MakeSpace(secondary_bucket_index, 0, hasher) >= 0) {
-      goto again;
+    slot_idx = MakeSpace(secondary_bucket_index, 0, hasher);
+    if (slot_idx >= 0) {
+      return EmplaceInBucket(buckets_[secondary_bucket_index], slot_idx, key,
+                             hasher, std::forward<Args>(args)...);
     }
 
     return nullptr;
@@ -367,11 +378,10 @@ protected:
 
   // Return an empty slot index in the bucket
   int FindEmptySlot(const Bucket &bucket) const {
-    for (int i = 0; i < kEntriesPerBucket; i++) {
-      if (bucket.hash_values[i] == 0) {
+    for (auto i : irange(kEntriesPerBucket))
+      if (bucket.hash_values[i] == 0)
         return i;
-      }
-    }
+
     return -1;
   }
 
@@ -379,7 +389,7 @@ protected:
   // and the actual key. Return -1 if not found.
   int FindSlot(const Bucket &bucket, HashResult primary, const K &key,
                const E &eq) const {
-    for (int i = 0; i < kEntriesPerBucket; i++) {
+    for (auto i : irange(kEntriesPerBucket))
       if (bucket.hash_values[i] == primary) {
         EntryIndex idx = bucket.entry_indices[i];
         const Entry &entry = entries_[idx];
@@ -388,7 +398,7 @@ protected:
           return i;
         }
       }
-    }
+
     return -1;
   }
 
@@ -468,14 +478,14 @@ protected:
 
     entries_.resize(new_size);
 
-    for (EntryIndex i = new_size - 1; i >= old_size; --i) {
+    for (auto i : irange(int(new_size - 1), int(old_size - 1), -1))
       free_entry_indices_.push(i);
-    }
   }
 
   // Resize the space of buckets, and rehash existing entries
   template <typename VV> void ExpandBuckets(const H &hasher, const E &eq) {
-    CuckooMap<K, V, H, E> bigger(buckets_.size() * 2, entries_.size());
+    CuckooMap<K, V, H, E> bigger(allocator_.socket(), buckets_.size() * 2,
+                                 entries_.size());
 
     for (auto &e : *this) {
       // While very unlikely, this DoEmplace() may cause recursive expansion
@@ -486,11 +496,7 @@ protected:
       }
     }
 
-    bucket_mask_ = std::move(bigger.bucket_mask_);
-    num_entries_ = bigger.num_entries_;
-    buckets_ = std::move(bigger.buckets_);
-    entries_ = std::move(bigger.entries_);
-    free_entry_indices_ = std::move(bigger.free_entry_indices_);
+    *this = std::move(bigger);
   }
 
   // # of buckets == mask + 1
@@ -511,7 +517,6 @@ protected:
   // Stack of free entries (I don't know why using hugepage here will cause
   // performance degradation.)
   std::stack<EntryIndex> free_entry_indices_;
-  // TODO: using utils::UnsafePool
 };
 
 } // namespace utils

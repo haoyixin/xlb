@@ -3,13 +3,14 @@ project(xlb)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(GTEST_SRC googletest)
+#set(GTEST_SRC googletest)
 #set(BRPC_SRC brpc)
+set(ABSL_SRC abseil-cpp)
 
 #add_subdirectory(${GTEST_SRC})
 #add_subdirectory(${BRPC_SRC})
 
-add_compile_options(-O0 -msse4 -mavx)
+add_compile_options(-O3 -msse4 -mavx)
 
 set(DPDK_LIBS
         "-Wl,--whole-archive"
@@ -40,6 +41,10 @@ set(GTEST_LIBS
         ${SYS_LIBS}
         )
 
+set(ABSL_LIBS
+        absl::flat_hash_map
+        )
+
 set(DPDK_INCS
         /usr/local/include/dpdk
         )
@@ -51,8 +56,12 @@ set(SRC_INCS
 set(SYS_INCS
         )
 
-set(GTEST_INCS
-        ${GTEST_SRC}/include
+#set(GTEST_INCS
+#        ${GTEST_SRC}/include
+#        )
+
+set(ABSL_INCS
+        ${ABSL_SRC}
         )
 
 set(OBJS
@@ -76,7 +85,7 @@ set(OBJS
         )
 
 link_directories(/usr/local/lib)
-include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS})
+include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${ABSL_INCS})
 
 #add_executable(runHashTests tests/hash.cc clibs/c_hash.c)
 #target_link_libraries(runHashTests ${GTEST_LIBS})
@@ -84,12 +93,14 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS})
 #add_executable(runCuckooMapTests tests/cuckoo_map.cc clibs/c_hash.c)
 #target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
 
+add_subdirectory(abseil-cpp)
+
 #add_executable(xlb main.cpp)
-add_executable(xlb3 tests/main3.cc ${OBJS})
+#add_executable(xlb3 tests/main3.cc ${OBJS})
 add_executable(xlb4 tests/main4.cc)
 #add_executable(xlb3 tests/main3.cc)
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
-target_link_libraries(xlb3 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})
+target_link_libraries(xlb4 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS} ${ABSL_LIBS})

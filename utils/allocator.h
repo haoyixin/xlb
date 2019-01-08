@@ -39,6 +39,7 @@ public:
 class MemoryResource : public std::experimental::pmr::memory_resource {
 public:
   explicit MemoryResource(int socket) : socket_(socket) {}
+  int socket() { return socket_; }
 
 protected:
   void *do_allocate(std::size_t bytes, std::size_t) override {

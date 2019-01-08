@@ -2,6 +2,7 @@
 #define XLB_UTILS_FIXED_POOL_H
 
 #include "utils/allocator.h"
+#include "utils/boost.h"
 #include "utils/range.h"
 
 #include "glog/logging.h"
@@ -13,7 +14,8 @@
 namespace xlb {
 namespace utils {
 
-// Simple pool without check for performance
+// Simple pool without check for performance, fixed size and insure pointer
+// stability.
 template <typename T> class UnsafePool {
   static_assert(std::is_pod<T>::value);
 
@@ -25,7 +27,7 @@ public:
       std::function<void(size_t, T *)> init_func = default_init_func)
       : allocator_(socket), entries_(size, &allocator_), free_entry_pointer_() {
     CHECK_GT(size, 0);
-    for (auto i : range(size - 1, 0).step(-1)) {
+    for (auto i : irange(int(size - 1), -1, -1)) {
       init_func(i, &entries_[i]);
       free_entry_pointer_.push(&entries_[i]);
     }
