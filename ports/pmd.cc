@@ -13,8 +13,7 @@
 namespace xlb {
 namespace ports {
 
-PMD::PMD(std::string &&name)
-    : Port(name), dpdk_port_id_(kDpdkPortUnknown) {
+PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
   InitDriver();
   InitPort();
 }
@@ -143,7 +142,7 @@ void PMD::InitPort() {
 
   rte_eth_promiscuous_enable(ret_port_id);
 
-  int sid = rte_eth_dev_socket_id(ret_port_id);
+  int sid = CONFIG.nic.socket;
 
   /* Use defaut rx/tx configuration as provided by PMD ports,
    * maybe need minor tweaks */
@@ -162,7 +161,7 @@ void PMD::InitPort() {
   for (auto i : utils::range(0, num_q))
     CHECK(!rte_eth_rx_queue_setup(ret_port_id, i, dev_info.rx_desc_lim.nb_max,
                                   sid, &eth_rxconf,
-                                  PacketPool::GetPool(sid)->pool()));
+                                  utils::Singleton<PacketPool>::Get().pool()));
 
   CHECK(!rte_eth_dev_set_vlan_offload(ret_port_id, ETH_VLAN_STRIP_OFFLOAD));
 
@@ -242,4 +241,4 @@ Port::LinkStatus PMD::GetLinkStatus() {
 } // namespace ports
 } // namespace xlb
 
-DEFINE_PORT(PMD);
+// DEFINE_PORT(PMD);

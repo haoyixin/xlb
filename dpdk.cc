@@ -9,9 +9,12 @@
 #include <rte_eal.h>
 
 #include <glog/logging.h>
+#include <rte_launch.h>
 
 #include "utils/numa.h"
 #include "utils/boost.h"
+
+#include "config.h"
 
 namespace xlb {
 namespace {
@@ -59,28 +62,37 @@ private:
   std::vector<char *> argv_;
 };
 
-void init_eal(int dpdk_mb_per_socket) {
+void init_eal() {
   // TODO: clean useless args
   CmdLineOpts rte_args{
       "xlb",
+      "--master-lcore",
+      "127",
+      "--lcore",
+      "127@0",
       // Do not bother with /var/run/.rte_config and .rte_hugepage_info,
       // since we don't want to interfere with other DPDK applications.
       "--no-shconf",
+      "--huge-unlink",
+      "-m",
+      std::to_string(CONFIG.mem.hugepage),
+      "-n",
+      std::to_string(CONFIG.mem.channel),
   };
 
-  std::string opt_socket_mem;
-  for (auto i : utils::irange(utils::Topology().size())) {
-    if (i == 0)
-      opt_socket_mem += std::to_string(dpdk_mb_per_socket);
-    else
-      opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
-  }
-
-  rte_args.Append({"--socket-mem", opt_socket_mem});
+//  std::string opt_socket_mem;
+//  for (auto i : utils::irange(utils::Topology().size())) {
+//    if (i == 0)
+//      opt_socket_mem += std::to_string(dpdk_mb_per_socket);
+//    else
+//      opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
+//  }
+//
+//  rte_args.Append({"--socket-mem", opt_socket_mem});
 
   // Unlink mapped hugepage files so that memory can be reclaimed as soon as
   // xlb terminates.
-  rte_args.Append({"--huge-unlink"});
+//  rte_args.Append({"--huge-unlink"});
 
   // reset getopt()
   optind = 0;
@@ -137,11 +149,10 @@ int determine_default_core() {
 
 } // namespace
 
-void InitDpdk(int dpdk_mb_per_socket) {
-  if (!is_initialized) {
-    is_initialized = true;
+void InitDpdk() {
+  if (!dpdk_initialized.test_and_set()) {
     LOG(INFO) << "Initializing DPDK";
-    init_eal(dpdk_mb_per_socket);
+    init_eal();
   }
 }
 

@@ -13,12 +13,28 @@ public:
     return value;
   }
 
-  static void Reset() { Singleton<T>::Get().~T(); }
-
+  //  static void Reset() { Singleton<T>::Get().~T(); }
 private:
   Singleton();
   ~Singleton();
 };
+
+template <typename T> class UnsafeSingleton {
+public:
+  template <typename... Args> static T *Set(Args &&... args) {
+    value = new T(std::forward<Args>(args)...);
+    return value;
+  }
+
+  static T *Get() { return value; }
+
+private:
+  static T *value;
+  UnsafeSingleton();
+  ~UnsafeSingleton();
+};
+
+    template <typename T> T *UnsafeSingleton<T>::value;
 
 } // namespace utils
 } // namespace xlb

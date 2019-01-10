@@ -5,12 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 #set(GTEST_SRC googletest)
 #set(BRPC_SRC brpc)
-set(ABSL_SRC abseil-cpp)
+#set(ABSL_SRC abseil-cpp)
 
 #add_subdirectory(${GTEST_SRC})
 #add_subdirectory(${BRPC_SRC})
 
-add_compile_options(-O3 -msse4 -mavx)
+#add_compile_options(-O3 -msse4 -mavx)
+add_compile_options(-O0 -msse4 -mavx)
 
 set(DPDK_LIBS
         "-Wl,--whole-archive"
@@ -23,8 +24,6 @@ set(3RD_PARTY_LIBS
         brpc
         gflags
         glog
-        boost_fiber_numa
-        boost_fiber
         )
 
 set(SYS_LIBS
@@ -41,9 +40,9 @@ set(GTEST_LIBS
         ${SYS_LIBS}
         )
 
-set(ABSL_LIBS
-        absl::flat_hash_map
-        )
+#set(ABSL_LIBS
+#        absl::flat_hash_map
+#        )
 
 set(DPDK_INCS
         /usr/local/include/dpdk
@@ -60,9 +59,9 @@ set(SYS_INCS
 #        ${GTEST_SRC}/include
 #        )
 
-set(ABSL_INCS
-        ${ABSL_SRC}
-        )
+#set(ABSL_INCS
+#        ${ABSL_SRC}
+#        )
 
 set(OBJS
         global_variable.cc
@@ -70,7 +69,6 @@ set(OBJS
         dpdk.cc
         worker.cc
         config.cc
-        modules.cc
         control.cc
         pb/xlb.pb.cc
         utils/copy.cc
@@ -79,13 +77,14 @@ set(OBJS
         utils/format.cc
         utils/endian.cc
         utils/thread_local.cc
+        utils/singleton.cc
         headers/ip.cc
         headers/ether.cc
         ports/pmd.cc
         )
 
 link_directories(/usr/local/lib)
-include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${ABSL_INCS})
+include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
 
 #add_executable(runHashTests tests/hash.cc clibs/c_hash.c)
 #target_link_libraries(runHashTests ${GTEST_LIBS})
@@ -93,14 +92,17 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} ${ABSL_INCS})
 #add_executable(runCuckooMapTests tests/cuckoo_map.cc clibs/c_hash.c)
 #target_link_libraries(runCuckooMapTests ${GTEST_LIBS})
 
-add_subdirectory(abseil-cpp)
+#add_subdirectory(abseil-cpp)
 
 #add_executable(xlb main.cpp)
 #add_executable(xlb3 tests/main3.cc ${OBJS})
-add_executable(xlb4 tests/main4.cc)
+add_executable(xlb5 tests/main5.cc ${OBJS})
+#add_executable(xlb5 tests/main5.cc)
 #add_executable(xlb3 tests/main3.cc)
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
-target_link_libraries(xlb4 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS} ${ABSL_LIBS})
+target_link_libraries(xlb5 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})
+#target_link_libraries(xlb5 pthread)
+#target_link_libraries(xlb4)

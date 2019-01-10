@@ -24,6 +24,7 @@ public:
 
   static void Launch();
   static void Quit();
+  static void Wait();
 
   size_t id() { return id_; }
   size_t core() { return core_; }

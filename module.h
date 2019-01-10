@@ -1,18 +1,16 @@
 #ifndef XLB_MODULE_H
 #define XLB_MODULE_H
 
-#include "context.h"
-#include "task.h"
+#include <functional>
+#include <string>
+
+#include "utils/cuckoo_map.h"
+#include "utils/singleton.h"
 
 #include "packet_batch.h"
 #include "packet_pool.h"
 
-#include "utils/cuckoo_map.h"
-
-#include <functional>
-#include <string>
-#include <utils/singleton.h>
-
+#include "task.h"
 #include "types.h"
 
 namespace xlb {
@@ -24,15 +22,13 @@ public:
   // Process a set of packets in packet batch with the contexts 'ctx'.
   // A module should handle all packets in a batch properly as follows:
   // 1) forwards to the next modules, or 2) free
-  virtual void ProcessBatch(Context *ctx, PacketBatch *batch) = 0;
+  virtual void ProcessBatch(Context *ctx, PacketBatch *batch) { CHECK(0); };
 
 protected:
-  explicit Module(std::string &name) : name_(name) {}
-
-  template <typename T>
-  void NextModule(T *mod, Context *ctx, PacketBatch *batch) {
+  Module() = default;
+  template <typename T> void NextModule(Context *ctx, PacketBatch *batch) {
     static_assert(std::is_base_of<Module, T>::value);
-    mod->ProcessBatch(ctx, batch);
+    utils::UnsafeSingleton<T>::Get()->ProcessBatch(ctx, batch);
   }
 
   // Register a new task by a ModuleFunc, the latter should generate a set of
@@ -55,23 +51,21 @@ protected:
 
   auto AllocBatch(Context *ctx) { return ctx->task->AllocBatch(); }
 
-  const std::string &name() const { return name_; }
+  //  const std::string &name() const { return name_; }
 
 private:
-  std::string name_;
-
-  DISALLOW_IMPLICIT_CONSTRUCTORS(Module);
+  DISALLOW_COPY_AND_ASSIGN(Module);
 };
 
 } // namespace xlb
 
 // TODO: maybe a module builder is necessary
 
-#define DEFINE_MODULE(_MOD) xlb::modules::_MOD *MODULES_##_MOD
+//#define DEFINE_MODULE(_MOD) xlb::modules::_MOD *MODULES_##_MOD
 
-#define DECLARE_MODULE(_MOD) extern xlb::modules::_MOD *MODULES_##_MOD
+//#define DECLARE_MODULE(_MOD) extern xlb::modules::_MOD *MODULES_##_MOD
 
-#define MODULE_INIT(_MOD, ...)                                                 \
-  MODULES_##_MOD = new xlb::modules::_MOD(#_MOD, ##__VA_ARGS__)
+//#define MODULE_INIT(_MOD, ...)                                                 \
+//  MODULES_##_MOD = new xlb::modules::_MOD(#_MOD, ##__VA_ARGS__)
 
 #endif // XLB_MODULE_H

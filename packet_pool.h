@@ -1,10 +1,10 @@
 #ifndef XLB_PACKET_POOL_H
 #define XLB_PACKET_POOL_H
 
-#include "config.h"
-#include "memory.h"
-#include "packet.h"
 #include <memory>
+
+#include "config.h"
+#include "packet.h"
 
 namespace xlb {
 
@@ -13,11 +13,13 @@ namespace xlb {
 // Alloc() and Free() are thread-safe.
 class PacketPool {
 public:
-  static PacketPool *GetPool(int node) { return pools_[node].get(); }
+  //  static PacketPool *GetPool(int node) { return pools_[node].get(); }
 
-  static void CreatePools(size_t capacity = CONFIG.packet_pool);
+  //  static void CreatePools(size_t capacity = CONFIG.packet_pool);
 
-  virtual ~PacketPool();
+  PacketPool(size_t capacity = CONFIG.mem.packet_pool,
+             int socket_id = CONFIG.nic.socket);
+  ~PacketPool();
 
   // PacketPool is neither copyable nor movable.
   PacketPool(const PacketPool &) = delete;
@@ -29,7 +31,6 @@ public:
     if (pkt) {
       pkt->pkt_len_ = len;
       pkt->data_len_ = len;
-
       // TODO: check
     }
     return pkt;
@@ -53,26 +54,18 @@ protected:
   static const size_t kDefaultCapacity = (1 << 16) - 1; // 64k - 1
   static const size_t kMaxCacheSize = 512;              // per-core cache size
 
-  // socket_id == -1 means "I don't care".
-  PacketPool(size_t capacity = kDefaultCapacity, int socket_id = -1);
-
   // Subclasses are expected to call this function in their constructor
-  void PostPopulate();
+  //  void PostPopulate();
 
-  std::string name_;
+  //  std::string name_;
   rte_mempool *pool_;
 
 private:
   // Per-node packet pools
   // TODO: singleton
-  static std::shared_ptr<PacketPool> pools_[RTE_MAX_NUMA_NODES];
+  //  static std::shared_ptr<PacketPool> pools_[RTE_MAX_NUMA_NODES];
 
   friend class Packet;
-};
-
-class DpdkPacketPool : public PacketPool {
-public:
-  DpdkPacketPool(size_t capacity = kDefaultCapacity, int socket_id = -1);
 };
 
 } // namespace xlb

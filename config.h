@@ -1,10 +1,12 @@
 #ifndef XLB_CONFIG_H
 #define XLB_CONFIG_H
 
-#include "3rdparty/visit_struct.hpp"
-
 #include <string>
 #include <vector>
+
+#include "3rdparty/visit_struct.hpp"
+
+#include "utils/singleton.h"
 
 namespace xlb {
 
@@ -24,33 +26,32 @@ public:
     // TODO: offload & vlan
   };
 
+  struct Mem {
+    int hugepage;
+    int channel;
+    int packet_pool;
+  };
+
   std::string rpc_ip_port;
   std::vector<int> worker_cores;
 
-  int hugepage;
-  int packet_pool;
-
-  // TODO: only support one numa node now
+  // TODO: support multi numa node
   Nic nic;
-
-  static const Config &All() { return all_; }
+  Mem mem;
 
   static void Load();
 
 private:
   void validate();
-
-  static void error_reporter(std::string str);
-  static Config all_;
 };
 
-#define CONFIG Config::All()
+#define CONFIG utils::Singleton<Config>::Get()
 
 } // namespace xlb
 
 VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, netmask,
                  gateway, mtu);
-VISITABLE_STRUCT(xlb::Config, rpc_ip_port, worker_cores, hugepage, packet_pool,
-                 nic);
+VISITABLE_STRUCT(xlb::Config::Mem, hugepage, channel, packet_pool);
+VISITABLE_STRUCT(xlb::Config, rpc_ip_port, worker_cores, nic, mem);
 
 #endif // XLB_CONFIG_H

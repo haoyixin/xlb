@@ -20,8 +20,8 @@ class PMD final : public Port {
 public:
   static const int kDpdkPortUnknown = RTE_MAX_ETHPORTS;
 
-  PMD(std::string &&name);
-  ~PMD();
+  PMD();
+  ~PMD() override;
 
   bool GetStats(Port::Counters &stats) override;
 

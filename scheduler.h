@@ -23,11 +23,10 @@ public:
 
   // Runs the scheduler loop forever.
   void ScheduleLoop() {
-    Context ctx = {
-        .task = nullptr, .worker = Worker::current(), .silent_drops = 0};
+    bool idle{false};
+    Context ctx{};
+    uint64_t cycles{};
 
-    bool idle = false;
-    uint64_t cycles = 0;
     checkpoint_ = usage_.checkpoint = ctx.worker->current_tsc();
 
     // The main scheduling, running, accounting loop.

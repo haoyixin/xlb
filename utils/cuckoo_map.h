@@ -19,7 +19,7 @@
 namespace xlb {
 namespace utils {
 
-// A Hash table implementation using cuckoo hashing on hugepage
+// A hash table implementation using cuckoo hashing on hugepage
 // Note: this is not thread-safe
 template <typename K, typename V, typename H = std::hash<K>,
           typename E = std::equal_to<K>>
@@ -129,12 +129,12 @@ public:
   // not be called.
   Entry *Insert(const K &key, const V &value, const H &hasher = H(),
                 const E &eq = E()) {
-    return DoEmplace(key, hasher, eq, value);
+    return do_emplace(key, hasher, eq, value);
   }
 
   Entry *Insert(const K &key, V &&value, const H &hasher = H(),
                 const E &eq = E()) {
-    return DoEmplace(key, hasher, eq, std::move(value));
+    return do_emplace(key, hasher, eq, std::move(value));
   }
 
   // Emplace/update-in-place a key value pair
@@ -142,7 +142,7 @@ public:
   // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
   // called.
   template <typename... Args> Entry *Emplace(const K &key, Args &&... args) {
-    return DoEmplace(key, H(), E(), std::forward<Args>(args)...);
+    return do_emplace(key, H(), E(), std::forward<Args>(args)...);
   }
 
   // Find the pointer to the stored value by the key.
@@ -158,7 +158,7 @@ public:
   // const version of Find()
   const Entry *Find(const K &key, const H &hasher = H(),
                     const E &eq = E()) const {
-    EntryIndex idx = FindWithHash(Hash(key, hasher), key, eq);
+    EntryIndex idx = find_with_hash(hash(key, hasher), key, eq);
     if (idx == kInvalidEntryIdx) {
       return nullptr;
     }
@@ -171,14 +171,14 @@ public:
   // Remove the stored entry by the key
   // Return false if not exist.
   bool Remove(const K &key, const H &hasher = H(), const E &eq = E()) {
-    HashResult pri = Hash(key, hasher);
-    if (RemoveFromBucket(pri, pri & bucket_mask_, key, eq)) {
+    HashResult pri = hash(key, hasher);
+    if (remove_from_bucket(pri, pri & bucket_mask_, key, eq))
       return true;
-    }
-    HashResult sec = HashSecondary(pri);
-    if (RemoveFromBucket(pri, sec & bucket_mask_, key, eq)) {
+
+    HashResult sec = hash_secondary(pri);
+    if (remove_from_bucket(pri, sec & bucket_mask_, key, eq))
       return true;
-    }
+
     return false;
   }
 
@@ -187,9 +187,8 @@ public:
     entries_.clear();
 
     // std::stack doesn't have a clear() method. Strange.
-    while (!free_entry_indices_.empty()) {
+    while (!free_entry_indices_.empty())
       free_entry_indices_.pop();
-    }
 
     num_entries_ = 0;
     bucket_mask_ = kInitNumBucket - 1;
@@ -227,16 +226,16 @@ protected:
   };
 
   template <typename... Args>
-  Entry *DoEmplace(const K &key, const H &hasher, const E &eq,
-                   Args &&... args) {
+  Entry *do_emplace(const K &key, const H &hasher, const E &eq,
+                    Args &&... args) {
     Entry *entry;
-    HashResult primary = Hash(key, hasher);
-    HashResult secondary = HashSecondary(primary);
+    HashResult primary = hash(key, hasher);
+    HashResult secondary = hash_secondary(primary);
 
     int trials = 0;
 
-    while ((entry = EmplaceEntry(primary, secondary, key, hasher,
-                                 std::forward<Args>(args)...)) == nullptr) {
+    while ((entry = emplace_entry(primary, secondary, key, hasher,
+                                  std::forward<Args>(args)...)) == nullptr) {
       if (++trials >= 3) {
         LOG_FIRST_N(WARNING, 1)
             << "CuckooMap: Excessive hash colision detected:\n";
@@ -244,38 +243,38 @@ protected:
       }
 
       // expand the table as the last resort
-      ExpandBuckets<std::conditional_t<std::is_move_constructible<V>::value,
-                                       V &&, const V &>>(hasher, eq);
+      expand_buckets<std::conditional_t<std::is_move_constructible<V>::value,
+                                        V &&, const V &>>(hasher, eq);
     }
     return entry;
   }
 
   // Push an unused entry index back to the stack
-  void PushFreeEntryIndex(EntryIndex idx) { free_entry_indices_.push(idx); }
+  void push_free_entry_index(EntryIndex idx) { free_entry_indices_.push(idx); }
 
   // Pop a free entry index from stack and return the index
-  EntryIndex PopFreeEntryIndex() {
-    if (free_entry_indices_.empty()) {
-      ExpandEntries();
-    }
+  EntryIndex pop_free_entry_index() {
+    if (free_entry_indices_.empty())
+      expand_entries();
+
     EntryIndex idx = free_entry_indices_.top();
     free_entry_indices_.pop();
     return idx;
   }
 
   template <typename... Args>
-  Entry *EmplaceInBucket(Bucket &bucket, int slot_idx, const K &key,
-                         const H &hasher, Args &&... args) {
+  Entry *emplace_in_bucket(Bucket &bucket, int slot_idx, const K &key,
+                           const H &hasher, Args &&... args) {
     HashResult &hash_val = bucket.hash_values[slot_idx];
     EntryIndex &entry_idx = bucket.entry_indices[slot_idx];
     Entry *entry;
 
     // why use likely here cause performance degradation ?
     if (hash_val == 0) {
-      entry_idx = PopFreeEntryIndex();
+      entry_idx = pop_free_entry_index();
       entry = &entries_[entry_idx];
       entry->first = key;
-      hash_val = Hash(key, hasher);
+      hash_val = hash(key, hasher);
       num_entries_++;
     } else {
       entry = &entries_[entry_idx];
@@ -290,26 +289,25 @@ protected:
   // Try to add (key, value) to the bucket indexed by bucket_idx
   // Return the pointer to the entry if success. Otherwise return nullptr.
   template <typename... Args>
-  Entry *EmplaceInBucket(HashResult bucket_idx, const K &key, const H &hasher,
-                         Args &&... args) {
+  Entry *emplace_in_bucket(HashResult bucket_idx, const K &key, const H &hasher,
+                           Args &&... args) {
     Bucket &bucket = buckets_[bucket_idx];
 
-    int slot_idx = FindEmptySlot(bucket);
-    if (slot_idx == -1) {
+    int slot_idx = find_empty_slot(bucket);
+    if (slot_idx == -1)
       return nullptr;
-    }
 
-    return EmplaceInBucket(bucket, slot_idx, key, hasher,
-                           std::forward<Args>(args)...);
+    return emplace_in_bucket(bucket, slot_idx, key, hasher,
+                             std::forward<Args>(args)...);
   }
 
   // Remove key from the bucket indexed by bucket_idx
   // Return true if success.
-  bool RemoveFromBucket(HashResult primary, HashResult bucket_idx, const K &key,
-                        const E &eq) {
+  bool remove_from_bucket(HashResult primary, HashResult bucket_idx,
+                          const K &key, const E &eq) {
     Bucket &bucket = buckets_[bucket_idx];
 
-    int slot_idx = FindSlot(bucket, primary, key, eq);
+    int slot_idx = find_slot(bucket, primary, key, eq);
     if (slot_idx == -1) {
       return false;
     }
@@ -318,7 +316,7 @@ protected:
 
     EntryIndex idx = bucket.entry_indices[slot_idx];
     entries_[idx].~Entry();
-    PushFreeEntryIndex(idx);
+    push_free_entry_index(idx);
 
     num_entries_--;
     return true;
@@ -326,11 +324,11 @@ protected:
 
   // Find key from the bucket indexed by bucket_idx
   // Return the index of the entry if success. Otherwise return nullptr.
-  EntryIndex GetFromBucket(HashResult primary, HashResult bucket_idx,
-                           const K &key, const E &eq) const {
+  EntryIndex get_from_bucket(HashResult primary, HashResult bucket_idx,
+                             const K &key, const E &eq) const {
     const Bucket &bucket = buckets_[bucket_idx];
 
-    int slot_idx = FindSlot(bucket, primary, key, eq);
+    int slot_idx = find_slot(bucket, primary, key, eq);
     if (slot_idx == -1) {
       return kInvalidEntryIdx;
     }
@@ -344,40 +342,40 @@ protected:
   // Try to add the entry (key, value)
   // Return the pointer to the entry if success. Otherwise return nullptr.
   template <typename... Args>
-  Entry *EmplaceEntry(HashResult primary, HashResult secondary, const K &key,
-                      const H &hasher, Args &&... args) {
+  Entry *emplace_entry(HashResult primary, HashResult secondary, const K &key,
+                       const H &hasher, Args &&... args) {
     HashResult primary_bucket_index, secondary_bucket_index;
     Entry *entry = nullptr;
 
     primary_bucket_index = primary & bucket_mask_;
-    if ((entry = EmplaceInBucket(primary_bucket_index, key, hasher,
-                                 std::forward<Args>(args)...)) != nullptr) {
+    if ((entry = emplace_in_bucket(primary_bucket_index, key, hasher,
+                                   std::forward<Args>(args)...)) != nullptr) {
       return entry;
     }
 
     secondary_bucket_index = secondary & bucket_mask_;
-    if ((entry = EmplaceInBucket(secondary_bucket_index, key, hasher,
-                                 std::forward<Args>(args)...)) != nullptr) {
+    if ((entry = emplace_in_bucket(secondary_bucket_index, key, hasher,
+                                   std::forward<Args>(args)...)) != nullptr) {
       return entry;
     }
 
-    int slot_idx = MakeSpace(primary_bucket_index, 0, hasher);
+    int slot_idx = make_space(primary_bucket_index, 0, hasher);
     if (slot_idx >= 0) {
-      return EmplaceInBucket(buckets_[primary_bucket_index], slot_idx, key,
-                             hasher, std::forward<Args>(args)...);
+      return emplace_in_bucket(buckets_[primary_bucket_index], slot_idx, key,
+                               hasher, std::forward<Args>(args)...);
     }
 
-    slot_idx = MakeSpace(secondary_bucket_index, 0, hasher);
+    slot_idx = make_space(secondary_bucket_index, 0, hasher);
     if (slot_idx >= 0) {
-      return EmplaceInBucket(buckets_[secondary_bucket_index], slot_idx, key,
-                             hasher, std::forward<Args>(args)...);
+      return emplace_in_bucket(buckets_[secondary_bucket_index], slot_idx, key,
+                               hasher, std::forward<Args>(args)...);
     }
 
     return nullptr;
   }
 
   // Return an empty slot index in the bucket
-  int FindEmptySlot(const Bucket &bucket) const {
+  int find_empty_slot(const Bucket &bucket) const {
     for (auto i : irange(kEntriesPerBucket))
       if (bucket.hash_values[i] == 0)
         return i;
@@ -387,14 +385,14 @@ protected:
 
   // Return the slot index in the bucket that matches the primary hash_value
   // and the actual key. Return -1 if not found.
-  int FindSlot(const Bucket &bucket, HashResult primary, const K &key,
-               const E &eq) const {
+  int find_slot(const Bucket &bucket, HashResult primary, const K &key,
+                const E &eq) const {
     for (auto i : irange(kEntriesPerBucket))
       if (bucket.hash_values[i] == primary) {
         EntryIndex idx = bucket.entry_indices[i];
         const Entry &entry = entries_[idx];
 
-        if (likely(Eq(entry.first, key, eq))) {
+        if (likely(equal(entry.first, key, eq))) {
           return i;
         }
       }
@@ -405,7 +403,7 @@ protected:
   // Recursively try making an empty slot in the bucket
   // Returns a slot index in [0, kEntriesPerBucket) for successful operation,
   // or -1 if failed.
-  int MakeSpace(HashResult index, int depth, const H &hasher) {
+  int make_space(HashResult index, int depth, const H &hasher) {
     if (depth >= kMaxCuckooPath) {
       return -1;
     }
@@ -415,8 +413,8 @@ protected:
     for (int i = 0; i < kEntriesPerBucket; i++) {
       EntryIndex idx = bucket.entry_indices[i];
       const K &key = entries_[idx].first;
-      HashResult pri = Hash(key, hasher);
-      HashResult sec = HashSecondary(pri);
+      HashResult pri = hash(key, hasher);
+      HashResult sec = hash_secondary(pri);
 
       HashResult alt_index;
 
@@ -429,9 +427,9 @@ protected:
         return -1;
       }
 
-      int j = FindEmptySlot(buckets_[alt_index]);
+      int j = find_empty_slot(buckets_[alt_index]);
       if (j == -1) {
-        j = MakeSpace(alt_index, depth + 1, hasher);
+        j = make_space(alt_index, depth + 1, hasher);
       }
       if (j >= 0) {
         Bucket &alt_bucket = buckets_[alt_index];
@@ -447,32 +445,33 @@ protected:
 
   // Get the entry given the primary hash value of the key.
   // Returns the pointer to the entry or nullptr if failed.
-  EntryIndex FindWithHash(HashResult primary, const K &key, const E &eq) const {
-    EntryIndex ret = GetFromBucket(primary, primary & bucket_mask_, key, eq);
+  EntryIndex find_with_hash(HashResult primary, const K &key,
+                            const E &eq) const {
+    EntryIndex ret = get_from_bucket(primary, primary & bucket_mask_, key, eq);
     if (ret != kInvalidEntryIdx) {
       return ret;
     }
-    return GetFromBucket(primary, HashSecondary(primary) & bucket_mask_, key,
-                         eq);
+    return get_from_bucket(primary, hash_secondary(primary) & bucket_mask_, key,
+                           eq);
   }
 
   // Secondary hash value
-  static HashResult HashSecondary(HashResult primary) {
+  static HashResult hash_secondary(HashResult primary) {
     HashResult tag = primary >> 12;
     return primary ^ ((tag + 1) * 0x5bd1e995);
   }
 
   // Primary hash value. Should always be non-zero (= not empty)
-  static HashResult Hash(const K &key, const H &hasher) {
+  static HashResult hash(const K &key, const H &hasher) {
     return hasher(key) | (1u << 31);
   }
 
-  static bool Eq(const K &lhs, const K &rhs, const E &eq) {
+  static bool equal(const K &lhs, const K &rhs, const E &eq) {
     return eq(lhs, rhs);
   }
 
   // Resize the space of entries. Grow less aggressively than buckets.
-  void ExpandEntries() {
+  void expand_entries() {
     size_t old_size = entries_.size();
     size_t new_size = old_size + old_size / 2;
 
@@ -483,14 +482,14 @@ protected:
   }
 
   // Resize the space of buckets, and rehash existing entries
-  template <typename VV> void ExpandBuckets(const H &hasher, const E &eq) {
+  template <typename VV> void expand_buckets(const H &hasher, const E &eq) {
     CuckooMap<K, V, H, E> bigger(allocator_.socket(), buckets_.size() * 2,
                                  entries_.size());
 
     for (auto &e : *this) {
-      // While very unlikely, this DoEmplace() may cause recursive expansion
+      // While very unlikely, this do_emplace() may cause recursive expansion
       Entry *ret =
-          bigger.DoEmplace(e.first, hasher, eq, std::forward<VV>(e.second));
+          bigger.do_emplace(e.first, hasher, eq, std::forward<VV>(e.second));
       if (!ret) {
         return;
       }

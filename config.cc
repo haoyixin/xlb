@@ -4,40 +4,44 @@
 
 #include "3rdparty/configuru.hpp"
 
+#include <boost/algorithm/cxx11/any_of.hpp>
+#include <boost/fiber/numa/topology.hpp>
+
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
+#include <rte_pci.h>
+
 #include "utils/boost.h"
 #include "utils/endian.h"
 #include "utils/numa.h"
 
 #include "headers/ether.h"
 #include "headers/ip.h"
-#include "opts.h"
 
-#include <boost/algorithm/cxx11/any_of.hpp>
-#include <boost/fiber/numa/topology.hpp>
-#include <glog/logging.h>
-#include <rte_pci.h>
-
-namespace al = boost::algorithm;
+DECLARE_string(config);
 
 namespace xlb {
 
-void Config::error_reporter(std::string str) {
+namespace {
+
+void error_reporter(std::string str) {
   LOG(FATAL) << "Failed to parse config: " << str;
 }
 
+} // namespace
+
 void Config::Load() {
-  configuru::deserialize(&all_,
+  configuru::deserialize(&CONFIG,
                          configuru::parse_file(FLAGS_config, configuru::JSON),
                          error_reporter);
-  all_.validate();
+  CONFIG.validate();
 }
 
 void Config::validate() {
-  // TODO: more detail info
+  // TODO: more detail log
   CHECK(!worker_cores.empty());
   CHECK_LE(worker_cores.size(), 32);
-
-  //  auto topo = utils::Topology();
 
   auto socket = utils::PciSocketId(nic.pci_address);
   CHECK(socket.has_value());
@@ -60,9 +64,11 @@ void Config::validate() {
   CHECK_GT(nic.mtu, 0);
   CHECK_LE(nic.mtu, UINT16_MAX);
 
-  CHECK_GT(hugepage, 0);
-  CHECK_GT(packet_pool, 0);
-  CHECK_EQ(packet_pool % 2, 0);
+  CHECK_GT(mem.hugepage, 0);
+  CHECK_GT(mem.channel, 0);
+
+  CHECK_GT(mem.packet_pool, 0);
+  CHECK_EQ(mem.packet_pool % 2, 0);
 
   CHECK(!nic.local_ips.empty());
   std::sort(nic.local_ips.begin(), nic.local_ips.end());

@@ -1,8 +1,9 @@
 #ifndef XLB_PACKET_BATCH_H
 #define XLB_PACKET_BATCH_H
 
-#include "packet.h"
 #include "utils/copy.h"
+
+#include "packet.h"
 
 namespace xlb {
 

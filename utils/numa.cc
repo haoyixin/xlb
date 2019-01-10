@@ -1,23 +1,15 @@
-#include <utility>
-
 #include "utils/numa.h"
 
-#include "glog/logging.h"
+#include <experimental/filesystem>
+#include <utility>
+#include <fstream>
+#include <regex>
+
+#include <glog/logging.h>
+
 #include "utils/boost.h"
 #include "utils/format.h"
 #include "utils/singleton.h"
-
-#include <rte_lcore.h>
-
-#include <algorithm>
-#include <cassert>
-#include <experimental/filesystem>
-#include <fstream>
-#include <set>
-
-#include <functional>
-#include <regex>
-#include <string>
 
 namespace fs = std::experimental::filesystem;
 

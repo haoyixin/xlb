@@ -4,9 +4,11 @@
 #include <string>
 
 #include "headers/ether.h"
+
+#include "utils/common.h"
+
 #include "packet.h"
 #include "packet_batch.h"
-#include "utils/common.h"
 
 namespace xlb {
 
@@ -60,32 +62,30 @@ public:
 
   // TODO: reset status
 
-  const std::string &name() const { return name_; }
+  //  const std::string &name() const { return name_; }
   const Conf &conf() const { return conf_; }
 
 protected:
-  explicit Port(std::string &name) : name_(name), conf_(), queue_counters_() {}
+  explicit Port() : conf_(), queue_counters_() {}
 
   // Current configuration
   Conf conf_;
 
 private:
-  std::string name_; // The name of this port instance.
+  //  std::string name_; // The name of this port instance.
 
   DISALLOW_COPY_AND_ASSIGN(Port);
-
-public:
 };
 
 } // namespace xlb
 
 // TODO: builder ?
 
-#define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
+//#define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
 
-#define DECLARE_PORT(_PORT) extern xlb::ports::_PORT *PORTS_##_PORT
+//#define DECLARE_PORT(_PORT) extern xlb::ports::_PORT *PORTS_##_PORT
 
-#define PORT_INIT(_PORT, ...)                                                  \
-  PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ##__VA_ARGS__)
+//#define PORT_INIT(_PORT, ...)                                                  \
+//  PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ##__VA_ARGS__)
 
 #endif // XLB_PORT_H

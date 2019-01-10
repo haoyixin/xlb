@@ -1,12 +1,11 @@
 #ifndef XLB_TASK_H
 #define XLB_TASK_H
 
-#include "config.h"
-#include "packet_batch.h"
-
 #include "utils/cuckoo_map.h"
 #include "utils/unsafe_pool.h"
 
+#include "packet_batch.h"
+#include "config.h"
 #include "types.h"
 
 namespace xlb {
