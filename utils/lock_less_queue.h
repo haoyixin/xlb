@@ -8,12 +8,10 @@
 
 #include "3rdparty/llring.h"
 
-
 namespace xlb {
 namespace utils {
 
-// A wrapper class for llring that extends the abstract class Queue. Takes a
-// template argument T which is the type to be enqueued and dequeued.
+// A wrapper class for llring.
 template <typename T> class LockLessQueue {
   static_assert(std::is_pointer<T>::value,
                 "LockLessQueue only supports pointer types");
@@ -21,12 +19,6 @@ template <typename T> class LockLessQueue {
 public:
   static const size_t kDefaultRingSize = 256;
 
-  // Construct a new queue. Takes the size of backing ring buffer (must power of
-  // two and entries available will be one less than specified. default is 256),
-  // boolean where if true, queue is in single producer mode or if false, queue
-  // is in multi producer mode, boolean where if true, queue is in single
-  // consumer mode, or if false, queue is in multi consumer mode. default for
-  // both booleans is true.
   LockLessQueue(int socket = SOCKET_ID_ANY, size_t capacity = kDefaultRingSize,
                 bool single_producer = true, bool single_consumer = true)
       : capacity_(capacity), socket_(socket) {

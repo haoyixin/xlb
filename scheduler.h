@@ -6,14 +6,13 @@
 #include "utils/common.h"
 #include "utils/singleton.h"
 #include "utils/time.h"
+#include "utils/metric.h"
 
 #include "task.h"
 #include "worker.h"
 #include "types.h"
 
 namespace xlb {
-
-// TODO: histogram with more metrics
 
 // The non-instantiable base class for schedulers.  Implements common routines
 // needed for scheduling.
@@ -27,7 +26,11 @@ public:
     Context ctx{};
     uint64_t cycles{};
 
+    ctx.worker = Worker::current();
     checkpoint_ = usage_.checkpoint = ctx.worker->current_tsc();
+
+    for (auto &f : utils::Singleton<InitWorkerFuncs>::instance())
+      f(ctx.worker->id());
 
     // The main scheduling, running, accounting loop.
     for (uint64_t round = 0;; ++round) {
@@ -99,7 +102,7 @@ private:
 class DefaultScheduler : public Scheduler {
 public:
   explicit DefaultScheduler() : Scheduler() {
-    for (auto &t : utils::Singleton<TaskFuncs>::Get())
+    for (auto &t : utils::Singleton<TaskFuncs>::instance())
       tasks_.emplace_back(t);
 
     CHECK_GT(tasks_.size(), 0);

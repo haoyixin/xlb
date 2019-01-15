@@ -64,7 +64,6 @@ set(SYS_INCS
 #        )
 
 set(OBJS
-        global_variable.cc
         packet_pool.cc
         dpdk.cc
         worker.cc
@@ -76,7 +75,6 @@ set(OBJS
         utils/numa.cc
         utils/format.cc
         utils/endian.cc
-        utils/thread_local.cc
         utils/singleton.cc
         headers/ip.cc
         headers/ether.cc

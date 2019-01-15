@@ -11,13 +11,15 @@
 #include <glog/logging.h>
 #include <rte_launch.h>
 
-#include "utils/numa.h"
 #include "utils/boost.h"
+#include "utils/numa.h"
 
 #include "config.h"
 
 namespace xlb {
 namespace {
+
+std::atomic_flag dpdk_initialized = ATOMIC_FLAG_INIT;
 
 void disable_syslog() { setlogmask(0x01); }
 
@@ -80,20 +82,6 @@ void init_eal() {
       std::to_string(CONFIG.mem.channel),
   };
 
-//  std::string opt_socket_mem;
-//  for (auto i : utils::irange(utils::Topology().size())) {
-//    if (i == 0)
-//      opt_socket_mem += std::to_string(dpdk_mb_per_socket);
-//    else
-//      opt_socket_mem += "," + std::to_string(dpdk_mb_per_socket);
-//  }
-//
-//  rte_args.Append({"--socket-mem", opt_socket_mem});
-
-  // Unlink mapped hugepage files so that memory can be reclaimed as soon as
-  // xlb terminates.
-//  rte_args.Append({"--huge-unlink"});
-
   // reset getopt()
   optind = 0;
 
@@ -120,31 +108,6 @@ void init_eal() {
   stdout = org_stdout;
 
   rte_openlog_stream(fopencookie(nullptr, "w", dpdk_log_funcs));
-}
-
-// Returns the last core ID of all cores.
-// If the process was run with a limited set of cores (by `taskset`),
-// the last one among them will be picked.
-// TODO: maybe useless
-int determine_default_core() {
-  cpu_set_t set;
-
-  int ret = pthread_getaffinity_np(pthread_self(), sizeof(set), &set);
-  if (ret < 0) {
-    PLOG(WARNING) << "pthread_getaffinity_np()";
-    return 0; // Core 0 as a fallback
-  }
-
-  // Choose the last core available
-  for (int i = CPU_SETSIZE; i >= 0; i--) {
-    if (CPU_ISSET(i, &set)) {
-      return i;
-    }
-  }
-
-  // This will never happen, but just in case.
-  PLOG(WARNING) << "No core is allowed for the process?";
-  return 0;
 }
 
 } // namespace

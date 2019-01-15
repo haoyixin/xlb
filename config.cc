@@ -19,7 +19,7 @@
 #include "headers/ether.h"
 #include "headers/ip.h"
 
-DECLARE_string(config);
+DEFINE_string(config, "../config.json", "Path of config file.");
 
 namespace xlb {
 

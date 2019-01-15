@@ -13,11 +13,7 @@ namespace xlb {
 // Alloc() and Free() are thread-safe.
 class PacketPool {
 public:
-  //  static PacketPool *GetPool(int node) { return pools_[node].get(); }
-
-  //  static void CreatePools(size_t capacity = CONFIG.packet_pool);
-
-  PacketPool(size_t capacity = CONFIG.mem.packet_pool,
+  explicit PacketPool(size_t capacity = CONFIG.mem.packet_pool,
              int socket_id = CONFIG.nic.socket);
   ~PacketPool();
 
@@ -54,17 +50,8 @@ protected:
   static const size_t kDefaultCapacity = (1 << 16) - 1; // 64k - 1
   static const size_t kMaxCacheSize = 512;              // per-core cache size
 
-  // Subclasses are expected to call this function in their constructor
-  //  void PostPopulate();
-
-  //  std::string name_;
-  rte_mempool *pool_;
-
 private:
-  // Per-node packet pools
-  // TODO: singleton
-  //  static std::shared_ptr<PacketPool> pools_[RTE_MAX_NUMA_NODES];
-
+  rte_mempool *pool_;
   friend class Packet;
 };
 

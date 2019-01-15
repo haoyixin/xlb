@@ -13,11 +13,14 @@
 
 namespace xlb {
 
+__thread Worker Worker::current_ = {};
+bool Worker::quitting_;
+
 // The entry point of worker threads
 void *Worker::Run() {
   random_ = new utils::Random();
 
-  auto name = utils::Format("worker-%d@%d", id_, core_);
+  auto name = utils::Format("worker-%u@%u", id_, core_);
   pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_), &cpu_set_);
   pthread_setname_np(pthread_self(), name.c_str());
 
@@ -46,10 +49,10 @@ void *Worker::Run() {
   return nullptr;
 }
 
-Worker::Worker(size_t core)
-    : id_(utils::Singleton<Counter>::Get().fetch_add(1)), core_(core),
-      socket_(CONFIG.nic.socket),
-      packet_pool_(&utils::Singleton<PacketPool>::Get()), silent_drops_(0),
+Worker::Worker(uint16_t core)
+    : id_(utils::Singleton<Counter, Worker>::instance().fetch_add(1)),
+      core_(core), socket_(CONFIG.nic.socket),
+      packet_pool_(&utils::Singleton<PacketPool>::instance()), silent_drops_(0),
       current_tsc_(0), current_ns_(0) {
   CPU_ZERO(&cpu_set_);
   CPU_SET(core_, &cpu_set_);
@@ -57,14 +60,14 @@ Worker::Worker(size_t core)
 
 void Worker::Launch() {
   for (auto core : CONFIG.worker_cores)
-    utils::Singleton<Threads>::Get().emplace_back(
-        [=]() { (new (current()) Worker(core))->Run(); });
+    utils::Singleton<Threads, Worker>::instance().emplace_back(
+        [=]() { (new (&current_) Worker(core))->Run(); });
 }
 
 void Worker::Quit() { quitting_ = true; }
 
 void Worker::Wait() {
-  for (auto &thread : utils::Singleton<Threads>::Get())
+  for (auto &thread : utils::Singleton<Threads, Worker>::instance())
     if (thread.joinable())
       thread.join();
 

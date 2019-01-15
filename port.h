@@ -1,11 +1,15 @@
 #ifndef XLB_PORT_H
 #define XLB_PORT_H
 
+#include <memory>
 #include <string>
 
 #include "headers/ether.h"
 
+#include "utils/boost.h"
 #include "utils/common.h"
+#include "utils/format.h"
+#include "utils/metric.h"
 
 #include "packet.h"
 #include "packet_batch.h"
@@ -14,78 +18,40 @@ namespace xlb {
 
 class Port {
 public:
-  /* The term RX/TX could be very confusing for a virtual port.
-   * Instead, we use the "incoming/outgoizng" convention:
-   * - incoming: outside -> XLB
-   * - outgoing: XLB -> outside */
-  typedef enum { INC = 0, OUT = 1, DIRS } Direction;
-
-  struct QueueCounters {
-    uint64_t packets;
-    uint64_t dropped;
-    uint64_t errors;
-    uint64_t bytes; // It doesn't include Ethernet overhead
-  };
-
-  struct LinkStatus {
+  struct Status {
     uint32_t speed;   // speed in mbps: 1000, 40000, etc. 0 for vports
     bool full_duplex; // full-duplex enabled?
     bool autoneg;     // auto-negotiated speed and duplex?
-    bool link_up;     // link up?
+    bool up;          // link up?
   };
 
   struct Conf {
-    headers::Ethernet::Address mac_addr;
+    headers::Ethernet::Address addr;
     uint16_t mtu;
-  };
-
-  struct Counters {
-    QueueCounters inc;
-    QueueCounters out;
   };
 
   static const uint32_t kDefaultMtu = 1500;
   static const uint32_t kMaxQueues = 32;
 
-  // TODO: more encapsulated
-  struct QueueCounters queue_counters_[DIRS][kMaxQueues];
+  virtual ~Port() = default;
 
-  virtual ~Port() {}
+  virtual uint16_t Recv(uint16_t qid, Packet **pkts, uint16_t cnt) = 0;
+  virtual uint16_t Send(uint16_t qid, Packet **pkts, uint16_t cnt) = 0;
 
-  virtual size_t RecvPackets(uint16_t qid, Packet **pkts, int cnt) = 0;
-  virtual size_t SendPackets(uint16_t qid, Packet **pkts, int cnt) = 0;
+  virtual struct Status Status() = 0;
 
-  virtual LinkStatus GetLinkStatus() = 0;
-
-  // return false if failed
-  virtual bool GetStats(Port::Counters &stats) = 0;
-
-  // TODO: reset status
-
-  //  const std::string &name() const { return name_; }
   const Conf &conf() const { return conf_; }
 
 protected:
-  explicit Port() : conf_(), queue_counters_() {}
+  explicit Port() : conf_() {}
 
   // Current configuration
   Conf conf_;
 
 private:
-  //  std::string name_; // The name of this port instance.
-
   DISALLOW_COPY_AND_ASSIGN(Port);
 };
 
 } // namespace xlb
-
-// TODO: builder ?
-
-//#define DEFINE_PORT(_PORT) xlb::ports::_PORT *PORTS_##_PORT
-
-//#define DECLARE_PORT(_PORT) extern xlb::ports::_PORT *PORTS_##_PORT
-
-//#define PORT_INIT(_PORT, ...)                                                  \
-//  PORTS_##_PORT = new xlb::ports::_PORT(#_PORT, ##__VA_ARGS__)
 
 #endif // XLB_PORT_H

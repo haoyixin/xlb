@@ -3,9 +3,9 @@
 
 #include <string>
 
-#include <rte_config.h>
-#include <rte_errno.h>
 #include <rte_ethdev.h>
+
+#include "utils/metric.h"
 
 #include "module.h"
 #include "port.h"
@@ -13,39 +13,36 @@
 namespace xlb {
 namespace ports {
 
-typedef uint16_t dpdk_port_t;
-
 // This driver binds a port to a device using DPDK.
 class PMD final : public Port {
 public:
-  static const int kDpdkPortUnknown = RTE_MAX_ETHPORTS;
+  static const uint16_t kDpdkPortUnknown = RTE_MAX_ETHPORTS;
 
   PMD();
   ~PMD() override;
 
-  bool GetStats(Port::Counters &stats) override;
-
-  // This should be inline
-  size_t RecvPackets(uint16_t qid, Packet **pkts, int cnt) override {
-    return rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
+  // recv and send should be inline
+  uint16_t Recv(uint16_t qid, Packet **pkts, uint16_t cnt) override {
+    auto recv =
+        rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
+    M::Adder<TSTR("rx_packets")>() << recv;
+    return recv;
   }
 
-  size_t SendPackets(uint16_t qid, Packet **pkts, int cnt) override {
-    int sent = rte_eth_tx_burst(
+  uint16_t Send(uint16_t qid, Packet **pkts, uint16_t cnt) override {
+    auto sent = rte_eth_tx_burst(
         dpdk_port_id_, qid, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
-    queue_counters_[OUT][qid].dropped += (cnt - sent);
+    M::Adder<TSTR("tx_dropped")>() << (cnt - sent);
+    M::Adder<TSTR("tx_packets")>() << sent;
     return sent;
   }
 
-  LinkStatus GetLinkStatus() override;
+  struct Status Status() override;
 
 private:
+  using M = utils::Metric<TSTR("xlb_ports"), TSTR("pmd")>;
   // The DPDK port ID number (set after binding).
-  dpdk_port_t dpdk_port_id_;
-
-  static void InitDriver();
-  void InitPort();
-  void Destroy();
+  uint16_t dpdk_port_id_;
 };
 
 } // namespace ports

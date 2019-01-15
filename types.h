@@ -21,11 +21,17 @@ struct TaskResult {
 };
 
 template <typename T>
-using ModuleFunc = TaskResult (T::*)(Context *, PacketBatch *, void *);
+using ModuleTaskFunc = TaskResult (T::*)(Context *, PacketBatch *, void *);
+
+template <typename T> using ModuleInitWorkerFunc = void (T::*)(uint16_t);
 
 using TaskFunc = std::function<TaskResult(Context *, PacketBatch *)>;
 
+using InitWorkerFunc = std::function<void(uint16_t)>;
+
 using TaskFuncs = std::vector<TaskFunc>;
+
+using InitWorkerFuncs = std::vector<InitWorkerFunc>;
 
 } // namespace xlb
 

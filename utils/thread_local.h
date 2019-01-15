@@ -5,7 +5,6 @@
 #include <shared_mutex>
 
 #include <bthread/bthread.h>
-#include <rte_lru.h>
 
 #include "utils/lock_less_queue.h"
 #include "utils/range.h"
@@ -18,13 +17,11 @@ namespace utils {
 template <typename T, typename R> class alignas(64) ThreadLocal {
 private:
   using MapResults = CuckooMap<size_t, R>;
-  using TaskFunc = std::function<void()>;
   using VoidFunc = std::function<void(T *)>;
   using MapFunc = std::function<void(T *, R *)>;
   using MergeFunc = std::function<void(const MapResults *)>;
   using SafeReadFunc = std::function<void(const T *)>;
 
-  // TODO: implement by std::function
   class TaskBase {
   public:
     TaskBase(ThreadLocal *data)
@@ -70,16 +67,16 @@ private:
         if (data->data_pointer_[tid])
           results_->Emplace(tid);
 
-      bthread_mutex_init(&merge_cond_mutex_, nullptr);
-      bthread_cond_init(&merge_cond_, nullptr);
-      bthread_start_background(&merge_thread_, nullptr, merge_thread_func,
-                               this);
+//      bthread_mutex_init(&merge_cond_mutex_, nullptr);
+//      bthread_cond_init(&merge_cond_, nullptr);
+//      bthread_start_background(&merge_thread_, nullptr, merge_thread_func,
+//                               this);
     }
 
     ~MapTask() {
       delete results_;
-      bthread_mutex_destroy(&merge_cond_mutex_);
-      bthread_cond_destroy(&merge_cond_);
+//      bthread_mutex_destroy(&merge_cond_mutex_);
+//      bthread_cond_destroy(&merge_cond_);
       bthread_join(&merge_thread_, nullptr);
     }
 
@@ -89,9 +86,11 @@ private:
     }
 
     void done() {
-      bthread_mutex_lock(&merge_cond_mutex_);
-      bthread_cond_signal(&merge_cond_);
-      bthread_mutex_unlock(&merge_cond_mutex_);
+        bthread_start_background(&merge_thread_, nullptr, merge_thread_func,
+                                 this);
+//      bthread_mutex_lock(&merge_cond_mutex_);
+//      bthread_cond_signal(&merge_cond_);
+//      bthread_mutex_unlock(&merge_cond_mutex_);
     }
 
   private:
@@ -135,7 +134,7 @@ public:
     for (auto i : range(0, num_threads)) {
       new (data_ + i) T(std::forward<Args>(args)...);
       new (task_queue_ + i)
-          LockLessQueue<VoidFunc>(socket_, kDefaultOpsLength, false, true);
+          LockLessQueue<TaskBase *>(socket_, kDefaultOpsLength, false, true);
     }
     // 0 is reserved
     Register(0);
@@ -216,6 +215,8 @@ private:
 
   static __thread size_t tid_;
 };
+
+template <typename T, typename R> __thread size_t ThreadLocal<T, R>::tid_ = {};
 
 } // namespace utils
 } // namespace xlb

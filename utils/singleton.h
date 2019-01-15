@@ -6,11 +6,13 @@
 namespace xlb {
 namespace utils {
 
-template <typename T> class Singleton {
+struct DefaultTag {};
+
+template <typename T, typename Tag = DefaultTag> class Singleton {
 public:
-  template <typename... Args> static T &Get(Args &&... args) {
-    static T value(std::forward<Args>(args)...);
-    return value;
+  template <typename... Args> static T &instance(Args &&... args) {
+    static T instance_(std::forward<Args>(args)...);
+    return instance_;
   }
 
   //  static void Reset() { Singleton<T>::Get().~T(); }
@@ -19,22 +21,23 @@ private:
   ~Singleton();
 };
 
-template <typename T> class UnsafeSingleton {
+template <typename T, typename Tag = DefaultTag> class UnsafeSingleton {
 public:
-  template <typename... Args> static T *Set(Args &&... args) {
-    value = new T(std::forward<Args>(args)...);
-    return value;
+  template <typename... Args> static T *Init(Args &&... args) {
+    instance_ = new T(std::forward<Args>(args)...);
+    return instance_;
   }
 
-  static T *Get() { return value; }
+  static T *instance() { return instance_; }
 
 private:
-  static T *value;
+  static T *instance_;
   UnsafeSingleton();
   ~UnsafeSingleton();
 };
 
-    template <typename T> T *UnsafeSingleton<T>::value;
+template <typename T, typename Tag>
+T *UnsafeSingleton<T, Tag>::instance_;
 
 } // namespace utils
 } // namespace xlb

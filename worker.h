@@ -1,13 +1,13 @@
 #ifndef XLB_WORKER_H
 #define XLB_WORKER_H
 
+#include <memory>
+#include <thread>
+
 #include "utils/common.h"
 #include "utils/cuckoo_map.h"
 #include "utils/random.h"
 #include "utils/time.h"
-
-#include <memory>
-#include <thread>
 
 namespace xlb {
 
@@ -26,17 +26,17 @@ public:
   static void Quit();
   static void Wait();
 
-  size_t id() { return id_; }
-  size_t core() { return core_; }
+  uint16_t id() { return id_; }
+  uint16_t core() { return core_; }
   int socket() { return socket_; }
 
   Scheduler *scheduler() { return scheduler_; }
   PacketPool *packet_pool() { return packet_pool_; }
-  utils::Random *random() const { return random_; }
+  utils::Random *random() { return random_; }
 
   uint64_t silent_drops() { return silent_drops_; }
-  uint64_t current_tsc() const { return current_tsc_; }
-  uint64_t current_ns() const { return current_ns_; }
+  uint64_t current_tsc() { return current_tsc_; }
+  uint64_t current_ns() { return current_ns_; }
 
   static bool quitting() { return quitting_; }
   static Worker *current() { return &current_; }
@@ -48,16 +48,16 @@ public:
   }
 
 private:
-  using Counter = std::atomic<size_t>;
+  using Counter = std::atomic<uint16_t>;
   using Threads = std::vector<std::thread>;
 
-  explicit Worker(size_t core);
+  explicit Worker(uint16_t core);
 
   // The entry point of worker threads.
   void *Run();
 
-  size_t id_;
-  size_t core_;
+  uint16_t id_;
+  uint16_t core_;
   int socket_;
   cpu_set_t cpu_set_;
 
@@ -70,8 +70,6 @@ private:
   uint64_t current_ns_;
 
   static bool quitting_;
-  //  static std::atomic<size_t> num_workers_;
-  //  static std::vector<std::thread> threads_;
 
   static __thread Worker current_;
 };

@@ -21,19 +21,19 @@ public:
     std::string netmask;
     std::string gateway;
 
-    int mtu;
+    uint16_t mtu;
     int socket;
     // TODO: offload & vlan
   };
 
   struct Mem {
-    int hugepage;
-    int channel;
-    int packet_pool;
+    size_t hugepage;
+    size_t channel;
+    size_t packet_pool;
   };
 
   std::string rpc_ip_port;
-  std::vector<int> worker_cores;
+  std::vector<uint16_t> worker_cores;
 
   // TODO: support multi numa node
   Nic nic;
@@ -45,7 +45,7 @@ private:
   void validate();
 };
 
-#define CONFIG utils::Singleton<Config>::Get()
+#define CONFIG utils::Singleton<Config>::instance()
 
 } // namespace xlb
 

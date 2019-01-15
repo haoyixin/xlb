@@ -5,8 +5,6 @@
 
 namespace xlb {
 
-extern std::atomic_flag dpdk_initialized;
-
 // Initialize DPDK, with the specified amount of hugepage memory.
 // Safe to call multiple times.
 void InitDpdk();

@@ -2,6 +2,7 @@
 
 #include <rte_ethdev_pci.h>
 
+#include "utils/boost.h"
 #include "utils/format.h"
 #include "utils/range.h"
 
@@ -13,16 +14,10 @@
 namespace xlb {
 namespace ports {
 
-PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
-  InitDriver();
-  InitPort();
-}
+namespace {
 
-PMD::~PMD() { Destroy(); }
-
-static const struct rte_eth_conf
-default_eth_conf(struct rte_eth_dev_info &dev_info) {
-  struct rte_eth_conf ret = {0};
+const struct rte_eth_conf default_eth_conf(struct rte_eth_dev_info &dev_info) {
+  struct rte_eth_conf ret {};
 
   // TODO: support software offload
   CHECK_NE(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM, 0);
@@ -54,7 +49,7 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
   CHECK(!rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_NTUPLE));
   // TODO: support RTE_ETH_FILTER_FDIR
 
-  struct rte_eth_ntuple_filter ntuple = {0};
+  struct rte_eth_ntuple_filter ntuple {};
   utils::be32_t dst;
   headers::ParseIpv4Address(dst_ip, &dst);
 
@@ -68,17 +63,38 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
                                  RTE_ETH_FILTER_ADD, &ntuple));
 }
 
-void PMD::InitDriver() {
-  dpdk_port_t num_dpdk_ports = rte_eth_dev_count();
+// Find a port attached to DPDK by its PCI address.
+// returns true and sets *ret_port_id to the port_id of the port at PCI address
+// "pci" if it is valid and available.
+bool find_dpdk_port_by_pci_addr(const std::string &pci, uint16_t *ret_port_id) {
+  uint16_t port_id{};
+  struct rte_eth_dev_info info {};
+  struct rte_pci_addr addr {};
+
+  rte_pci_addr_parse(pci.c_str(), &addr);
+
+  RTE_ETH_FOREACH_DEV(port_id) {
+    rte_eth_dev_info_get(port_id, &info);
+    if (info.pci_dev &&
+        rte_eal_compare_pci_addr(&addr, &info.pci_dev->addr) == 0) {
+      *ret_port_id = port_id;
+      return true;
+    }
+  }
+  return false;
+}
+
+void init_driver() {
+  uint16_t num_dpdk_ports = rte_eth_dev_count();
 
   CHECK_NE(num_dpdk_ports, 0);
 
   LOG(INFO) << static_cast<int>(num_dpdk_ports)
             << " nics have been recognized:";
 
-  for (dpdk_port_t i = 0; i < num_dpdk_ports; i++) {
-    struct rte_eth_dev_info dev_info;
-    std::string pci_info;
+  for (auto i : utils::irange((uint16_t)0, num_dpdk_ports)) {
+    struct rte_eth_dev_info dev_info {};
+    std::string pci_info{};
     int numa_node = -1;
 
     headers::Ethernet::Address mac_addr{};
@@ -104,43 +120,24 @@ void PMD::InitDriver() {
   }
 }
 
-// Find a port attached to DPDK by its PCI address.
-// returns true and sets *ret_port_id to the port_id of the port at PCI address
-// "pci" if it is valid and available.
-// TODO: google style
-static bool find_dpdk_port_by_pci_addr(const std::string &pci,
-                                       dpdk_port_t *ret_port_id) {
-  dpdk_port_t port_id = 0;
-  struct rte_eth_dev_info info = {0};
-  struct rte_pci_addr addr = {0};
+} // namespace
 
-  rte_pci_addr_parse(pci.c_str(), &addr);
+PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
+  M::Expose<TSTR("rx_packets"), TSTR("tx_packets"), TSTR("tx_dropped")>;
 
-  RTE_ETH_FOREACH_DEV(port_id) {
-    rte_eth_dev_info_get(port_id, &info);
-    if (info.pci_dev &&
-        rte_eal_compare_pci_addr(&addr, &info.pci_dev->addr) == 0) {
-      *ret_port_id = port_id;
-      return true;
-    }
-  }
-  return false;
-}
+  init_driver();
 
-void PMD::InitPort() {
-  dpdk_port_t ret_port_id = kDpdkPortUnknown;
+  uint16_t num_q = CONFIG.worker_cores.size();
 
-  uint8_t num_q = CONFIG.worker_cores.size();
+  CHECK(find_dpdk_port_by_pci_addr(CONFIG.nic.pci_address, &dpdk_port_id_));
 
-  CHECK(find_dpdk_port_by_pci_addr(CONFIG.nic.pci_address, &ret_port_id));
-
-  struct rte_eth_dev_info dev_info;
-  rte_eth_dev_info_get(ret_port_id, &dev_info);
+  struct rte_eth_dev_info dev_info {};
+  rte_eth_dev_info_get(dpdk_port_id_, &dev_info);
 
   struct rte_eth_conf eth_conf = default_eth_conf(dev_info);
-  CHECK(!rte_eth_dev_configure(ret_port_id, num_q, num_q, &eth_conf));
+  CHECK(!rte_eth_dev_configure(dpdk_port_id_, num_q, num_q, &eth_conf));
 
-  rte_eth_promiscuous_enable(ret_port_id);
+  rte_eth_promiscuous_enable(dpdk_port_id_);
 
   int sid = CONFIG.nic.socket;
 
@@ -155,27 +152,26 @@ void PMD::InitPort() {
 
   // TODO: configurable queue size
   for (auto i : utils::range(0, num_q))
-    CHECK(!rte_eth_tx_queue_setup(ret_port_id, i, dev_info.tx_desc_lim.nb_max,
+    CHECK(!rte_eth_tx_queue_setup(dpdk_port_id_, i, dev_info.tx_desc_lim.nb_max,
                                   sid, &eth_txconf));
 
   for (auto i : utils::range(0, num_q))
-    CHECK(!rte_eth_rx_queue_setup(ret_port_id, i, dev_info.rx_desc_lim.nb_max,
-                                  sid, &eth_rxconf,
-                                  utils::Singleton<PacketPool>::Get().pool()));
+    CHECK(!rte_eth_rx_queue_setup(
+        dpdk_port_id_, i, dev_info.rx_desc_lim.nb_max, sid, &eth_rxconf,
+        utils::Singleton<PacketPool>::instance().pool()));
 
-  CHECK(!rte_eth_dev_set_vlan_offload(ret_port_id, ETH_VLAN_STRIP_OFFLOAD));
+  CHECK(!rte_eth_dev_set_vlan_offload(dpdk_port_id_, ETH_VLAN_STRIP_OFFLOAD));
 
   for (auto i : utils::range(0, CONFIG.nic.local_ips.size())) {
-    filter_add(ret_port_id, CONFIG.nic.local_ips[i],
+    filter_add(dpdk_port_id_, CONFIG.nic.local_ips[i],
                i % CONFIG.worker_cores.size());
   }
 
-  CHECK(!rte_eth_dev_start(ret_port_id));
-
-  dpdk_port_id_ = ret_port_id;
+  CHECK(!rte_eth_dev_start(dpdk_port_id_));
+  CHECK_NE(dpdk_port_id_, kDpdkPortUnknown);
 
   rte_eth_macaddr_get(dpdk_port_id_,
-                      reinterpret_cast<ether_addr *>(conf_.mac_addr.bytes));
+                      reinterpret_cast<ether_addr *>(conf_.addr.bytes));
   CHECK(!rte_eth_dev_set_mtu(dpdk_port_id_, CONFIG.nic.mtu));
 
   conf_.mtu = CONFIG.nic.mtu;
@@ -184,58 +180,21 @@ void PMD::InitPort() {
   CHECK(!rte_eth_stats_reset(dpdk_port_id_));
 }
 
-void PMD::Destroy() { rte_eth_dev_stop(dpdk_port_id_); }
+PMD::~PMD() { rte_eth_dev_stop(dpdk_port_id_); }
 
-// TODO: using bvar
-bool PMD::GetStats(Port::Counters &stats) {
-  struct rte_eth_stats phy_stats = {0};
-
-  int ret = rte_eth_stats_get(dpdk_port_id_, &phy_stats);
-  if (ret < 0) {
-    LOG(ERROR) << "rte_eth_stats_get(" << static_cast<int>(dpdk_port_id_)
-               << ") failed: " << rte_strerror(-ret);
-    return false;
-  }
-
-  VLOG(1) << utils::Format(
-      "PMD port %d: ipackets %" PRIu64 " opackets %" PRIu64 " ibytes %" PRIu64
-      " obytes %" PRIu64 " imissed %" PRIu64 " ierrors %" PRIu64
-      " oerrors %" PRIu64 " rx_nombuf %" PRIu64,
-      dpdk_port_id_, phy_stats.ipackets, phy_stats.opackets, phy_stats.ibytes,
-      phy_stats.obytes, phy_stats.imissed, phy_stats.ierrors, phy_stats.oerrors,
-      phy_stats.rx_nombuf);
-
-  stats.inc.errors = phy_stats.ierrors + phy_stats.rx_nombuf;
-  stats.inc.dropped = phy_stats.imissed;
-  stats.inc.packets = phy_stats.ipackets;
-  stats.inc.bytes = phy_stats.ibytes;
-
-  stats.out.errors = phy_stats.oerrors;
-  stats.out.packets = phy_stats.opackets;
-  stats.out.bytes = phy_stats.obytes;
-
-  Direction dir = OUT;
-  uint64_t odroped = 0;
-
-  // As we are loadbalancer, tx drop mean that dropping by application
-  for (uint16_t qid = 0; qid < CONFIG.worker_cores.size(); qid++)
-    odroped += queue_counters_[dir][qid].dropped;
-
-  stats.out.dropped = odroped;
-
-  return true;
-  // TODO: status per queue
-}
-
-Port::LinkStatus PMD::GetLinkStatus() {
-  struct rte_eth_link status;
+struct Port::Status PMD::Status() {
+  struct rte_eth_link dpdk_status;
   // rte_eth_link_get() may block up to 9 seconds, so use _nowait() variant.
-  rte_eth_link_get_nowait(dpdk_port_id_, &status);
+  rte_eth_link_get_nowait(dpdk_port_id_, &dpdk_status);
 
-  return LinkStatus{.speed = status.link_speed,
-                    .full_duplex = static_cast<bool>(status.link_duplex),
-                    .autoneg = static_cast<bool>(status.link_autoneg),
-                    .link_up = static_cast<bool>(status.link_status)};
+  struct Port::Status port_status;
+
+  port_status.speed = dpdk_status.link_speed;
+  port_status.full_duplex = static_cast<bool>(dpdk_status.link_duplex);
+  port_status.autoneg = static_cast<bool>(dpdk_status.link_autoneg);
+  port_status.up = static_cast<bool>(dpdk_status.link_status);
+
+  return port_status;
 }
 
 } // namespace ports

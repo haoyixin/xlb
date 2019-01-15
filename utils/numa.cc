@@ -194,7 +194,7 @@ public:
   }
 };
 
-topology &topology_singleton() { return Singleton<topology>::Get(); }
+topology &topology_singleton() { return Singleton<topology>::instance(); }
 
 #define _RETURN_ID_OPT_BY_FIELD_HAS_VALUE(_FIELD, _VALUE)                      \
   do {                                                                         \
