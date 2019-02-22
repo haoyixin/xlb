@@ -19,7 +19,7 @@ struct PoolPrivate {
 };
 
 // callback function for each packet
-void InitPacket(rte_mempool *mp, void *, void *mbuf, unsigned index) {
+void init_packet(rte_mempool *mp, void *, void *mbuf, unsigned index) {
   rte_pktmbuf_init(mp, nullptr, mbuf, index);
 
   auto *pkt = static_cast<Packet *>(mbuf);
@@ -52,8 +52,18 @@ PacketPool::PacketPool(size_t capacity, int socket_id) {
       .owner = this};
 
   rte_pktmbuf_pool_init(pool_, &priv.dpdk_priv);
-  rte_mempool_obj_iter(pool_, InitPacket, nullptr);
+  rte_mempool_obj_iter(pool_, init_packet, nullptr);
   CHECK_EQ(pool_->populated_size, capacity);
+}
+
+Packet *PacketPool::Alloc(size_t len) {
+  auto *pkt = reinterpret_cast<Packet *>(rte_pktmbuf_alloc(pool_));
+  if (pkt) {
+    pkt->pkt_len_ = len;
+    pkt->data_len_ = len;
+    // TODO: check
+  }
+  return pkt;
 }
 
 PacketPool::~PacketPool() { rte_mempool_free(pool_); }

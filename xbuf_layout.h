@@ -1,5 +1,4 @@
-#ifndef XLB_XBUF_LAYOUT_H
-#define XLB_XBUF_LAYOUT_H
+#pragma once
 
 /* xbuf and mbuf share the same start address, so that we can avoid conversion.
  *
@@ -35,5 +34,3 @@
 #define XBUF_DATA_OFF (XBUF_HEADROOM_OFF + XBUF_HEADROOM)
 
 #define XBUF_SIZE (XBUF_DATA_OFF + XBUF_DATA)
-
-#endif //XLB_XBUF_LAYOUT_H

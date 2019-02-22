@@ -1,45 +1,66 @@
-#ifndef XLB_UTILS_SINGLETON_H
-#define XLB_UTILS_SINGLETON_H
+#pragma once
 
 #include <utility>
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 struct DefaultTag {};
 
-template <typename T, typename Tag = DefaultTag> class Singleton {
-public:
-  template <typename... Args> static T &instance(Args &&... args) {
+template <typename T, typename Tag = DefaultTag>
+class Singleton {
+ public:
+  template <typename... Args>
+  static T &instance(Args &&... args) {
     static T instance_(std::forward<Args>(args)...);
     return instance_;
   }
 
-  //  static void Reset() { Singleton<T>::Get().~T(); }
-private:
-  Singleton();
-  ~Singleton();
+  // private:
+  Singleton() = delete;
+  ~Singleton() = delete;
 };
 
-template <typename T, typename Tag = DefaultTag> class UnsafeSingleton {
-public:
-  template <typename... Args> static T *Init(Args &&... args) {
+template <typename T, typename Tag = DefaultTag>
+class UnsafeSingleton {
+ public:
+  UnsafeSingleton() = delete;
+  ~UnsafeSingleton() { delete instance_; };
+
+  template <typename... Args>
+  static T *Init(Args &&... args) {
     instance_ = new T(std::forward<Args>(args)...);
     return instance_;
   }
 
   static T *instance() { return instance_; }
 
-private:
+ private:
   static T *instance_;
-  UnsafeSingleton();
-  ~UnsafeSingleton();
 };
 
 template <typename T, typename Tag>
 T *UnsafeSingleton<T, Tag>::instance_;
 
-} // namespace utils
-} // namespace xlb
+/*
+template <typename T, typename Tag = DefaultTag> class UnsafeSingletonTLS {
+public:
+  template <typename... Args> static T *InitInThread(Args &&... args) {
+    instance_ = new T(std::forward<Args>(args)...);
+    return instance_;
+  }
 
-#endif // XLB_UTILS_SINGLETON_H
+  static void InitInThread(T *instance) { instance_ = instance; }
+
+  static T *instance() { return instance_; }
+
+private:
+  static __thread T *instance_;
+  UnsafeSingletonTLS();
+  ~UnsafeSingletonTLS();
+};
+
+template <typename T, typename Tag>
+__thread T *UnsafeSingletonTLS<T, Tag>::instance_;
+ */
+
+}  // namespace xlb::utils

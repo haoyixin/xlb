@@ -1,5 +1,4 @@
-#ifndef XLB_WORKER_H
-#define XLB_WORKER_H
+#pragma once
 
 #include <memory>
 #include <thread>
@@ -15,15 +14,15 @@ class Scheduler;
 
 class PacketPool;
 
-class Task;
+// class Task;
 
 class Worker {
-public:
+ public:
   // This is used for static ctor
   Worker() = default;
 
   static void Launch();
-  static void Quit();
+  static void Abort();
   static void Wait();
 
   uint16_t id() { return id_; }
@@ -38,7 +37,7 @@ public:
   uint64_t current_tsc() { return current_tsc_; }
   uint64_t current_ns() { return current_ns_; }
 
-  static bool quitting() { return quitting_; }
+  static bool aborting() { return aborting_; }
   static Worker *current() { return &current_; }
 
   void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
@@ -47,7 +46,7 @@ public:
     current_ns_ = utils::TscToNs(current_ns_);
   }
 
-private:
+ private:
   using Counter = std::atomic<uint16_t>;
   using Threads = std::vector<std::thread>;
 
@@ -65,15 +64,13 @@ private:
   Scheduler *scheduler_;
   utils::Random *random_;
 
-  uint64_t silent_drops_; // packets that have been sent to a deadend
+  uint64_t silent_drops_;  // packets that have been sent to a deadend
   uint64_t current_tsc_;
   uint64_t current_ns_;
 
-  static bool quitting_;
+  static bool aborting_;
 
   static __thread Worker current_;
 };
 
-} // namespace xlb
-
-#endif // XLB_WORKER_H
+}  // namespace xlb

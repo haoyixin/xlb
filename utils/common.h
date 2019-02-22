@@ -1,13 +1,13 @@
 /* This header file contains general (not XLB specific) C/C++ definitions */
 
-#ifndef XLB_UTILS_COMMON_H
-#define XLB_UTILS_COMMON_H
+#pragma once
 
 #include <unistd.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <string>
+
 
 #if __cplusplus < 201703L  // pre-C++17?
 #error Must be built with C++17
@@ -177,5 +177,3 @@ struct PairHasher {
     return static_cast<size_t>(b);
   }
 };
-
-#endif  // XLB_UTILS_COMMON_H_

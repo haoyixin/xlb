@@ -1,16 +1,11 @@
-#ifndef XLB_HEADERS_COMMON_H
-#define XLB_HEADERS_COMMON_H
+#pragma once
 
 #include "utils/endian.h"
 
-namespace xlb {
-namespace headers {
+namespace xlb::headers {
 
 using utils::be16_t;
 using utils::be32_t;
 using utils::be64_t;
 
-} // namespace headers
-} // namespace xlb
-
-#endif // XLB_HEADERS_COMMON_H
+}  // namespace xlb::headers

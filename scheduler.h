@@ -1,133 +1,101 @@
-#ifndef XLB_SCHEDULER_H
-#define XLB_SCHEDULER_H
+#pragma once
 
+#include <functional>
+#include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "utils/common.h"
+#include "utils/extended_priority_queue.h"
+#include "utils/metric.h"
 #include "utils/singleton.h"
 #include "utils/time.h"
-#include "utils/metric.h"
 
-#include "task.h"
+#include "packet_batch.h"
 #include "worker.h"
-#include "types.h"
 
 namespace xlb {
 
-// The non-instantiable base class for schedulers.  Implements common routines
-// needed for scheduling.
+// The weighted round robin scheduler.
+// TODO: abstract
 class Scheduler {
-public:
-  virtual ~Scheduler() = default;
+ public:
+  explicit Scheduler();
+  virtual ~Scheduler();
 
   // Runs the scheduler loop forever.
-  void ScheduleLoop() {
-    bool idle{false};
-    Context ctx{};
-    uint64_t cycles{};
+  void Loop();
 
-    ctx.worker = Worker::current();
-    checkpoint_ = usage_.checkpoint = ctx.worker->current_tsc();
+  static double CpuUsage();
 
-    for (auto &f : utils::Singleton<InitWorkerFuncs>::instance())
-      f(ctx.worker->id());
+  // Functor used by a Worker's Scheduler to run a task in a module.
+  class Task {
+   public:
+    class Context {
+     public:
+      Context() = default;
+      inline void DropPacket(Packet *pkt);
+      inline void HoldPacket(Packet *pkt);
 
-    // The main scheduling, running, accounting loop.
-    for (uint64_t round = 0;; ++round) {
-      if (Worker::quitting())
-        break;
+      auto worker() { return worker_; }
+      auto stage_batch() { return stage_batch_; }
 
-      ctx.task = Next();
-      ctx.worker->UpdateTsc();
-      ctx.worker->IncrSilentDrops(ctx.silent_drops);
-      ctx.silent_drops = 0;
+     private:
+      Task *task_;
+      Worker *worker_;
+      uint64_t silent_drops_;
 
-      cycles = ctx.worker->current_tsc() - checkpoint_;
+      // A packet batch for storing packets to free
+      PacketBatch dead_batch_;
+      PacketBatch stage_batch_;
 
-      if (idle)
-        stats_.cycles_idle += cycles;
-      else
-        stats_.cycles_busy += cycles;
+      friend Scheduler;
+      friend Task;
+    };
 
-      checkpoint_ = ctx.worker->current_tsc();
-      if (checkpoint_ - usage_.checkpoint > Usage::kDefaultInterval) {
-        usage_.ratio = double(stats_.cycles_busy) /
-                       (stats_.cycles_busy + stats_.cycles_idle);
-        usage_.checkpoint = checkpoint_;
-
-        stats_.cycles_busy = 0;
-        stats_.cycles_idle = 0;
+    struct Compare {
+      bool operator()(Task *t1, Task *t2) const {
+        return t1->current_weight_ < t2->current_weight_;
       }
+    };
 
-      idle = !ScheduleOnce(&ctx);
-    }
+    struct Result {
+      uint64_t packets;
+    };
+
+    using Func = std::function<Result(Context *)>;
+
+   protected:
+    explicit Task(Func &&func, uint8_t weight);
+
+    ~Task();
+
+   private:
+    Func func_;
+    Context context_;
+
+    uint8_t current_weight_;
+    uint8_t max_weight_;
+
+    friend Scheduler;
+  };
+
+  void RegisterTask(Task::Func &&func, uint8_t weight) {
+    runnable_->emplace(new Task(std::move(func), weight));
   }
 
-  double usage_ratio() { return usage_.ratio; }
+ private:
+  using M = utils::Metric<TS("xlb_scheduler"), TS("wrr")>;
+  using TaskQueue = utils::extended_priority_queue<Task *, Task::Compare>;
 
-protected:
-  explicit Scheduler() : stats_(), usage_(), checkpoint_() {}
+  inline Task::Context *next_ctx();
 
-  virtual Task *Next() = 0;
-
-  // Runs the scheduler once, return false for idle loop.
-  // As we only hava a DefaultSchedular, speculative devirtualization in gcc
-  // maybe work
-  virtual bool ScheduleOnce(Context *ctx) = 0;
-
-private:
-  struct Stats {
-    uint64_t cycles_idle;
-    uint64_t cycles_busy;
-  };
-
-  struct Usage {
-    // this is 5 seconds by default
-    // TODO: maybe this should be in CONFIG
-    static const uint64_t kDefaultInterval = 5e9;
-    double ratio;
-    uint64_t checkpoint;
-  };
-
-  Stats stats_;
-  Usage usage_;
+  TaskQueue *runnable_;
+  TaskQueue *blocked_;
 
   uint64_t checkpoint_;
 
   DISALLOW_COPY_AND_ASSIGN(Scheduler);
 };
 
-// The default scheduler, which round robins the tasks to run
-// TODO: weighted round robin
-class DefaultScheduler : public Scheduler {
-public:
-  explicit DefaultScheduler() : Scheduler() {
-    for (auto &t : utils::Singleton<TaskFuncs>::instance())
-      tasks_.emplace_back(t);
-
-    CHECK_GT(tasks_.size(), 0);
-
-    pos_ = tasks_.begin();
-  }
-
-  ~DefaultScheduler() override = default;
-
-  bool ScheduleOnce(Context *ctx) override {
-    return ctx->task->Run(ctx).packets != 0;
-  }
-
-  Task *Next() override {
-    if (pos_ == tasks_.end())
-      pos_ = tasks_.begin();
-
-    return &*pos_++;
-  }
-
-private:
-  std::vector<Task> tasks_;
-  std::vector<Task>::iterator pos_;
-};
-
-} // namespace xlb
-
-#endif // XLB_SCHEDULER_H
+}  // namespace xlb

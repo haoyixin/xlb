@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_SIMD_H
-#define XLB_UTILS_SIMD_H
+#pragma once
 
 #include <string>
 
@@ -71,6 +70,4 @@ static inline uint64_t m128i_extract_u64(__m128i a, int i) {
 #endif
 }
 
-#endif  // __AVX__
-
-#endif  // XLB_UTILS_SIMD_H_
+#endif // __AVX__

@@ -8,8 +8,7 @@
 #include "utils/format.h"
 #include "utils/random.h"
 
-namespace xlb {
-namespace headers {
+namespace xlb::headers {
 
 using Address = Ethernet::Address;
 
@@ -33,13 +32,11 @@ std::string Address::ToString() const {
 void Address::Randomize() {
   utils::Random rng;
 
-  for (size_t i = 0; i < Address::kSize; i++) {
-    bytes[i] = rng.Integer() & 0xff;
-  }
+  for (auto &byte : bytes)
+    byte = rng.Integer() & 0xff;
 
   bytes[0] &= 0xfe;  // not broadcast/multicast
   bytes[0] |= 0x02;  // locally administered
 }
 
-}  // namespace headers
-}  // namespace xlb
+}  // namespace xlb::headers

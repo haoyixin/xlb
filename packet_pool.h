@@ -1,5 +1,4 @@
-#ifndef XLB_PACKET_POOL_H
-#define XLB_PACKET_POOL_H
+#pragma once
 
 #include <memory>
 
@@ -22,15 +21,7 @@ public:
   PacketPool &operator=(const PacketPool &) = delete;
 
   // Allocate a packet from the pool, with specified initial packet size.
-  Packet *Alloc(size_t len = 0) {
-    Packet *pkt = reinterpret_cast<Packet *>(rte_pktmbuf_alloc(pool_));
-    if (pkt) {
-      pkt->pkt_len_ = len;
-      pkt->data_len_ = len;
-      // TODO: check
-    }
-    return pkt;
-  }
+  inline Packet *Alloc(size_t len = 0);
 
   // TODO: implement it
   /*
@@ -56,5 +47,3 @@ private:
 };
 
 } // namespace xlb
-
-#endif // XLB_PACKET_POOL_H

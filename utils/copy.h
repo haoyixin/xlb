@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_COPY_H_
-#define XLB_UTILS_COPY_H_
+#pragma once
 
 #include <x86intrin.h>
 #include <cstring>
@@ -8,8 +7,7 @@
 
 #include "common.h"
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 static inline void Copy16(void *__restrict__ dst,
                           const void *__restrict__ src) {
@@ -226,7 +224,4 @@ static inline void Copy(void *__restrict__ dst, const void *__restrict__ src,
   }
 }
 
-}  // namespace utils
-}  // namespace xlb
-
-#endif  // XLB_UTILS_COPY_H_
+}  // namespace xlb::utils

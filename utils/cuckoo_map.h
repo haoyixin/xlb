@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_CUCKOO_MAP_H
-#define XLB_UTILS_CUCKOO_MAP_H
+#pragma once
 
 #include <array>
 #include <functional>
@@ -16,21 +15,20 @@
 #include "utils/allocator.h"
 #include "utils/boost.h"
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 // A hash table implementation using cuckoo hashing on hugepage
 // Note: this is not thread-safe
 template <typename K, typename V, typename H = std::hash<K>,
           typename E = std::equal_to<K>>
 class CuckooMap {
-public:
+ public:
   using Entry = std::pair<K, V>;
   using HashResult = uint32_t;
   using EntryIndex = uint32_t;
 
   class iterator {
-  public:
+   public:
     using difference_type = std::ptrdiff_t;
     using value_type = Entry;
     using pointer = Entry *;
@@ -49,7 +47,7 @@ public:
       }
     }
 
-    iterator &operator++() { // Pre-increment
+    iterator &operator++() {  // Pre-increment
       do {
         slot_idx_++;
         if (slot_idx_ == kEntriesPerBucket) {
@@ -61,7 +59,7 @@ public:
       return *this;
     }
 
-    const iterator operator++(int) { // Post-increment
+    const iterator operator++(int) {  // Post-increment
       iterator tmp(*this);
       do {
         slot_idx_++;
@@ -94,17 +92,21 @@ public:
       return &map_.entries_[idx];
     }
 
-  private:
+   private:
     CuckooMap &map_;
     size_t bucket_idx_;
     size_t slot_idx_;
   };
 
-  CuckooMap(int socket = SOCKET_ID_ANY, size_t reserve_buckets = kInitNumBucket,
-            size_t reserve_entries = kInitNumEntries)
-      : bucket_mask_(reserve_buckets - 1), num_entries_(0), allocator_(socket),
+  explicit CuckooMap(int socket = SOCKET_ID_ANY,
+                     size_t reserve_buckets = kInitNumBucket,
+                     size_t reserve_entries = kInitNumEntries)
+      : bucket_mask_(reserve_buckets - 1),
+        num_entries_(0),
+        allocator_(socket),
         buckets_(reserve_buckets, &allocator_),
-        entries_(reserve_entries, &allocator_), free_entry_indices_() {
+        entries_(reserve_entries, &allocator_),
+        free_entry_indices_() {
     // the number of buckets must be a power of 2
     CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
@@ -141,7 +143,8 @@ public:
   // On success returns a pointer to the inserted entry, nullptr otherwise.
   // NOTE: when Emplace() returns nullptr, the constructor of `V` may not be
   // called.
-  template <typename... Args> Entry *Emplace(const K &key, Args &&... args) {
+  template <typename... Args>
+  Entry *Emplace(const K &key, Args &&... args) {
     return do_emplace(key, H(), E(), std::forward<Args>(args)...);
   }
 
@@ -172,14 +175,10 @@ public:
   // Return false if not exist.
   bool Remove(const K &key, const H &hasher = H(), const E &eq = E()) {
     HashResult pri = hash(key, hasher);
-    if (remove_from_bucket(pri, pri & bucket_mask_, key, eq))
-      return true;
+    if (remove_from_bucket(pri, pri & bucket_mask_, key, eq)) return true;
 
     HashResult sec = hash_secondary(pri);
-    if (remove_from_bucket(pri, sec & bucket_mask_, key, eq))
-      return true;
-
-    return false;
+    return remove_from_bucket(pri, sec & bucket_mask_, key, eq);
   }
 
   void Clear() {
@@ -187,8 +186,7 @@ public:
     entries_.clear();
 
     // std::stack doesn't have a clear() method. Strange.
-    while (!free_entry_indices_.empty())
-      free_entry_indices_.pop();
+    while (!free_entry_indices_.empty()) free_entry_indices_.pop();
 
     num_entries_ = 0;
     bucket_mask_ = kInitNumBucket - 1;
@@ -202,11 +200,13 @@ public:
   // Return the number of stored entries
   size_t Count() const { return num_entries_; }
 
-protected:
+  int socket() const { return allocator_.socket(); }
+
+ protected:
   // Tunable macros
   static const int kInitNumBucket = 8;
   static const int kInitNumEntries = 32;
-  static const int kEntriesPerBucket = 4; // 4-way set associative
+  static const int kEntriesPerBucket = 4;  // 4-way set associative
 
   // 4^kMaxCuckooPath buckets will be considered to make a empty slot,
   // before giving up and expand the table.
@@ -254,8 +254,7 @@ protected:
 
   // Pop a free entry index from stack and return the index
   EntryIndex pop_free_entry_index() {
-    if (free_entry_indices_.empty())
-      expand_entries();
+    if (free_entry_indices_.empty()) expand_entries();
 
     EntryIndex idx = free_entry_indices_.top();
     free_entry_indices_.pop();
@@ -294,8 +293,7 @@ protected:
     Bucket &bucket = buckets_[bucket_idx];
 
     int slot_idx = find_empty_slot(bucket);
-    if (slot_idx == -1)
-      return nullptr;
+    if (slot_idx == -1) return nullptr;
 
     return emplace_in_bucket(bucket, slot_idx, key, hasher,
                              std::forward<Args>(args)...);
@@ -377,8 +375,7 @@ protected:
   // Return an empty slot index in the bucket
   int find_empty_slot(const Bucket &bucket) const {
     for (auto i : irange(kEntriesPerBucket))
-      if (bucket.hash_values[i] == 0)
-        return i;
+      if (bucket.hash_values[i] == 0) return i;
 
     return -1;
   }
@@ -482,7 +479,8 @@ protected:
   }
 
   // Resize the space of buckets, and rehash existing entries
-  template <typename VV> void expand_buckets(const H &hasher, const E &eq) {
+  template <typename VV>
+  void expand_buckets(const H &hasher, const E &eq) {
     CuckooMap<K, V, H, E> bigger(allocator_.socket(), buckets_.size() * 2,
                                  entries_.size());
 
@@ -508,17 +506,12 @@ protected:
   MemoryResource allocator_;
 
   // bucket and entry arrays grow independently
-  std::vector<Bucket, std::experimental::pmr::polymorphic_allocator<Bucket>>
-      buckets_;
-  std::vector<Entry, std::experimental::pmr::polymorphic_allocator<Entry>>
-      entries_;
+  std::vector<Bucket, pmr::polymorphic_allocator<Bucket>> buckets_;
+  std::vector<Entry, pmr::polymorphic_allocator<Entry>> entries_;
 
   // Stack of free entries (I don't know why using hugepage here will cause
   // performance degradation.)
   std::stack<EntryIndex> free_entry_indices_;
 };
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_CUCKOO_MAP_H
+}  // namespace xlb::utils

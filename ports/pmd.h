@@ -1,5 +1,4 @@
-#ifndef XLB_PORTS_PMD_H
-#define XLB_PORTS_PMD_H
+#pragma once
 
 #include <string>
 
@@ -7,11 +6,9 @@
 
 #include "utils/metric.h"
 
-#include "module.h"
 #include "port.h"
 
-namespace xlb {
-namespace ports {
+namespace xlb::ports {
 
 // This driver binds a port to a device using DPDK.
 class PMD final : public Port {
@@ -21,31 +18,19 @@ public:
   PMD();
   ~PMD() override;
 
-  // recv and send should be inline
-  uint16_t Recv(uint16_t qid, Packet **pkts, uint16_t cnt) override {
-    auto recv =
-        rte_eth_rx_burst(dpdk_port_id_, qid, (struct rte_mbuf **)pkts, cnt);
-    M::Adder<TSTR("rx_packets")>() << recv;
-    return recv;
-  }
-
-  uint16_t Send(uint16_t qid, Packet **pkts, uint16_t cnt) override {
-    auto sent = rte_eth_tx_burst(
-        dpdk_port_id_, qid, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
-    M::Adder<TSTR("tx_dropped")>() << (cnt - sent);
-    M::Adder<TSTR("tx_packets")>() << sent;
-    return sent;
-  }
+  inline uint16_t Recv(uint16_t qid, Packet **pkts, uint16_t cnt) override;
+  inline uint16_t Send(uint16_t qid, Packet **pkts, uint16_t cnt) override;
 
   struct Status Status() override;
 
+  const struct rte_eth_dev_info *dev_info() { return &dev_info_; }
+  uint16_t dpdk_port_id() { return dpdk_port_id_; }
+
 private:
-  using M = utils::Metric<TSTR("xlb_ports"), TSTR("pmd")>;
+  using M = utils::Metric<TS("xlb_ports"), TS("pmd")>;
   // The DPDK port ID number (set after binding).
   uint16_t dpdk_port_id_;
+  struct rte_eth_dev_info dev_info_;
 };
 
-} // namespace ports
-} // namespace xlb
-
-#endif // XLB_PORTS_PMD_H
+}  // namespace xlb::ports

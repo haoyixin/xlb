@@ -1,11 +1,9 @@
-#ifndef XLB_CTRL_H
-#define XLB_CTRL_H
+#pragma once
 
 #include "config.h"
 #include <brpc/server.h>
 #include <string>
 #include <utils/cuckoo_map.h>
-#include <utils/thread_local.h>
 
 namespace xlb {
 
@@ -22,5 +20,3 @@ public:
 };
 
 } // namespace xlb
-
-#endif // XLB_CTRL_H

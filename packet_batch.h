@@ -1,13 +1,12 @@
-#ifndef XLB_PACKET_BATCH_H
-#define XLB_PACKET_BATCH_H
+#pragma once
+
+#include <array>
 
 #include "utils/copy.h"
 
 #include "packet.h"
 
 namespace xlb {
-
-// class Packet;
 
 class PacketBatch {
 public:
@@ -19,7 +18,7 @@ public:
     using reference = Packet &;
     using iterator_category = std::forward_iterator_tag;
 
-    iterator(PacketBatch &batch, size_t pos) : batch_(batch), pos_(pos) {}
+    iterator(PacketBatch &batch, uint16_t pos) : batch_(batch), pos_(pos) {}
 
     iterator &operator++() { // Pre-increment
       ++pos_;
@@ -46,56 +45,64 @@ public:
 
   private:
     PacketBatch &batch_;
-    size_t pos_;
+    uint16_t pos_;
   };
 
   iterator begin() { return iterator(*this, 0); }
   iterator end() { return iterator(*this, cnt_); }
 
-  uint64_t cnt() const { return cnt_; }
-  void set_cnt(size_t cnt) { cnt_ = cnt; }
-  void incr_cnt(size_t n = 1) { cnt_ += n; }
+  uint16_t cnt() const { return cnt_; }
 
-  Packet *const *pkts() const { return pkts_; }
-  Packet **pkts() { return pkts_; }
+  void SetCnt(uint16_t cnt) { cnt_ = cnt; }
+  void IncrCnt(uint16_t n = 1) { cnt_ += n; }
 
-  void clear() { cnt_ = 0; }
+  Packet *const *pkts() const { return pkts_.data(); }
+  Packet **pkts() { return pkts_.data(); }
 
-  // WARNING: this function has no bounds checks and so it's possible to
-  // overrun the buffer by calling this. We are not adding bounds check because
-  // we want maximum GOFAST.
-  void add(Packet *pkt) { pkts_[cnt_++] = pkt; }
-  void add(PacketBatch *batch) {
-    xlb::utils::CopyInlined(pkts_ + cnt_, batch->pkts(),
+  Packet **Alloc(uint16_t cnt) {
+    cnt_ = cnt;
+    return pkts_.data();
+  }
+
+  void Clear() { cnt_ = 0; }
+
+  // WARNING: this function has no bounds checks as we want maximum performance.
+  void Push(Packet *pkt) { pkts_[cnt_++] = pkt; }
+  void Push(PacketBatch *batch) {
+    xlb::utils::CopyInlined(pkts_.data() + cnt_, batch->pkts(),
                             batch->cnt() * sizeof(Packet *));
     cnt_ += batch->cnt();
   }
+  void Push(Packet **pkts, uint16_t cnt) {
+    xlb::utils::CopyInlined(pkts_.data() + cnt_, pkts, cnt * sizeof(Packet *));
 
-  bool empty() { return (cnt_ == 0); }
+    cnt_ += cnt;
+  }
 
-  bool full() { return (cnt_ == Packet::kMaxBurst); }
+  bool Empty() { return (cnt_ == 0); }
+
+  bool Full() { return (cnt_ == kMaxCnt); }
 
   void Copy(const PacketBatch *src) {
     cnt_ = src->cnt_;
-    xlb::utils::CopyInlined(pkts_, src->pkts_, cnt_ * sizeof(Packet *));
+    xlb::utils::CopyInlined(pkts_.data(), src->pkts_.data(),
+                            cnt_ * sizeof(Packet *));
   }
 
   void Free() {
-    if (!empty())
-      Packet::Free(pkts(), cnt());
+    if (!Empty())
+      Packet::Free(pkts(), cnt_);
 
-    clear();
+    Clear();
   }
 
-//  static const size_t kMaxBurst = 32;
+  static const uint16_t kMaxCnt = 64;
 
 private:
-  size_t cnt_;
-  Packet *pkts_[Packet::kMaxBurst];
+  uint16_t cnt_;
+  std::array<Packet *, kMaxCnt> pkts_;
 };
 
 static_assert(std::is_pod<PacketBatch>::value, "PacketBatch is not a POD Type");
 
 } // namespace xlb
-
-#endif // XLB_PACKET_BATCH_H

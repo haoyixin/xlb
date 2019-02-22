@@ -1,9 +1,9 @@
 #include "dpdk.h"
 
-#include <cstring>
-#include <string>
 #include <syslog.h>
 #include <unistd.h>
+#include <cstring>
+#include <string>
 
 #include <rte_cycles.h>
 #include <rte_eal.h>
@@ -39,8 +39,8 @@ ssize_t dpdk_log_writer(void *, const char *data, size_t len) {
 }
 
 class CmdLineOpts {
-public:
-  explicit CmdLineOpts(std::initializer_list<std::string> args)
+ public:
+  CmdLineOpts(std::initializer_list<std::string> args)
       : args_(), argv_({nullptr}) {
     Append(args);
   }
@@ -57,7 +57,7 @@ public:
 
   int Argc() const { return args_.size(); }
 
-private:
+ private:
   // Contains a copy of each argument.
   std::vector<std::vector<char>> args_;
   // Pointer to each argument (in `args_`), plus an extra `nullptr`.
@@ -110,7 +110,7 @@ void init_eal() {
   rte_openlog_stream(fopencookie(nullptr, "w", dpdk_log_funcs));
 }
 
-} // namespace
+}  // namespace
 
 void InitDpdk() {
   if (!dpdk_initialized.test_and_set()) {
@@ -119,4 +119,4 @@ void InitDpdk() {
   }
 }
 
-} // namespace xlb
+}  // namespace xlb

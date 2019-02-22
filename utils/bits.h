@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_BITS_H
-#define XLB_UTILS_BITS_H
+#pragma once
 
 #include <glog/logging.h>
 #include <x86intrin.h>
@@ -8,8 +7,7 @@
 
 #include "common.h"
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes using
@@ -35,7 +33,7 @@ static inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
   size_t tmp_len = len;
   size_t inc = sizeof(uint64_t) - shift;
   while (tmp_len >= sizeof(uint64_t)) {
-    uint64_t *block = reinterpret_cast<uint64_t *>(tmp_buf);
+    auto *block = reinterpret_cast<uint64_t *>(tmp_buf);
     *block >>= shift * 8;
     tmp_buf += inc;
     tmp_len = buf + len - tmp_buf;
@@ -73,7 +71,7 @@ static inline void ShiftBytesRight(uint8_t *buf, const size_t len,
   size_t dec = sizeof(uint64_t) - shift;
   size_t leftover = len;
   while (tmp_buf >= buf) {
-    uint64_t *block = reinterpret_cast<uint64_t *>(tmp_buf);
+    auto *block = reinterpret_cast<uint64_t *>(tmp_buf);
     *block <<= shift * 8;
     tmp_buf -= dec;
     leftover -= dec;
@@ -95,8 +93,8 @@ static inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
                                const size_t len) {
   size_t n = len / sizeof(uint64_t);
   size_t leftover = len - n * sizeof(uint64_t);
-  uint64_t *buf64 = reinterpret_cast<uint64_t *>(buf);
-  const uint64_t *mask64 = reinterpret_cast<const uint64_t *>(mask);
+  auto *buf64 = reinterpret_cast<uint64_t *>(buf);
+  const auto *mask64 = reinterpret_cast<const uint64_t *>(mask);
   for (size_t i = 0; i < n; i++) {
     buf64[i] &= mask64[i];
   }
@@ -119,8 +117,8 @@ static inline void MaskBytes(uint8_t *buf, uint8_t const *mask,
   // TODO: AVX2 ?
   size_t n = len / sizeof(__m128i);
   size_t leftover = len - n * sizeof(__m128i);
-  __m128i *buf128 = reinterpret_cast<__m128i *>(buf);
-  const __m128i *mask128 = reinterpret_cast<const __m128i *>(mask);
+  auto *buf128 = reinterpret_cast<__m128i *>(buf);
+  const auto *mask128 = reinterpret_cast<const __m128i *>(mask);
   for (size_t i = 0; i < n; i++) {
     __m128i a = _mm_loadu_si128(buf128 + i);
     __m128i b = _mm_loadu_si128(mask128 + i);
@@ -168,7 +166,4 @@ static inline T SetBitsLow(size_t n) {
   return (n >= sizeof(T) * 8) ? ~T{0} : ~_SetBitsHigh<T>((sizeof(T) * 8) - n);
 }
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_BITS_H
+}  // namespace xlb::utils

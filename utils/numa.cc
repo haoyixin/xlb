@@ -13,8 +13,7 @@
 
 namespace fs = std::experimental::filesystem;
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 namespace {
 
@@ -62,7 +61,7 @@ public:
     return *this;
   }
 
-  directory_iterator operator++(int) {
+  const directory_iterator operator++(int) {
     directory_iterator tmp(*this);
     ++*this;
     return tmp;
@@ -217,5 +216,4 @@ std::optional<uint32_t> PciSocketId(const std::string &pci_addr) {
   _RETURN_ID_OPT_BY_FIELD_HAS_VALUE(pci_devices, pci_addr);
 }
 
-} // namespace utils
-} // namespace xlb
+}  // namespace xlb::utils

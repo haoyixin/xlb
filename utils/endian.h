@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_ENDIAN_H
-#define XLB_UTILS_ENDIAN_H
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -7,8 +6,7 @@
 #include <iostream>
 #include <vector>
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 constexpr bool is_be_system() {
   return (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__);
@@ -156,8 +154,7 @@ bool uint64_to_bin(void *ptr, uint64_t val, size_t size, bool big_endian);
 // this is to make sure BigEndian has constexpr constructor and value()
 static_assert(be32_t(0x1234).value() == 0x1234, "Something is wrong");
 
-}  // namespace utils
-}  // namespace xlb
+}  // namespace xlb::utils
 
 namespace std {
 
@@ -169,5 +166,3 @@ struct hash<xlb::utils::BigEndian<T>> {
 };
 
 }  // namespace std
-
-#endif  // XLB_UTILS_ENDIAN_H

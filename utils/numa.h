@@ -1,13 +1,11 @@
-#ifndef XLB_UTILS_NUMA_H
-#define XLB_UTILS_NUMA_H
+#pragma once
 
 #include <set>
 #include <string>
 #include <vector>
 #include <optional>
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 struct Node {
   uint32_t id;
@@ -27,7 +25,4 @@ TopologyBase &Topology();
 std::optional<uint32_t> CoreSocketId(uint32_t core_id);
 std::optional<uint32_t> PciSocketId(const std::string &pci_addr);
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_NUMA_H
+}  // namespace xlb::utils

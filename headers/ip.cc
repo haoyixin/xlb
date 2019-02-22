@@ -5,8 +5,7 @@
 #include "utils/bits.h"
 #include "utils/format.h"
 
-namespace xlb {
-namespace headers {
+namespace xlb::headers {
 
 bool ParseIpv4Address(const std::string &str, be32_t *addr) {
   unsigned int a, b, c, d;
@@ -49,5 +48,4 @@ Ipv4Prefix::Ipv4Prefix(const std::string &prefix) {
   mask = be32_t(utils::SetBitsLow<uint32_t>(len));
 }
 
-} // namespace headers
-} // namespace xlb
+}  // namespace xlb::headers

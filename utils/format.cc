@@ -3,8 +3,7 @@
 #include <cassert>
 #include <memory>
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 std::string FormatVarg(const char *fmt, va_list ap) {
   char *ptr = nullptr;
@@ -37,5 +36,4 @@ int Parse(const std::string &s, const char *fmt, ...) {
   return ret;
 }
 
-} // namespace utils
-} // namespace xlb
+}  // namespace xlb::utils

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.10)
 project(xlb)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 17)
 #add_subdirectory(${BRPC_SRC})
 
 #add_compile_options(-O3 -msse4 -mavx)
-add_compile_options(-O0 -msse4 -mavx)
+add_compile_options(-O3 -msse4 -mavx)
 
 set(DPDK_LIBS
         "-Wl,--whole-archive"
@@ -64,6 +64,7 @@ set(SYS_INCS
 #        )
 
 set(OBJS
+        scheduler.cc
         packet_pool.cc
         dpdk.cc
         worker.cc
@@ -75,11 +76,13 @@ set(OBJS
         utils/numa.cc
         utils/format.cc
         utils/endian.cc
-        utils/singleton.cc
+        utils/iface.cc
         headers/ip.cc
         headers/ether.cc
         ports/pmd.cc
-        )
+        ports/kni.cc
+#        task.cc
+        conn.h conn.cc)
 
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
@@ -99,6 +102,9 @@ add_executable(xlb5 tests/main5.cc ${OBJS})
 #add_executable(xlb3 tests/main3.cc)
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
+
+set_property(TARGET xlb5 PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
+#target_link_options(xlb5 PRIVATE -Winline)
 
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
 target_link_libraries(xlb5 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})

@@ -1,7 +1,6 @@
 #include "utils/endian.h"
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 bool uint64_to_bin(void *ptr, uint64_t val, size_t size, bool big_endian) {
   uint8_t *const ptr8 = static_cast<uint8_t *>(ptr);
@@ -25,5 +24,4 @@ bool uint64_to_bin(void *ptr, uint64_t val, size_t size, bool big_endian) {
   }
 }
 
-}  // namespace utils
-}  // namespace xlb
+}  // namespace xlb::utils

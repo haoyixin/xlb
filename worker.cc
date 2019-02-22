@@ -14,7 +14,7 @@
 namespace xlb {
 
 __thread Worker Worker::current_ = {};
-bool Worker::quitting_;
+bool Worker::aborting_;
 
 // The entry point of worker threads
 void *Worker::Run() {
@@ -35,8 +35,8 @@ void *Worker::Run() {
             << "(" << id_ << ") "
             << "is running on core " << core_ << " (socket " << socket_ << ")";
 
-  scheduler_ = new DefaultScheduler();
-  scheduler_->ScheduleLoop();
+  scheduler_ = new Scheduler();
+  scheduler_->Loop();
 
   LOG(INFO) << "Worker "
             << "(" << id_ << ") "
@@ -51,9 +51,12 @@ void *Worker::Run() {
 
 Worker::Worker(uint16_t core)
     : id_(utils::Singleton<Counter, Worker>::instance().fetch_add(1)),
-      core_(core), socket_(CONFIG.nic.socket),
-      packet_pool_(&utils::Singleton<PacketPool>::instance()), silent_drops_(0),
-      current_tsc_(0), current_ns_(0) {
+      core_(core),
+      socket_(CONFIG.nic.socket),
+      packet_pool_(&utils::Singleton<PacketPool>::instance()),
+      silent_drops_(0),
+      current_tsc_(0),
+      current_ns_(0) {
   CPU_ZERO(&cpu_set_);
   CPU_SET(core_, &cpu_set_);
 }
@@ -64,14 +67,13 @@ void Worker::Launch() {
         [=]() { (new (&current_) Worker(core))->Run(); });
 }
 
-void Worker::Quit() { quitting_ = true; }
+void Worker::Abort() { aborting_ = true; }
 
 void Worker::Wait() {
   for (auto &thread : utils::Singleton<Threads, Worker>::instance())
-    if (thread.joinable())
-      thread.join();
+    if (thread.joinable()) thread.join();
 
   rte_eal_mp_wait_lcore();
 }
 
-} // namespace xlb
+}  // namespace xlb

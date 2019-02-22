@@ -1,18 +1,15 @@
-#ifndef XLB_UTILS_FIXED_POOL_H
-#define XLB_UTILS_FIXED_POOL_H
-
-#include "utils/allocator.h"
-#include "utils/boost.h"
-#include "utils/range.h"
-
-#include "glog/logging.h"
+#pragma once
 
 #include <functional>
 #include <stack>
 #include <vector>
 
-namespace xlb {
-namespace utils {
+#include "glog/logging.h"
+
+#include "utils/allocator.h"
+#include "utils/boost.h"
+
+namespace xlb::utils {
 
 // Simple pool without check for performance, fixed size and insure pointer
 // stability.
@@ -20,8 +17,6 @@ template <typename T> class UnsafePool {
   static_assert(std::is_pod<T>::value);
 
 public:
-  using Shared = std::shared_ptr<T>;
-
   explicit UnsafePool(
       size_t size, int socket = SOCKET_ID_ANY,
       std::function<void(size_t, T *)> init_func = default_init_func)
@@ -40,14 +35,10 @@ public:
     return obj;
   }
 
-  Shared GetShared() {
-    return Shared(Get(), [this](T *p) { put(p); });
-  }
-
   // Put a pointer outside entries into pool is UB
-  void put(T *obj) { free_entry_pointer_.push(obj); }
+  void Put(T *obj) { free_entry_pointer_.push(obj); }
 
-  bool empty() { return free_entry_pointer_.empty(); }
+  bool Empty() { return free_entry_pointer_.empty(); }
 
 private:
   static void default_init_func(size_t, T *) {}
@@ -57,7 +48,4 @@ private:
   std::stack<T *> free_entry_pointer_;
 };
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_FIXED_POOL_H
+}  // namespace xlb::utils

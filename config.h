@@ -1,5 +1,4 @@
-#ifndef XLB_CONFIG_H
-#define XLB_CONFIG_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -53,5 +52,3 @@ VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, netmask,
                  gateway, mtu);
 VISITABLE_STRUCT(xlb::Config::Mem, hugepage, channel, packet_pool);
 VISITABLE_STRUCT(xlb::Config, rpc_ip_port, worker_cores, nic, mem);
-
-#endif // XLB_CONFIG_H

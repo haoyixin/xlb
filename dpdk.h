@@ -1,5 +1,4 @@
-#ifndef XLB_DPDK_H
-#define XLB_DPDK_H
+#pragma once
 
 #include <atomic>
 
@@ -10,5 +9,3 @@ namespace xlb {
 void InitDpdk();
 
 } // namespace xlb
-
-#endif // XLB_DPDK_H

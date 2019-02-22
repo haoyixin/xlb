@@ -1,10 +1,8 @@
-#ifndef XLB_HEADERS_TCP_H
-#define XLB_HEADERS_TCP_H
+#pragma once
 
 #include "headers/common.h"
 
-namespace xlb {
-namespace headers {
+namespace xlb::headers {
 
 // A basic TCP header definition loosely based on the BSD version.
 struct [[gnu::packed]] Tcp {
@@ -47,7 +45,4 @@ static_assert(std::is_pod<Tcp>::value, "not a POD type");
 static_assert(std::is_pod<TcpToa>::value, "not a POD type");
 static_assert(sizeof(Tcp) == 20, "struct Tcp is incorrect");
 
-} // namespace headers
-} // namespace xlb
-
-#endif // XLB_HEADERS_TCP_H
+}  // namespace xlb::headers

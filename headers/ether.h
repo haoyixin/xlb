@@ -1,5 +1,4 @@
-#ifndef XLB_HEADERS_ETHER_H
-#define XLB_HEADERS_ETHER_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -11,8 +10,7 @@
 
 #include "headers/common.h"
 
-namespace xlb {
-namespace headers {
+namespace xlb::headers {
 
 struct [[gnu::packed]] Ethernet {
   struct [[gnu::packed]] Address {
@@ -97,7 +95,4 @@ static_assert(sizeof(Ethernet) == 14, "struct Ethernet is incorrect");
 static_assert(std::is_pod<Vlan>::value, "not a POD type");
 static_assert(sizeof(Vlan) == 4, "struct Vlan is incorrectly sized");
 
-}  // namespace headers
-}  // namespace xlb
-
-#endif  // XLB_HEADERS_ETHER_H
+}  // namespace xlb::headers

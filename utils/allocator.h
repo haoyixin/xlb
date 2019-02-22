@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_ALLOCATOR_H
-#define XLB_UTILS_ALLOCATOR_H
+#pragma once
 
 #include <cstddef>
 
@@ -9,8 +8,9 @@
 #include <experimental/memory_resource>
 #include <new>
 
-namespace xlb {
-namespace utils {
+namespace pmr = std::experimental::pmr;
+
+namespace xlb::utils {
 
 template <typename T> class Allocator {
 public:
@@ -18,14 +18,15 @@ public:
 
   Allocator() = default;
 
-  template <typename U> constexpr Allocator(const Allocator<U> &) noexcept {}
+  template <typename U>
+  constexpr explicit Allocator(const Allocator<U> &) noexcept {}
 
   // Will be allocated on the socket which calling this.
   T *allocate(std::size_t n) {
     if (n > std::size_t(-1) / sizeof(T))
       throw std::bad_alloc();
     if (auto p = static_cast<T *>(
-            rte_malloc(NULL, n * sizeof(T), RTE_CACHE_LINE_SIZE)))
+            rte_malloc(nullptr, n * sizeof(T), RTE_CACHE_LINE_SIZE)))
       return p;
     throw std::bad_alloc();
   }
@@ -39,7 +40,7 @@ public:
 class MemoryResource : public std::experimental::pmr::memory_resource {
 public:
   explicit MemoryResource(int socket) : socket_(socket) {}
-  int socket() { return socket_; }
+  int socket() const { return socket_; }
 
 protected:
   void *do_allocate(std::size_t bytes, std::size_t) override {
@@ -63,7 +64,4 @@ private:
   int socket_;
 };
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_ALLOCATOR_H
+}  // namespace xlb::utils

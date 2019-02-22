@@ -1,12 +1,10 @@
-#ifndef XLB_UTILS_RANDOM_H
-#define XLB_UTILS_RANDOM_H
+#pragma once
 
 #include <cstdint>
 
 #include "utils/time.h"
 
-namespace xlb {
-namespace utils {
+namespace xlb::utils {
 
 class Random {
   // TODO: using rte_rand
@@ -74,7 +72,4 @@ inline double Random::RealNonZero() {
   return 2.0 - tmp.d;
 }
 
-} // namespace utils
-} // namespace xlb
-
-#endif // XLB_UTILS_RANDOM_H
+}  // namespace xlb::utils

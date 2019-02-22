@@ -1,5 +1,4 @@
-#ifndef XLB_PORT_H
-#define XLB_PORT_H
+#pragma once
 
 #include <memory>
 #include <string>
@@ -53,5 +52,3 @@ private:
 };
 
 } // namespace xlb
-
-#endif // XLB_PORT_H

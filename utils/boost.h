@@ -1,5 +1,4 @@
-#ifndef XLB_UTILS_BOOST_H
-#define XLB_UTILS_BOOST_H
+#pragma once
 
 #include <boost/algorithm/cxx11/any_of.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -26,5 +25,3 @@ using boost::find_if;
 
 } // namespace utils
 } // namespace xlb
-
-#endif // XLB_BOOST_H

@@ -1,5 +1,4 @@
-#ifndef XLB_PACKET_H
-#define XLB_PACKET_H
+#pragma once
 
 #include <algorithm>
 #include <cassert>
@@ -179,7 +178,8 @@ public:
     dump << "pool chain: ";
     for (pkt = this; pkt; pkt = pkt->next_) {
       int i;
-      dump << pkt->pool_ << "(" << ") ";
+      dump << pkt->pool_ << "("
+           << ") ";
       // TODO: pool chain ?
     }
     dump << std::endl;
@@ -473,5 +473,3 @@ static_assert(std::is_standard_layout<Packet>::value, "Incorrect class Packet");
 static_assert(sizeof(Packet) == XBUF_SIZE, "Incorrect class Packet");
 
 } // namespace xlb
-
-#endif // XLB_PACKET_H

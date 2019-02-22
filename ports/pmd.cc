@@ -1,18 +1,19 @@
 #include "ports/pmd.h"
 
 #include <rte_ethdev_pci.h>
+#include <rte_flow.h>
+#include <rte_ip.h>
 
 #include "utils/boost.h"
 #include "utils/format.h"
-#include "utils/range.h"
 
 #include "headers/ether.h"
 #include "headers/ip.h"
 
 #include "config.h"
+#include "packet_pool.h"
 
-namespace xlb {
-namespace ports {
+namespace xlb::ports {
 
 namespace {
 
@@ -45,9 +46,9 @@ const struct rte_eth_conf default_eth_conf(struct rte_eth_dev_info &dev_info) {
   return ret;
 }
 
+/*
 void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
   CHECK(!rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_NTUPLE));
-  // TODO: support RTE_ETH_FILTER_FDIR
 
   struct rte_eth_ntuple_filter ntuple {};
   utils::be32_t dst;
@@ -61,6 +62,35 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
 
   CHECK(!rte_eth_dev_filter_ctrl(port_id, RTE_ETH_FILTER_NTUPLE,
                                  RTE_ETH_FILTER_ADD, &ntuple));
+}
+ */
+
+void set_lip_affinity(uint16_t port_id, const std::string &dst_ip,
+                      uint16_t qid) {
+  utils::be32_t dst{};
+  headers::ParseIpv4Address(dst_ip, &dst);
+
+  rte_flow_attr attr{.group = 0, .priority = 0, .ingress = 1};
+
+  ipv4_hdr ipv4{};
+  ipv4.dst_addr = dst.raw_value();
+
+  ipv4_hdr ipv4_mask{};
+  ipv4_mask.dst_addr = 0xffffffff;
+
+  rte_flow_item pattern[] = {{.type = RTE_FLOW_ITEM_TYPE_ETH},
+                             {.type = RTE_FLOW_ITEM_TYPE_IPV4,
+                              .spec = &ipv4,
+                              .last = nullptr,
+                              .mask = &ipv4_mask},
+                             {.type = RTE_FLOW_ITEM_TYPE_END}};
+
+  rte_flow_action actions[] = {
+      {.type = RTE_FLOW_ACTION_TYPE_QUEUE, .conf = &qid},
+      {.type = RTE_FLOW_ACTION_TYPE_END}};
+
+  CHECK(!rte_flow_validate(port_id, &attr, pattern, actions, nullptr));
+  CHECK(rte_flow_create(port_id, &attr, pattern, actions, nullptr));
 }
 
 // Find a port attached to DPDK by its PCI address.
@@ -120,10 +150,11 @@ void init_driver() {
   }
 }
 
-} // namespace
+}  // namespace
 
-PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
-  M::Expose<TSTR("rx_packets"), TSTR("tx_packets"), TSTR("tx_dropped")>;
+PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
+  CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
+                   TS("tx_bytes"), TS("tx_dropped")>));
 
   init_driver();
 
@@ -131,10 +162,9 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
 
   CHECK(find_dpdk_port_by_pci_addr(CONFIG.nic.pci_address, &dpdk_port_id_));
 
-  struct rte_eth_dev_info dev_info {};
-  rte_eth_dev_info_get(dpdk_port_id_, &dev_info);
+  rte_eth_dev_info_get(dpdk_port_id_, &dev_info_);
 
-  struct rte_eth_conf eth_conf = default_eth_conf(dev_info);
+  struct rte_eth_conf eth_conf = default_eth_conf(dev_info_);
   CHECK(!rte_eth_dev_configure(dpdk_port_id_, num_q, num_q, &eth_conf));
 
   rte_eth_promiscuous_enable(dpdk_port_id_);
@@ -144,27 +174,29 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
   /* Use defaut rx/tx configuration as provided by PMD ports,
    * maybe need minor tweaks */
 
-  struct rte_eth_rxconf eth_rxconf = dev_info.default_rxconf;
-  struct rte_eth_txconf eth_txconf = dev_info.default_txconf;
+  struct rte_eth_rxconf eth_rxconf = dev_info_.default_rxconf;
+  struct rte_eth_txconf eth_txconf = dev_info_.default_txconf;
 
   eth_txconf.offloads = eth_conf.txmode.offloads;
   eth_rxconf.offloads = eth_conf.rxmode.offloads;
 
   // TODO: configurable queue size
-  for (auto i : utils::range(0, num_q))
-    CHECK(!rte_eth_tx_queue_setup(dpdk_port_id_, i, dev_info.tx_desc_lim.nb_max,
-                                  sid, &eth_txconf));
+  for (auto i : utils::irange(num_q))
+    CHECK(!rte_eth_tx_queue_setup(
+        dpdk_port_id_, i, dev_info_.tx_desc_lim.nb_max, sid, &eth_txconf));
 
-  for (auto i : utils::range(0, num_q))
+  for (auto i : utils::irange(num_q))
     CHECK(!rte_eth_rx_queue_setup(
-        dpdk_port_id_, i, dev_info.rx_desc_lim.nb_max, sid, &eth_rxconf,
+        dpdk_port_id_, i, dev_info_.rx_desc_lim.nb_max, sid, &eth_rxconf,
         utils::Singleton<PacketPool>::instance().pool()));
 
   CHECK(!rte_eth_dev_set_vlan_offload(dpdk_port_id_, ETH_VLAN_STRIP_OFFLOAD));
 
-  for (auto i : utils::range(0, CONFIG.nic.local_ips.size())) {
-    filter_add(dpdk_port_id_, CONFIG.nic.local_ips[i],
-               i % CONFIG.worker_cores.size());
+  CHECK(!rte_flow_flush(dpdk_port_id_, nullptr));
+
+  for (auto i : utils::irange(CONFIG.nic.local_ips.size())) {
+    set_lip_affinity(dpdk_port_id_, CONFIG.nic.local_ips[i],
+                     i % CONFIG.worker_cores.size());
   }
 
   CHECK(!rte_eth_dev_start(dpdk_port_id_));
@@ -183,11 +215,11 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown) {
 PMD::~PMD() { rte_eth_dev_stop(dpdk_port_id_); }
 
 struct Port::Status PMD::Status() {
-  struct rte_eth_link dpdk_status;
+  struct rte_eth_link dpdk_status {};
   // rte_eth_link_get() may block up to 9 seconds, so use _nowait() variant.
   rte_eth_link_get_nowait(dpdk_port_id_, &dpdk_status);
 
-  struct Port::Status port_status;
+  struct Port::Status port_status {};
 
   port_status.speed = dpdk_status.link_speed;
   port_status.full_duplex = static_cast<bool>(dpdk_status.link_duplex);
@@ -197,7 +229,29 @@ struct Port::Status PMD::Status() {
   return port_status;
 }
 
-} // namespace ports
-} // namespace xlb
+uint16_t PMD::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
+  M::Adder<TS("tx_packets")>() << cnt;
+
+  for (auto i : utils::irange(cnt))
+    M::Adder<TS("tx_bytes")>() << pkts[i]->data_len();
+
+  auto sent = rte_eth_tx_burst(dpdk_port_id_, qid,
+                               reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
+  M::Adder<TS("tx_dropped")>() << (cnt - sent);
+  return sent;
+}
+
+uint16_t PMD::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
+  auto recv = rte_eth_rx_burst(dpdk_port_id_, qid,
+                               reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
+  M::Adder<TS("rx_packets")>() << recv;
+
+  for (auto i : utils::irange(recv))
+    M::Adder<TS("rx_bytes")>() << pkts[i]->data_len();
+
+  return recv;
+}
+
+}  // namespace xlb::ports
 
 // DEFINE_PORT(PMD);
