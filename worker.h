@@ -6,6 +6,7 @@
 #include "utils/common.h"
 #include "utils/cuckoo_map.h"
 #include "utils/random.h"
+#include "utils/singleton.h"
 #include "utils/time.h"
 
 namespace xlb {
@@ -25,20 +26,26 @@ class Worker {
   static void Abort();
   static void Wait();
 
-  uint16_t id() { return id_; }
-  uint16_t core() { return core_; }
-  int socket() { return socket_; }
+  uint16_t id() const { return id_; }
+  uint16_t core() const { return core_; }
+  int socket() const { return socket_; }
 
-  Scheduler *scheduler() { return scheduler_; }
-  PacketPool *packet_pool() { return packet_pool_; }
-  utils::Random *random() { return random_; }
+  Scheduler *scheduler() const { return scheduler_; }
+  PacketPool *packet_pool() const { return packet_pool_; }
+  utils::Random *random() const { return random_; }
 
-  uint64_t silent_drops() { return silent_drops_; }
-  uint64_t current_tsc() { return current_tsc_; }
-  uint64_t current_ns() { return current_ns_; }
+  uint64_t silent_drops() const { return silent_drops_; }
+  uint64_t current_tsc() const { return current_tsc_; }
+  uint64_t current_ns() const { return current_ns_; }
+
+  bool master() const { return master_; }
 
   static bool aborting() { return aborting_; }
+  static bool slaves_aborted() { return slaves_aborted_; }
+  static bool master_started() { return master_started_; }
   static Worker *current() { return &current_; }
+
+  static void confirm_master() { master_started_ = true; }
 
   void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
   void UpdateTsc() {
@@ -47,13 +54,20 @@ class Worker {
   }
 
  private:
-  using Counter = std::atomic<uint16_t>;
-  using Threads = std::vector<std::thread>;
+  //  using Counter = std::atomic<uint16_t>;
+  //  using Threads = std::vector<std::thread>;
 
-  explicit Worker(uint16_t core);
+  using Slaves = utils::Singleton<std::vector<std::thread>, Worker>;
+  using Master = utils::Singleton<std::thread, Worker>;
+  using Counter = utils::Singleton<std::atomic<uint8_t>, Worker>;
+
+  explicit Worker(uint16_t core, bool master);
 
   // The entry point of worker threads.
-  void *Run();
+  void *run();
+  //  void *run_master();
+
+  bool master_;
 
   uint16_t id_;
   uint16_t core_;
@@ -69,6 +83,8 @@ class Worker {
   uint64_t current_ns_;
 
   static bool aborting_;
+  static bool slaves_aborted_;
+  static bool master_started_;
 
   static __thread Worker current_;
 };

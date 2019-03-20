@@ -1,20 +1,34 @@
 #pragma once
 
-#include "module.h"
-#include "port.h"
-#include "ports/pmd.h"
-#include "worker.h"
+#include "modules/common.h"
+#include "modules/ether_inc.h"
 
 namespace xlb::modules {
 
-template <typename T>
+template <typename T, bool Master = false>
 class PortInc final : public Module {
   static_assert(std::is_base_of<Port, T>::value);
 
  public:
   template <typename... Args>
-  explicit PortInc(Args &&... args) {
+  explicit PortInc(uint8_t weight, Args &&... args) : weight_(weight) {
     port_ = &utils::Singleton<T>::instance(std::forward<Args>(args)...);
+  }
+
+  void InitInMaster() override {
+    if constexpr (!Master) return;
+    register_task();
+  }
+
+  void InitInSlave(uint16_t wid) override {
+    if constexpr (Master) return;
+    register_task();
+  }
+
+//  ~PortInc() { delete (port_); }
+
+ protected:
+  void register_task() {
     RegisterTask(
         [this](Context *ctx) -> Result {
           PacketBatch batch{};
@@ -22,16 +36,15 @@ class PortInc final : public Module {
                                    Packet::kMaxBurst));
 
           // TODO: come on
+          HandOn<EtherInc, T>(ctx, &batch);
 
           return {.packets = batch.cnt()};
         },
-        kWeight);
+        weight_);
   }
 
-  ~PortInc() { delete (port_); }
-
  private:
-  static const uint8_t kWeight = 200;
+  uint8_t weight_;
   T *port_;
 };
 

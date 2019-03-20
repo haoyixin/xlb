@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <utility>
 
 namespace xlb::utils {
@@ -11,7 +12,7 @@ class Singleton {
  public:
   template <typename... Args>
   static T &instance(Args &&... args) {
-    static T instance_(std::forward<Args>(args)...);
+    alignas(64) static T instance_(std::forward<Args>(args)...);
     return instance_;
   }
 
@@ -24,22 +25,22 @@ template <typename T, typename Tag = DefaultTag>
 class UnsafeSingleton {
  public:
   UnsafeSingleton() = delete;
-  ~UnsafeSingleton() { delete instance_; };
+  ~UnsafeSingleton() { reinterpret_cast<T *>(instance_.data())->~T(); };
 
   template <typename... Args>
-  static T *Init(Args &&... args) {
-    instance_ = new T(std::forward<Args>(args)...);
-    return instance_;
+  static T &Init(Args &&... args) {
+    new (instance_.data()) T(std::forward<Args>(args)...);
+    return *reinterpret_cast<T *>(instance_.data());
   }
 
-  static T *instance() { return instance_; }
+  static T &instance() { return *reinterpret_cast<T *>(instance_.data()); }
 
  private:
-  static T *instance_;
+  alignas(64) static std::array<uint8_t, sizeof(T)> instance_;
 };
 
 template <typename T, typename Tag>
-T *UnsafeSingleton<T, Tag>::instance_;
+alignas(64) std::array<uint8_t, sizeof(T)> UnsafeSingleton<T, Tag>::instance_;
 
 /*
 template <typename T, typename Tag = DefaultTag> class UnsafeSingletonTLS {

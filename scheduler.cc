@@ -6,27 +6,39 @@
 
 #include "module.h"
 
+#include "utils/common.h"
+
 namespace xlb {
 
 namespace {
 
-double get_cpu_usage(void *arg) { return Scheduler::CpuUsage(); }
-bvar::PassiveStatus<double> cpu_usage("xlb_scheduler", "wrr_cpu_usage",
-                                      get_cpu_usage, nullptr);
+double get_cpu_usage_slaves(void *arg) {
+  return Scheduler::CpuUsage<TS("idle_cycles_slaves"),
+                             TS("busy_cycles_slaves")>();
+}
+
+double get_cpu_usage_master(void *arg) {
+  return Scheduler::CpuUsage<TS("idle_cycles_master"),
+                             TS("busy_cycles_master")>();
+}
+
+bvar::PassiveStatus<double> cpu_usage_master("xlb_scheduler",
+                                             "cpu_usage_master",
+                                             get_cpu_usage_master, nullptr);
+bvar::PassiveStatus<double> cpu_usage_slave("xlb_scheduler", "cpu_usage_slaves",
+                                            get_cpu_usage_slaves, nullptr);
 }  // namespace
 
 Scheduler::Scheduler()
-    : checkpoint_(), runnable_(new TaskQueue()), blocked_(new TaskQueue()) {}
+    : runnable_(new TaskQueue()), blocked_(new TaskQueue()), checkpoint_() {}
 
 Scheduler::~Scheduler() {
-  for (auto &t : runnable_->container())
-    delete(t);
+  for (auto &t : runnable_->container()) delete (t);
 
-  for (auto &t : blocked_->container())
-    delete(t);
+  for (auto &t : blocked_->container()) delete (t);
 
-  delete(runnable_);
-  delete(blocked_);
+  delete (runnable_);
+  delete (blocked_);
 }
 
 Scheduler::Task::Context *Scheduler::next_ctx() {
@@ -45,21 +57,22 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
   return &t->context_;
 }
 
-void Scheduler::Loop() {
+void Scheduler::MasterLoop() {
   bool idle{false};
   Task::Context *ctx;
   uint64_t cycles{};
 
   auto worker = Worker::current();
-  //  checkpoint_ = usage_.checkpoint = worker->current_tsc();
   checkpoint_ = worker->current_tsc();
 
-  for (auto &m : Modules::instance()) m->InitInWorker(worker->id());
+  for (auto &m : Modules::instance()) m->InitInMaster();
+  worker->confirm_master();
+
   for (auto &t : runnable_->container()) t->context_.worker_ = worker;
 
-  // The main scheduling, running, accounting loop.
+  // The main scheduling, running, accounting master loop.
   for (uint64_t round = 0;; ++round) {
-    if (Worker::aborting()) break;
+    if (worker->slaves_aborted()) break;
 
     ctx = next_ctx();
 
@@ -70,9 +83,9 @@ void Scheduler::Loop() {
     cycles = ctx->worker_->current_tsc() - checkpoint_;
 
     if (idle)
-      M::Adder<TS("idle_cycles")>() << cycles;
+      M::Adder<TS("idle_cycles_master")>() << cycles;
     else
-      M::Adder<TS("busy_cycles")>() << cycles;
+      M::Adder<TS("busy_cycles_master")>() << cycles;
 
     checkpoint_ = ctx->worker_->current_tsc();
 
@@ -80,22 +93,46 @@ void Scheduler::Loop() {
   }
 }
 
-double Scheduler::CpuUsage() {
-  auto idle = &M::PerSecond<TS("idle_cycles")>();
-  auto busy = &M::PerSecond<TS("busy_cycles")>();
+void Scheduler::SlaveLoop() {
+  bool idle{false};
+  Task::Context *ctx;
+  uint64_t cycles{};
 
-  // TODO: add a patch to brpc/bvar for fixing this
-  double idle_ps = idle->get_value(idle->window_size());
-  double busy_ps = busy->get_value(busy->window_size());
+  auto worker = Worker::current();
+  checkpoint_ = worker->current_tsc();
 
-  return busy_ps / (busy_ps + idle_ps);
+  for (auto &m : Modules::instance()) m->InitInSlave(worker->id());
+
+  for (auto &t : runnable_->container()) t->context_.worker_ = worker;
+
+  // The main scheduling, running, accounting slave loop.
+  for (uint64_t round = 0;; ++round) {
+    if (worker->aborting()) break;
+
+    ctx = next_ctx();
+
+    ctx->worker_->UpdateTsc();
+    ctx->worker_->IncrSilentDrops(ctx->silent_drops_);
+    ctx->silent_drops_ = 0;
+
+    cycles = ctx->worker_->current_tsc() - checkpoint_;
+
+    if (idle)
+      M::Adder<TS("idle_cycles_slaves")>() << cycles;
+    else
+      M::Adder<TS("busy_cycles_slaves")>() << cycles;
+
+    checkpoint_ = ctx->worker_->current_tsc();
+
+    idle = (ctx->task_->func_(ctx).packets != 0);
+  }
 }
 
 Scheduler::Task::Task(Func &&func, uint8_t weight)
     : func_(std::move(func)),
       context_(),
-      max_weight_(weight),
-      current_weight_(weight) {
+      current_weight_(weight),
+      max_weight_(weight) {
   CHECK_NE(weight, 0);
   context_.dead_batch_.Clear();
   context_.stage_batch_.Clear();

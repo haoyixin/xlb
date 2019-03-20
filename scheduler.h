@@ -24,9 +24,20 @@ class Scheduler {
   virtual ~Scheduler();
 
   // Runs the scheduler loop forever.
-  void Loop();
+  void MasterLoop();
+  void SlaveLoop();
 
-  static double CpuUsage();
+  template <typename I, typename B>
+  static double CpuUsage() {
+    auto idle = &M::PerSecond<I>();
+    auto busy = &M::PerSecond<B>();
+
+    // TODO: add a patch to brpc/bvar for fixing this
+    double idle_ps = idle->get_value(idle->window_size());
+    double busy_ps = busy->get_value(busy->window_size());
+
+    return busy_ps / (busy_ps + idle_ps);
+  }
 
   // Functor used by a Worker's Scheduler to run a task in a module.
   class Task {
@@ -38,7 +49,7 @@ class Scheduler {
       inline void HoldPacket(Packet *pkt);
 
       auto worker() { return worker_; }
-      auto stage_batch() { return stage_batch_; }
+      auto &stage_batch() { return stage_batch_; }
 
      private:
       Task *task_;
@@ -85,10 +96,10 @@ class Scheduler {
   }
 
  private:
-  using M = utils::Metric<TS("xlb_scheduler"), TS("wrr")>;
+  using M = utils::Metric<TS("xlb_scheduler"), TS("cpu")>;
   using TaskQueue = utils::extended_priority_queue<Task *, Task::Compare>;
 
-  inline Task::Context *next_ctx();
+  Task::Context *next_ctx();
 
   TaskQueue *runnable_;
   TaskQueue *blocked_;

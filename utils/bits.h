@@ -4,10 +4,36 @@
 #include <x86intrin.h>
 
 #include <algorithm>
+#include <type_traits>
 
 #include "common.h"
 
 namespace xlb::utils {
+
+template <size_t N>
+class [[gnu::packed]] bitset {
+  static_assert(N > 0 && N <= 64);
+
+ public:
+  using data_type = std::conditional_t<
+      N <= 8, uint8_t,
+      std::conditional_t<N <= 16, uint16_t,
+                         std::conditional_t<N <= 32, uint32_t, uint64_t>>>;
+
+  template <typename T>
+  bool operator[](T index) const { return (data_ & (1u << index)) != 0; }
+
+  bool all() const { return (data_ & ((1u << N) - 1)) == ((1u << N) - 1); }
+  bool any() const { return (data_ & ((1u << N) - 1)) != 0; }
+  bool none() const { return (data_ & ((1u << N) - 1)) == 0; }
+
+  void set(size_t index) { data_ |= ((1u << index)); }
+  void reset() { data_ = 0u; }
+  void reset(size_t index) { data_ &= (~((1u << index))); }
+
+ private:
+  data_type data_ = 0u;
+};
 
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes using

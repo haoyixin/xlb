@@ -19,6 +19,10 @@ static inline double TscToUs(uint64_t cycles) {
   return cycles * 1e6 / rte_get_timer_hz();
 }
 
+static inline double TscToMs(uint64_t cycles) {
+  return cycles * 1e3 / rte_get_timer_hz();
+}
+
 /* Return current time in seconds since the Epoch.
  * This is consistent with Python's time.time() */
 static inline double GetEpochTime() {

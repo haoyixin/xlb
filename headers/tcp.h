@@ -34,7 +34,7 @@ struct [[gnu::packed]] Tcp {
   be16_t urgent_ptr; // Urgent pointer.
 };
 
-struct [[gnu::packed]] TcpToa {
+struct [[gnu::packed]] Toa {
   uint8_t code;
   uint8_t size;
   be16_t port;
@@ -42,7 +42,7 @@ struct [[gnu::packed]] TcpToa {
 };
 
 static_assert(std::is_pod<Tcp>::value, "not a POD type");
-static_assert(std::is_pod<TcpToa>::value, "not a POD type");
+static_assert(std::is_pod<Toa>::value, "not a POD type");
 static_assert(sizeof(Tcp) == 20, "struct Tcp is incorrect");
 
 }  // namespace xlb::headers

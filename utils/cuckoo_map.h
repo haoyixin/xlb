@@ -18,7 +18,8 @@
 namespace xlb::utils {
 
 // A hash table implementation using cuckoo hashing on hugepage
-// Note: this is not thread-safe
+// Note: 1. this is not thread-safe
+//       2. insert/emplace with same key is undefined behavior
 template <typename K, typename V, typename H = std::hash<K>,
           typename E = std::equal_to<K>>
 class CuckooMap {
@@ -110,7 +111,7 @@ class CuckooMap {
     // the number of buckets must be a power of 2
     CHECK_EQ(align_ceil_pow2(reserve_buckets), reserve_buckets);
 
-    for (auto i : irange(int(reserve_entries - 1), -1, -1))
+    for (auto i : irange(int(reserve_entries - 1), 0, -1))
       free_entry_indices_.push(i);
   }
 
@@ -225,6 +226,14 @@ class CuckooMap {
     Bucket() : hash_values(), entry_indices() {}
   };
 
+  struct Slot {
+    HashResult alt_bucket_index;
+    // zero means empty
+    EntryIndex entry_index;
+  };
+
+  using _Bucket = std::array<Slot, kEntriesPerBucket>;
+
   template <typename... Args>
   Entry *do_emplace(const K &key, const H &hasher, const E &eq,
                     Args &&... args) {
@@ -249,6 +258,25 @@ class CuckooMap {
     return entry;
   }
 
+  template <typename... Args>
+  Entry *_do_emplace(const K &key, const H &hasher, const E &eq,
+                     Args &&... args) {
+    Slot *slot;
+    Entry *entry;
+
+    HashResult primary_hash = hash(key);
+
+    HashResult primary_bucket_idx = primary_hash & bucket_mask_;
+    HashResult secondary_bucket_idx =
+        hash_secondary(primary_hash) & bucket_mask_;
+
+    if ((slot = occupy_empty_slot(primary_bucket_idx, secondary_bucket_idx)) ==
+        nullptr) {
+      LOG(WARNING) << "CuckooMap: Excessive hash colision detected:\n";
+      return nullptr;
+    }
+    return entry;
+  }
   // Push an unused entry index back to the stack
   void push_free_entry_index(EntryIndex idx) { free_entry_indices_.push(idx); }
 
@@ -335,6 +363,61 @@ class CuckooMap {
     EntryIndex idx = bucket.entry_indices[slot_idx];
     promise(idx != kInvalidEntryIdx);
     return idx;
+  }
+
+  //  Slot *find_empty_slot(const K &key, const H &hasher) const {}
+
+  Slot *occupy_empty_slot(HashResult primary_bucket_idx,
+                          HashResult secondary_bucket_idx) const {
+    Slot *slot = nullptr;
+
+    if ((slot = find_empty_slot(buckets_[primary_bucket_idx])) != nullptr) {
+      slot->target_bucket_index = secondary_bucket_idx;
+      return slot;
+    }
+
+    if ((slot = find_empty_slot(buckets_[secondary_bucket_idx])) != nullptr) {
+      slot->target_bucket_index = primary_bucket_idx;
+      return slot;
+    }
+
+    if ((slot = make_empty_slot(primary_bucket_idx, 0)) != nullptr) {
+      slot->target_bucket_index = secondary_bucket_idx;
+      return slot;
+    }
+
+    if ((slot = make_empty_slot(secondary_bucket_idx, 0)) != nullptr) {
+      slot->target_bucket_index = primary_bucket_idx;
+      return slot;
+    }
+
+    return nullptr;
+  }
+
+  Slot *make_empty_slot(HashResult bucket_idx, int depth) {
+    if (depth >= kMaxCuckooPath) return nullptr;
+
+    Slot *slot;
+
+    for (auto &orig : buckets_[bucket_idx]) {
+      HashResult alt_idx = orig.target_bucket_index;
+
+      if ((slot = find_empty_slot(buckets_[alt_idx])) != nullptr) {
+        slot->target_bucket_index = bucket_idx;
+        slot->entry_index = orig.entry_index;
+        orig.entry_index = 0;
+        return slot;
+      }
+
+      if ((slot = make_empty_slot(alt_idx, depth + 1)) != nullptr) return slot;
+    }
+  }
+
+  Slot *find_empty_slot(const _Bucket &bucket) const {
+    for (auto &s : bucket)
+      if (s.entry_index == 0) return &s;
+
+    return nullptr;
   }
 
   // Try to add the entry (key, value)
@@ -463,6 +546,8 @@ class CuckooMap {
     return hasher(key) | (1u << 31);
   }
 
+  HashResult hash(const K &key) { return H()(key) | (1u << 31); }
+
   static bool equal(const K &lhs, const K &rhs, const E &eq) {
     return eq(lhs, rhs);
   }
@@ -481,19 +566,22 @@ class CuckooMap {
   // Resize the space of buckets, and rehash existing entries
   template <typename VV>
   void expand_buckets(const H &hasher, const E &eq) {
-    CuckooMap<K, V, H, E> bigger(allocator_.socket(), buckets_.size() * 2,
-                                 entries_.size());
+    //    CuckooMap<K, V, H, E> bigger(allocator_.socket(), buckets_.size() * 2,
+    //                                 entries_.size());
 
-    for (auto &e : *this) {
-      // While very unlikely, this do_emplace() may cause recursive expansion
-      Entry *ret =
-          bigger.do_emplace(e.first, hasher, eq, std::forward<VV>(e.second));
-      if (!ret) {
-        return;
-      }
-    }
+    decltype(buckets_) bigger(buckets_.size() * 2, &allocator_);
 
-    *this = std::move(bigger);
+    //    for (auto &e : *this) {
+    //      // While very unlikely, this do_emplace() may cause recursive
+    //      expansion Entry *ret =
+    //          bigger.do_emplace(e.first, hasher, eq,
+    //          std::forward<VV>(e.second));
+    //      if (!ret) {
+    //        return;
+    //      }
+    //    }
+    //
+    //    *this = std::move(bigger);
   }
 
   // # of buckets == mask + 1
@@ -508,6 +596,8 @@ class CuckooMap {
   // bucket and entry arrays grow independently
   std::vector<Bucket, pmr::polymorphic_allocator<Bucket>> buckets_;
   std::vector<Entry, pmr::polymorphic_allocator<Entry>> entries_;
+
+  decltype(buckets_) expand_buckets() {}
 
   // Stack of free entries (I don't know why using hugepage here will cause
   // performance degradation.)

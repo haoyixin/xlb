@@ -158,7 +158,7 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
 
   init_driver();
 
-  uint16_t num_q = CONFIG.worker_cores.size();
+  uint16_t num_q = CONFIG.slave_cores.size();
 
   CHECK(find_dpdk_port_by_pci_addr(CONFIG.nic.pci_address, &dpdk_port_id_));
 
@@ -196,7 +196,7 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
 
   for (auto i : utils::irange(CONFIG.nic.local_ips.size())) {
     set_lip_affinity(dpdk_port_id_, CONFIG.nic.local_ips[i],
-                     i % CONFIG.worker_cores.size());
+                     i % CONFIG.slave_cores.size());
   }
 
   CHECK(!rte_eth_dev_start(dpdk_port_id_));

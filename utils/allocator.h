@@ -5,6 +5,8 @@
 #include <rte_config.h>
 #include <rte_malloc.h>
 
+#include <glog/logging.h>
+
 #include <experimental/memory_resource>
 #include <new>
 
@@ -12,8 +14,9 @@ namespace pmr = std::experimental::pmr;
 
 namespace xlb::utils {
 
-template <typename T> class Allocator {
-public:
+template <typename T>
+class Allocator {
+ public:
   typedef T value_type;
 
   Allocator() = default;
@@ -23,8 +26,7 @@ public:
 
   // Will be allocated on the socket which calling this.
   T *allocate(std::size_t n) {
-    if (n > std::size_t(-1) / sizeof(T))
-      throw std::bad_alloc();
+    if (n > std::size_t(-1) / sizeof(T)) throw std::bad_alloc();
     if (auto p = static_cast<T *>(
             rte_malloc(nullptr, n * sizeof(T), RTE_CACHE_LINE_SIZE)))
       return p;
@@ -38,11 +40,12 @@ public:
 // Fortunately, the frequency of calling allocate/do_allocate is not very high
 // in our project, so we can bear the overhead of a virtual function.
 class MemoryResource : public std::experimental::pmr::memory_resource {
-public:
+ public:
   explicit MemoryResource(int socket) : socket_(socket) {}
+
   int socket() const { return socket_; }
 
-protected:
+ protected:
   void *do_allocate(std::size_t bytes, std::size_t) override {
     if (auto p =
             rte_malloc_socket(nullptr, bytes, RTE_CACHE_LINE_SIZE, socket_))
@@ -60,7 +63,7 @@ protected:
     return this == &other;
   }
 
-private:
+ private:
   int socket_;
 };
 

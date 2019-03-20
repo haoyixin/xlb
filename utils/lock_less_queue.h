@@ -7,6 +7,8 @@
 
 #include "3rdparty/llring.h"
 
+#include "utils/common.h"
+
 namespace xlb::utils {
 
 // A wrapper class for llring.
@@ -16,14 +18,20 @@ class LockLessQueue {
                 "LockLessQueue only supports pointer types");
 
  public:
+  enum Error : int8_t {
+    NONE = 0,
+    NOBUF = -LLRING_ERR_NOBUF,
+    QUOT = -LLRING_ERR_QUOT,
+    NOENT = -LLRING_ERR_NOENT
+  };
+
   static const size_t kDefaultRingSize = 256;
 
   explicit LockLessQueue(int socket = SOCKET_ID_ANY,
                          size_t capacity = kDefaultRingSize,
                          bool single_producer = true,
                          bool single_consumer = true)
-      : capacity_(capacity), socket_(socket) {
-    CHECK_EQ(capacity % 2, 0);
+      : capacity_(align_ceil_pow2(capacity)), socket_(socket) {
     ring_ = reinterpret_cast<struct llring *>(rte_malloc_socket(
         nullptr, llring_bytes_with_slots(capacity_), alignof(llring), socket_));
     CHECK_NOTNULL(ring_);
@@ -31,33 +39,27 @@ class LockLessQueue {
              0);
   }
 
-  virtual ~LockLessQueue() {
+  ~LockLessQueue() {
     if (ring_) rte_free(ring_);
   }
 
   // error codes: -1 is Quota exceeded. The objects have been enqueued,
   // but the high water mark is exceeded. -2 is not enough room in the
   // ring to enqueue; no object is enqueued.
-  int Push(T obj) {
+  Error Push(T obj) {
     return llring_enqueue(ring_, reinterpret_cast<void *>(obj));
   }
 
-  int Push(T *objs, size_t count) {
-    if (!llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
-      return count;
-    }
-    return 0;
+  Error Push(T *objs, size_t count) {
+    llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count);
   }
 
-  int Pop(T &obj) {
+  Error Pop(T &obj) {
     return llring_dequeue(ring_, reinterpret_cast<void **>(&obj));
   }
 
-  int Pop(T *objs, size_t count) {
-    if (!llring_dequeue_bulk(ring_, reinterpret_cast<void **>(objs), count)) {
-      return count;
-    }
-    return 0;
+  size_t Pop(T *objs, size_t count) {
+    llring_dequeue_burst(ring_, reinterpret_cast<void **>(objs), count);
   }
 
   // capacity will be one less than specified

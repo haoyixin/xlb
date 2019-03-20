@@ -8,14 +8,14 @@
 
 namespace xlb {
 
-class Conn {
+class alignas(64) [[gnu::packed]] Connection {
  private:
   using be32_t = utils::be32_t;
   using be16_t = utils::be16_t;
   using Tcp = headers::Tcp;
 
  public:
-  enum State {
+  enum State : uint8_t {
     STATE_NONE = 0,
     STATE_SYN_SENT,
     STATE_SYN_RECV,
@@ -30,11 +30,13 @@ class Conn {
     STATE_IGNORE
   };
 
-  enum Dir { DIR_ORIGINAL = 0, DIR_REPLY, DIR_MAX };
+  enum Dir : uint8_t { DIR_ORIGINAL = 0, DIR_REPLY, DIR_MAX };
 
-  enum Flag { FLAG_SYN = 0, FLAG_SYNACK, FLAG_FIN, FLAG_ACK, FLAG_RST, FLAG_NONE, FLAG_MAX };
+  enum Flag : uint8_t { FLAG_SYN = 0, FLAG_SYNACK, FLAG_FIN, FLAG_ACK, FLAG_RST, FLAG_NONE, FLAG_MAX };
 
-  void SetState(Tcp *hdr, Dir dir);
+  void UpdateState(Tcp *hdr, Dir dir);
+
+  State state() { return state_; }
 
  private:
   be32_t cip, vip, lip, rip;
@@ -42,9 +44,8 @@ class Conn {
 
   State state_;
 
-  static Flag get_flag(Tcp *hdr);
-
-  static constexpr uint8_t smm[DIR_MAX][FLAG_MAX][STATE_MAX] = {
+// state machine table
+  static constexpr State smt[DIR_MAX][FLAG_MAX][STATE_MAX] = {
       {/* ORIGINAL */
        /*syn*/ {STATE_SYN_SENT, STATE_SYN_SENT, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE,
                 STATE_IGNORE, STATE_IGNORE, STATE_SYN_SENT, STATE_SYN_SENT, STATE_SYN_SENT2},
@@ -82,7 +83,7 @@ class Conn {
        {STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX,
         STATE_MAX, STATE_MAX}}};
 
-  uint32_t timeouts[STATE_MAX] = {
+  static constexpr uint8_t timeouts[STATE_MAX] = {
       [STATE_NONE] = 2,         [STATE_SYN_SENT] = 30, [STATE_SYN_RECV] = 30,
       [STATE_ESTABLISHED] = 90, [STATE_FIN_WAIT] = 30, [STATE_CLOSE_WAIT] = 30,
       [STATE_LAST_ACK] = 30,    [STATE_TIME_WAIT] = 0, [STATE_CLOSE] = 0,

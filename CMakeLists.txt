@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 17)
 #add_subdirectory(${BRPC_SRC})
 
 #add_compile_options(-O3 -msse4 -mavx)
-add_compile_options(-O3 -msse4 -mavx)
+add_compile_options(-O3 -msse4 -mavx -Wall -Wextra)
 
 set(DPDK_LIBS
         "-Wl,--whole-archive"
@@ -81,8 +81,8 @@ set(OBJS
         headers/ether.cc
         ports/pmd.cc
         ports/kni.cc
-#        task.cc
-        conn.h conn.cc)
+        #        task.cc
+        connection.h connection.cc)
 
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
@@ -97,16 +97,20 @@ include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
 
 #add_executable(xlb main.cpp)
 #add_executable(xlb3 tests/main3.cc ${OBJS})
-add_executable(xlb5 tests/main5.cc ${OBJS})
+add_executable(xlb xlb.cc ${OBJS})
 #add_executable(xlb5 tests/main5.cc)
 #add_executable(xlb3 tests/main3.cc)
 #add_executable(packet packet.cc utils/format.cc)
 #add_executable(xlb main.cpp clibs/c_hash.c)
 
-set_property(TARGET xlb5 PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
+set_property(TARGET xlb PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
 #target_link_options(xlb5 PRIVATE -Winline)
 
+#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+#SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+#SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+
 #target_link_libraries(xlb glog rte_eal pthread numa ${CMAKE_DL_LIBS})
-target_link_libraries(xlb5 ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})
+target_link_libraries(xlb ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})
 #target_link_libraries(xlb5 pthread)
 #target_link_libraries(xlb4)

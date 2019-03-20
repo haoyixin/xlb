@@ -1,13 +1,10 @@
 #pragma once
 
-#include "config.h"
-#include "module.h"
-
-#include "headers/ether.h"
+#include "modules/common.h"
 
 namespace xlb::modules {
 
-template <typename T>
+template <typename T, bool Master = false>
 class PortOut final : public Module {
   static_assert(std::is_base_of<Port, T>::value);
 
@@ -17,17 +14,17 @@ class PortOut final : public Module {
     port_ = &utils::Singleton<T>::instance(std::forward<Args>(args)...);
   }
 
-  ~PortOut() {
-    delete(port_);
-  }
+  //  ~PortOut() { delete (port_); }
 
-  inline void Process(Context *ctx, PacketBatch *batch) override {
+  template <typename Tag = NoneTag>
+  void Process(Context *ctx, PacketBatch *batch) {
     port_->Send(ctx->worker()->current()->id(), batch->pkts(), batch->cnt());
   }
 
-  inline void Process(Context *ctx, Packet *packet) override {
-    port_->Send(ctx->worker()->current()->id(), &packet, 1);
-  }
+  //  template <typename Tag = NoneTag>
+  //  void Process(Context *ctx, Packet *packet) override {
+  //    port_->Send(ctx->worker()->current()->id(), &packet, 1);
+  //  }
 
  private:
   T *port_;
