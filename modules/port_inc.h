@@ -11,9 +11,9 @@ class PortInc final : public Module {
 
  public:
   template <typename... Args>
-  explicit PortInc(uint8_t weight, Args &&... args) : weight_(weight) {
-    port_ = &utils::Singleton<T>::instance(std::forward<Args>(args)...);
-  }
+  explicit PortInc(uint8_t weight, Args &&... args)
+      : weight_(weight),
+        port_(Singleton<T>::instance(std::forward<Args>(args)...)) {}
 
   void InitInMaster() override {
     if constexpr (!Master) return;
@@ -25,18 +25,22 @@ class PortInc final : public Module {
     register_task();
   }
 
-//  ~PortInc() { delete (port_); }
+  //  ~PortInc() { delete (port_); }
 
  protected:
   void register_task() {
     RegisterTask(
         [this](Context *ctx) -> Result {
           PacketBatch batch{};
-          batch.SetCnt(port_->Recv(ctx->worker()->current()->id(), batch.pkts(),
-                                   Packet::kMaxBurst));
+          batch.SetCnt(port_.Recv(ctx->worker()->current()->id(), batch.pkts(),
+                                  Packet::kMaxBurst));
 
           // TODO: come on
-          HandOn<EtherInc, T>(ctx, &batch);
+          if (batch.cnt() > 0) {
+            DLOG(INFO) << "Recieve " << batch.cnt() << " packets in "
+                       << (Master ? "master" : "slave") << " thread";
+            HandOn<EtherInc, T>(ctx, &batch);
+          }
 
           return {.packets = batch.cnt()};
         },
@@ -45,7 +49,7 @@ class PortInc final : public Module {
 
  private:
   uint8_t weight_;
-  T *port_;
+  T &port_;
 };
 
 }  // namespace xlb::modules

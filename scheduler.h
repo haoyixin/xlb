@@ -45,8 +45,8 @@ class Scheduler {
     class Context {
      public:
       Context() = default;
-      inline void DropPacket(Packet *pkt);
-      inline void HoldPacket(Packet *pkt);
+      void DropPacket(Packet *pkt);
+      void HoldPacket(Packet *pkt);
 
       auto worker() { return worker_; }
       auto &stage_batch() { return stage_batch_; }

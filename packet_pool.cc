@@ -30,7 +30,6 @@ void init_packet(rte_mempool *mp, void *, void *mbuf, unsigned index) {
 } // namespace
 
 PacketPool::PacketPool(size_t capacity, int socket_id) {
-  rte_dump_physmem_layout(stdout);
 
   // TODO: support multi numa node
 

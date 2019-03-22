@@ -21,11 +21,17 @@ using utils::be16_t;
 using utils::be32_t;
 using utils::be64_t;
 
+using utils::Singleton;
+
 using ports::KNI;
 using ports::PMD;
 
 using headers::Arp;
 using headers::Ethernet;
 using headers::Ipv4;
+using headers::Tcp;
+
+using headers::ToIpv4Address;
+using headers::ParseIpv4Address;
 
 }  // namespace xlb::headers

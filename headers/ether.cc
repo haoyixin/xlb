@@ -20,20 +20,19 @@ Address::Address(const std::string &str) {
 
 bool Address::FromString(const std::string &str) {
   int ret = utils::Parse(str, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", &bytes[0],
-                  &bytes[1], &bytes[2], &bytes[3], &bytes[4], &bytes[5]);
+                         &bytes[1], &bytes[2], &bytes[3], &bytes[4], &bytes[5]);
   return (ret == Address::kSize);
 }
 
 std::string Address::ToString() const {
-  return utils::Format("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", bytes[0], bytes[1],
-                bytes[2], bytes[3], bytes[4], bytes[5]);
+  return utils::Format("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", bytes[0],
+                       bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
 }
 
 void Address::Randomize() {
   utils::Random rng;
 
-  for (auto &byte : bytes)
-    byte = rng.Integer() & 0xff;
+  for (auto &byte : bytes) byte = rng.Integer() & 0xff;
 
   bytes[0] &= 0xfe;  // not broadcast/multicast
   bytes[0] |= 0x02;  // locally administered

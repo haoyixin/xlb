@@ -3,7 +3,6 @@
 #include "config.h"
 #include <brpc/server.h>
 #include <string>
-#include <utils/cuckoo_map.h>
 
 namespace xlb {
 

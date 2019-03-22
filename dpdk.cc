@@ -7,9 +7,10 @@
 
 #include <rte_cycles.h>
 #include <rte_eal.h>
+#include <rte_launch.h>
+#include <rte_memory.h>
 
 #include <glog/logging.h>
-#include <rte_launch.h>
 
 #include "utils/boost.h"
 #include "utils/numa.h"
@@ -102,6 +103,7 @@ void init_eal() {
   disable_syslog();
   CHECK_GE(rte_eal_init(rte_args.Argc(), rte_args.Argv()), 0);
   CHECK_EQ(rte_eal_hpet_init(1), 0);
+  rte_dump_physmem_layout(stdout);
 
   enable_syslog();
   fclose(stdout);

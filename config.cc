@@ -70,6 +70,7 @@ void Config::validate() {
   CHECK_NE(kni.ip_address, "");
   CHECK_NE(kni.netmask, "");
   CHECK_NE(kni.gateway, "");
+  CHECK_GT(kni.ring_size, 64);
 
   CHECK_GT(mem.hugepage, 0);
   CHECK_GT(mem.channel, 0);

@@ -10,8 +10,7 @@ namespace xlb::ports {
 
 class KNI final : public Port {
  public:
-  template <typename... Args>
-  explicit KNI(Args &&... args);
+  KNI();
   ~KNI() override;
 
   struct Status Status() override {

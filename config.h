@@ -18,7 +18,7 @@ struct Config {
 
     std::vector<std::string> local_ips;
     //    std::string netmask;
-//    std::string gateway;
+    //    std::string gateway;
 
     uint16_t mtu;
     int socket;
@@ -32,9 +32,10 @@ struct Config {
   };
 
   struct Kni {
-      std::string ip_address;
-      std::string netmask;
-      std::string gateway;
+    std::string ip_address;
+    std::string netmask;
+    std::string gateway;
+    size_t ring_size;
   };
 
   std::string rpc_ip_port;
@@ -58,5 +59,6 @@ struct Config {
 
 VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, mtu);
 VISITABLE_STRUCT(xlb::Config::Mem, hugepage, channel, packet_pool);
-VISITABLE_STRUCT(xlb::Config::Kni, ip_address, netmask, gateway);
-VISITABLE_STRUCT(xlb::Config, rpc_ip_port, slave_cores, master_core, nic, mem, kni);
+VISITABLE_STRUCT(xlb::Config::Kni, ip_address, netmask, gateway, ring_size);
+VISITABLE_STRUCT(xlb::Config, rpc_ip_port, slave_cores, master_core, nic, mem,
+                 kni);

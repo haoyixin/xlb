@@ -2,9 +2,9 @@
 
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include "utils/common.h"
-#include "utils/cuckoo_map.h"
 #include "utils/random.h"
 #include "utils/singleton.h"
 #include "utils/time.h"

@@ -82,7 +82,7 @@ set(OBJS
         ports/pmd.cc
         ports/kni.cc
         #        task.cc
-        connection.h connection.cc)
+        connection.cc)
 
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)

@@ -26,7 +26,7 @@ void *Worker::run() {
   std::string name;
 
   if (!master_)
-    name = utils::Format("worker-%u@%u", id_, core_);
+    name = utils::Format("worker@%u", core_);
   else
     name = utils::Format("master@%u", core_);
 

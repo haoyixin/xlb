@@ -5,7 +5,6 @@
 #include <functional>
 #include <string>
 
-#include "utils/cuckoo_map.h"
 #include "utils/singleton.h"
 
 #include "packet_batch.h"
@@ -41,7 +40,7 @@ class Module {
 
   template <typename T, typename... Args>
   static void Init(Args &&... args) {
-    CHECK_NOTNULL(utils::UnsafeSingleton<T>::Init(std::forward<Args>(args)...));
+    utils::UnsafeSingleton<T>::Init(std::forward<Args>(args)...);
   }
 
  protected:
@@ -58,7 +57,7 @@ class Module {
   void RegisterTask(Func &&func, uint8_t weight) {
     auto worker = Worker::current();
 
-    CHECK(!Worker::current());
+//    CHECK(!Worker::current());
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 

@@ -5,50 +5,86 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <functional>
 #include <string>
+
+#include "glog/logging.h"
 
 #include "headers/ip.h"
 
 namespace xlb::utils {
 
-bool SetHwAddr(const std::string &ifname, const headers::Ethernet::Address &addr) {
-  if (ifname.empty() || ifname == "lo" || addr.IsBroadcast() ||
-      addr.IsBroadcast())
-    return false;
+namespace {
 
+bool do_command(const std::string &ifname,
+                const std::function<int(int, ifreq *)> &func) {
   int sock_fd = socket(PF_INET, SOCK_DGRAM, 0);
-  if (sock_fd < 0)
-    return false;
+  if (sock_fd < 0) return false;
 
   struct ifreq ifr = {};
   snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", ifname.c_str());
-  ifr.ifr_hwaddr.sa_family = 1;
-  memcpy(ifr.ifr_hwaddr.sa_data, addr.bytes, headers::Ethernet::Address::kSize);
 
-  int ret = ioctl(sock_fd, SIOCSIFHWADDR, &ifr);
+  bool success = (func(sock_fd, &ifr) == 0);
   close(sock_fd);
 
-  return ret == 0;
+  return success;
 }
 
-bool SetIpAddr(const std::string &ifname, const headers::be32_t &addr) {
-  if (ifname.empty() || ifname == "lo")
+}  // namespace
+
+bool SetHwAddr(const std::string &ifname,
+               const headers::Ethernet::Address &addr) {
+  if (ifname.empty() || ifname == "lo" || addr.IsZero() || addr.IsBroadcast())
     return false;
 
-  int sock_fd = socket(PF_INET, SOCK_DGRAM, 0);
-  if (sock_fd < 0)
-    return false;
-
-  struct ifreq ifr = {};
-  struct sockaddr_in sin = {};
-  sin.sin_family = AF_INET;
-  inet_pton(AF_INET, headers::ToIpv4Address(addr).c_str(), &(sin.sin_addr));
-  memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr));
-
-  int ret = ioctl(sock_fd, SIOCSIFADDR, &ifr);
-  close(sock_fd);
-
-  return ret == 0;
+  return do_command(ifname, [&addr](int fd, ifreq *ifr) -> int {
+    ifr->ifr_hwaddr.sa_family = 1;
+    memcpy(ifr->ifr_hwaddr.sa_data, addr.bytes,
+           headers::Ethernet::Address::kSize);
+    return ioctl(fd, SIOCSIFHWADDR, ifr);
+  });
 }
+
+/*
+
+bool SetIpAddr(const std::string &ifname, const std::string &addr) {
+  if (ifname.empty() || ifname == "lo") return false;
+
+  DLOG(INFO) << "Set iface: " << ifname << " ip address to: " << addr;
+
+  return do_command(ifname, [&addr](int fd, ifreq *ifr) -> int {
+    struct sockaddr_in sin = {};
+    sin.sin_family = AF_INET;
+    sin.sin_port = 0;
+
+    inet_pton(AF_INET, addr.c_str(), &(sin.sin_addr.s_addr));
+    memcpy(&ifr->ifr_addr, &sin, sizeof(struct sockaddr));
+    return ioctl(fd, SIOCSIFADDR, ifr);
+  });
+}
+
+bool SetNetmask(const std::string &ifname, const std::string &netmask) {
+  if (ifname.empty() || ifname == "lo") return false;
+
+  return do_command(ifname, [&netmask](int fd, ifreq *ifr) -> int {
+    struct sockaddr_in sin = {};
+    sin.sin_family = AF_INET;
+
+    inet_pton(AF_INET, netmask.c_str(), &(sin.sin_addr));
+    memcpy(&ifr->ifr_netmask, &sin, sizeof(struct sockaddr));
+    return ioctl(fd, SIOCSIFNETMASK, ifr);
+  });
+}
+
+bool SetUp(const std::string &ifname) {
+  if (ifname.empty() || ifname == "lo") return false;
+
+  return do_command(ifname, [](int fd, ifreq *ifr) -> int {
+    ifr->ifr_flags |= IFF_UP;
+    return ioctl(fd, SIOCSIFFLAGS, ifr);
+  });
+}
+
+ */
 
 }  // namespace xlb::utils

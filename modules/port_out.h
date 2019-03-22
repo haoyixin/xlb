@@ -4,21 +4,22 @@
 
 namespace xlb::modules {
 
-template <typename T, bool Master = false>
+template <typename T>
 class PortOut final : public Module {
   static_assert(std::is_base_of<Port, T>::value);
 
  public:
   template <typename... Args>
-  explicit PortOut(Args &&... args) {
-    port_ = &utils::Singleton<T>::instance(std::forward<Args>(args)...);
-  }
+  explicit PortOut(Args &&... args)
+      : port_(Singleton<T>::instance(std::forward<Args>(args)...)) {}
 
   //  ~PortOut() { delete (port_); }
 
   template <typename Tag = NoneTag>
   void Process(Context *ctx, PacketBatch *batch) {
-    port_->Send(ctx->worker()->current()->id(), batch->pkts(), batch->cnt());
+    port_.Send(ctx->worker()->current()->id(), batch->pkts(), batch->cnt());
+    DLOG(INFO) << "Send " << batch->cnt()
+               << " packets in worker: " << ctx->worker()->current()->id();
   }
 
   //  template <typename Tag = NoneTag>
@@ -27,7 +28,7 @@ class PortOut final : public Module {
   //  }
 
  private:
-  T *port_;
+  T &port_;
 };
 
 }  // namespace xlb::modules

@@ -51,7 +51,8 @@ class LockLessQueue {
   }
 
   Error Push(T *objs, size_t count) {
-    llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count);
+    return static_cast<Error>(
+        llring_enqueue_bulk(ring_, reinterpret_cast<void **>(objs), count));
   }
 
   Error Pop(T &obj) {
@@ -59,7 +60,7 @@ class LockLessQueue {
   }
 
   size_t Pop(T *objs, size_t count) {
-    llring_dequeue_burst(ring_, reinterpret_cast<void **>(objs), count);
+    return llring_dequeue_burst(ring_, reinterpret_cast<void **>(objs), count);
   }
 
   // capacity will be one less than specified

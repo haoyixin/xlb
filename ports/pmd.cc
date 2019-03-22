@@ -67,6 +67,8 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
 
 void set_lip_affinity(uint16_t port_id, const std::string &dst_ip,
                       uint16_t qid) {
+  LOG(INFO) << "Set local ip affinity: " << dst_ip << " to rxq: " << qid;
+
   utils::be32_t dst{};
   headers::ParseIpv4Address(dst_ip, &dst);
 
@@ -119,8 +121,7 @@ void init_driver() {
 
   CHECK_NE(num_dpdk_ports, 0);
 
-  LOG(INFO) << static_cast<int>(num_dpdk_ports)
-            << " nics have been recognized:";
+  LOG(INFO) << static_cast<int>(num_dpdk_ports) << " nics have been recognized";
 
   for (auto i : utils::irange((uint16_t)0, num_dpdk_ports)) {
     struct rte_eth_dev_info dev_info {};
@@ -178,6 +179,8 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
   struct rte_eth_txconf eth_txconf = dev_info_.default_txconf;
 
   eth_txconf.offloads = eth_conf.txmode.offloads;
+  eth_txconf.txq_flags |= ETH_TXQ_FLAGS_IGNORE;
+
   eth_rxconf.offloads = eth_conf.rxmode.offloads;
 
   // TODO: configurable queue size
@@ -244,10 +247,13 @@ uint16_t PMD::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
 uint16_t PMD::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
   auto recv = rte_eth_rx_burst(dpdk_port_id_, qid,
                                reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
-  M::Adder<TS("rx_packets")>() << recv;
 
-  for (auto i : utils::irange(recv))
-    M::Adder<TS("rx_bytes")>() << pkts[i]->data_len();
+  if (recv > 0) {
+    M::Adder<TS("rx_packets")>() << recv;
+
+    for (auto i : utils::irange(recv))
+      M::Adder<TS("rx_bytes")>() << pkts[i]->data_len();
+  }
 
   return recv;
 }
