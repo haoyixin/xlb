@@ -1,8 +1,8 @@
 #include "ports/kni.h"
 
 #include <atomic>
-#include <thread>
 #include <cstdlib>
+#include <thread>
 
 #include <rte_bus_pci.h>
 
@@ -36,8 +36,10 @@ KNI::KNI() : Port() {
                                   pmd_port.dev_info()->pci_dev->id,
                                   1};
 
+  struct rte_kni_ops kni_ops = {0, nullptr, nullptr};
+
   kni_ = rte_kni_alloc(utils::Singleton<PacketPool>::instance().pool(),
-                       &kni_conf, nullptr);
+                       &kni_conf, &kni_ops);
   CHECK_NOTNULL(kni_);
 
   conf_ = pmd_port.conf();
@@ -49,8 +51,10 @@ KNI::KNI() : Port() {
 }
 
 uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
-  if (rte_kni_handle_request(kni_) != 0)
+  if (rte_kni_handle_request(kni_) != 0) {
+    LOG(ERROR) << "rte_kni_handle_request failed";
     M::Adder<TS("req_failed")>() << 1;
+  }
 
   auto recv =
       rte_kni_rx_burst(kni_, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
@@ -77,6 +81,9 @@ uint16_t KNI::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
   return sent;
 }
 
-KNI::~KNI() { rte_kni_release(kni_); }
+KNI::~KNI() {
+  DLOG(INFO) << "Release kni interface";
+  rte_kni_release(kni_);
+}
 
 }  // namespace xlb::ports

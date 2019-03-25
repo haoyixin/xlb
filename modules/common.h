@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include "module.h"
 #include "config.h"
 #include "port.h"
@@ -16,6 +18,8 @@
 #include "headers/tcp.h"
 
 namespace xlb::modules {
+
+using std::is_same;
 
 using utils::be16_t;
 using utils::be32_t;

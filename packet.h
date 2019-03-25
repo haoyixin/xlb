@@ -28,18 +28,18 @@ static_assert(XBUF_METADATA_OFF == 192, "Packet metadata offset must by 192");
 static_assert(XBUF_SCRATCHPAD_OFF == 320,
               "Packet scratchpad offset must be 320");
 
-#define check_offset(field)                                                    \
-  static_assert(                                                               \
-      offsetof(Packet, field##_) == offsetof(rte_mbuf, field),                 \
+#define check_offset(field)                                    \
+  static_assert(                                               \
+      offsetof(Packet, field##_) == offsetof(rte_mbuf, field), \
       "Incompatibility detected between class Packet and struct rte_mbuf")
 
 namespace xlb {
 // For the layout of xbuf, see xbuf_layout.h
 class alignas(64) Packet {
-public:
+ public:
   static const size_t kMaxBurst = 32;
 
-  Packet() = delete; // Packet must be allocated from PacketPool
+  Packet() = delete;  // Packet must be allocated from PacketPool
 
   Packet *vaddr() const { return vaddr_; }
   void set_vaddr(Packet *addr) { vaddr_ = addr; }
@@ -53,31 +53,40 @@ public:
   uint32_t index() const { return index_; }
   void set_index(uint32_t index) { index_ = index; }
 
-  template <typename T = char *> T reserve() {
+  template <typename T = char *>
+  T reserve() {
     return reinterpret_cast<T>(reserve_);
   }
 
-  template <typename T = void *> const T head_data(uint16_t offset = 0) const {
+  template <typename T = void *>
+  const T head_data(uint16_t offset = 0) const {
     return reinterpret_cast<T>(static_cast<char *>(buf_addr_) + data_off_ +
                                offset);
   }
 
-  template <typename T = void *> T head_data(uint16_t offset = 0) {
+  template <typename T = void *>
+  T head_data(uint16_t offset = 0) {
     return const_cast<T>(
         static_cast<const Packet &>(*this).head_data<T>(offset));
   }
 
-  template <typename T = char *> T data() { return reinterpret_cast<T>(data_); }
+  template <typename T = char *>
+  T data() {
+    return reinterpret_cast<T>(data_);
+  }
 
-  template <typename T = char *> T metadata() const {
+  template <typename T = char *>
+  T metadata() const {
     return reinterpret_cast<T>(metadata_);
   }
 
-  template <typename T = char *> T scratchpad() {
+  template <typename T = char *>
+  T scratchpad() {
     return reinterpret_cast<T>(scratchpad_);
   }
 
-  template <typename T = void *> T buffer() {
+  template <typename T = void *>
+  T buffer() {
     return reinterpret_cast<T>(buf_addr_);
   }
 
@@ -98,6 +107,21 @@ public:
   int total_len() const { return pkt_len_; }
   void set_total_len(uint32_t len) { pkt_len_ = len; }
 
+  void set_l2_len(size_t len) { mbuf_.l2_len = len; }
+  void set_l3_len(size_t len) { mbuf_.l3_len = len; }
+  void set_l4_len(size_t len) { mbuf_.l4_len = len; }
+
+  uint64_t ol_flags() { return ol_flags_; }
+  void set_ol_flags(uint64_t bit) { ol_flags_ |= bit; }
+
+  bool rx_ip_cksum_good() {
+    return (ol_flags_ & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_GOOD;
+  }
+
+  bool rx_l4_cksum_good() {
+    return (ol_flags_ & PKT_RX_L4_CKSUM_MASK) == PKT_RX_L4_CKSUM_GOOD;
+  }
+
   uint16_t headroom() const { return rte_pktmbuf_headroom(&mbuf_); }
 
   uint16_t tailroom() const { return rte_pktmbuf_tailroom(&mbuf_); }
@@ -111,8 +135,7 @@ public:
   void reset() { rte_pktmbuf_reset(&mbuf_); }
 
   void *prepend(uint16_t len) {
-    if (unlikely(data_off_ < len))
-      return nullptr;
+    if (unlikely(data_off_ < len)) return nullptr;
 
     data_off_ -= len;
     data_len_ += len;
@@ -123,8 +146,7 @@ public:
 
   // remove bytes from the beginning
   void *adj(uint16_t len) {
-    if (unlikely(data_len_ < len))
-      return nullptr;
+    if (unlikely(data_len_ < len)) return nullptr;
 
     data_off_ += len;
     data_len_ -= len;
@@ -151,7 +173,7 @@ public:
 
     Packet *dst = reinterpret_cast<Packet *>(rte_pktmbuf_alloc(src->pool_));
     if (!dst) {
-      return nullptr; // FAIL.
+      return nullptr;  // FAIL.
     }
 
     utils::CopyInlined(dst->append(src->total_len()), src->head_data(),
@@ -230,7 +252,7 @@ public:
   // 3. reference counter == 1
   // 4. the data buffer is embedded in the mbuf
   static inline void Free(Packet **pkts, size_t cnt) {
-    DCHECK(cnt <= kMaxBurst);
+    DCHECK_LE(cnt, kMaxBurst);
 
     // rte_mempool_put_bulk() crashes when called with cnt == 0
     if (unlikely(cnt <= 0)) {
@@ -276,8 +298,7 @@ public:
       vcmp1 = _mm_and_si128(vcmp1, vcmp2);
       vcmp1 = _mm_and_si128(vcmp1, vcmp3);
 
-      if (unlikely(_mm_movemask_epi8(vcmp1) != 0xffff))
-        goto slow_path;
+      if (unlikely(_mm_movemask_epi8(vcmp1) != 0xffff)) goto slow_path;
     }
 
     if (i < cnt) {
@@ -351,7 +372,7 @@ public:
     check_offset(next);
   }
 
-private:
+ private:
   union {
     struct {
       // offset 0: Virtual address of segment buffer.
@@ -370,12 +391,12 @@ private:
           uint16_t refcnt_;
 
           // offset 20:
-          uint16_t nb_segs_; // Number of segments
+          uint16_t nb_segs_;  // Number of segments
 
           // offset 22:
-          uint16_t _dummy0_; // rte_mbuf.port
+          uint16_t _dummy0_;  // rte_mbuf.port
           // offset 24:
-          uint64_t _dummy1_; // rte_mbuf.ol_flags
+          uint64_t ol_flags_;  // rte_mbuf.ol_flags
         };
       };
 
@@ -384,49 +405,49 @@ private:
 
         struct {
           // offset 32:
-          uint32_t _dummy2_; // rte_mbuf.packet_type_;
+          uint32_t _dummy2_;  // rte_mbuf.packet_type_;
 
           // offset 36:
-          uint32_t pkt_len_; // Total pkt length: sum of all segments
+          uint32_t pkt_len_;  // Total pkt length: sum of all segments
 
           // offset 40:
-          uint16_t data_len_; // Amount of data in this segment
+          uint16_t data_len_;  // Amount of data in this segment
 
           // offset 42:
-          uint16_t _dummy3_; // rte_mbuf.vlan_tci
+          uint16_t _dummy3_;  // rte_mbuf.vlan_tci
 
           // offset 44:
-          uint32_t _dummy4_lo; // rte_mbuf.fdir.lo and rte_mbuf.rss
+          uint32_t _dummy4_lo;  // rte_mbuf.fdir.lo and rte_mbuf.rss
         };
       };
 
       // offset 48:
-      uint32_t _dummy4_hi; // rte_mbuf.fdir.hi
+      uint32_t _dummy4_hi;  // rte_mbuf.fdir.hi
 
       // offset 52:
-      uint16_t _dummy5_; // rte_mbuf.vlan_tci_outer
+      uint16_t _dummy5_;  // rte_mbuf.vlan_tci_outer
 
       // offset 54:
       const uint16_t buf_len_;
 
       // offset 56:
-      uint64_t _dummy6_; // rte_mbuf.timestamp
+      uint64_t _dummy6_;  // rte_mbuf.timestamp
 
       // 2nd cacheline - fields only used in slow path or on TX --------------
       // offset 64:
-      uint64_t _dummy7_; // rte_mbuf.userdata
+      uint64_t _dummy7_;  // rte_mbuf.userdata
 
       // offset 72:
-      struct rte_mempool *pool_; // Pool from which mbuf was allocated.
+      struct rte_mempool *pool_;  // Pool from which mbuf was allocated.
 
       // offset 80:
-      Packet *next_; // Next segment. nullptr if not scattered.
+      Packet *next_;  // Next segment. nullptr if not scattered.
 
       // offset 88:
-      uint64_t _dummy8;  // rte_mbuf.tx_offload
-      uint16_t _dummy9;  // rte_mbuf.priv_size
-      uint16_t _dummy10; // rte_mbuf.timesync
-      uint32_t _dummy11; // rte_mbuf.seqn
+      uint64_t _dummy8;   // rte_mbuf.tx_offload
+      uint16_t _dummy9;   // rte_mbuf.priv_size
+      uint16_t _dummy10;  // rte_mbuf.timesync
+      uint32_t _dummy11;  // rte_mbuf.seqn
 
       // offset 104:
     };
@@ -472,4 +493,4 @@ private:
 static_assert(std::is_standard_layout<Packet>::value, "Incorrect class Packet");
 static_assert(sizeof(Packet) == XBUF_SIZE, "Incorrect class Packet");
 
-} // namespace xlb
+}  // namespace xlb

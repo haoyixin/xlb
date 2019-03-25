@@ -35,6 +35,13 @@ class Module {
   // template <typename Tag = NoneTag>
   // Packet *Process(Context *ctx, Packet *packet);
 
+  /***************************************************************************
+   'Tag' represents the source 'Port' type of the 'Packet' or 'PacketBatch' in
+   the 'Module' suffixed with 'Inc', and vice versa, in the 'Module' with the
+   suffix of 'Out', it represents the destination. We use these rules to make
+   it easier for the compiler to check for errors.
+   ***************************************************************************/
+
   virtual void InitInSlave(uint16_t wid) { CHECK(1); }
   virtual void InitInMaster() { CHECK(1); };
 
@@ -57,7 +64,7 @@ class Module {
   void RegisterTask(Func &&func, uint8_t weight) {
     auto worker = Worker::current();
 
-//    CHECK(!Worker::current());
+    //    CHECK(!Worker::current());
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 
@@ -66,7 +73,7 @@ class Module {
   // 'HandOn' means that the lifetime management of packets in batch will be
   // handled by the next module.
   template <typename T, typename Tag = NoneTag>
-  void HandOn(Context *ctx, PacketBatch *batch) {
+  void Handle(Context *ctx, PacketBatch *batch) {
     static_assert(std::is_base_of<Module, T>::value);
     //    static_assert(std::experimental::is_detected_exact_v<void,
     //    has_processor, T, PacketBatch, Tag>);
@@ -74,7 +81,7 @@ class Module {
   }
 
   template <typename T, typename Tag = NoneTag>
-  Packet *Handle(Context *ctx, Packet *packet) {
+  void Handle(Context *ctx, Packet *packet) {
     static_assert(std::is_base_of<Module, T>::value);
     //    static_assert(std::experimental::is_detected_exact_v<void,
     //    has_processor, T, Packet, Tag>);

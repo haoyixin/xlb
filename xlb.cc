@@ -9,12 +9,13 @@
 #include "worker.h"
 #include "module.h"
 
-#include "modules/port_out.h"
-#include "modules/port_inc.h"
-#include "modules/ether_out.h"
-#include "modules/ether_inc.h"
-#include "modules/ipv4_inc.h"
 #include "modules/arp_inc.h"
+#include "modules/csum.h"
+#include "modules/ether_inc.h"
+#include "modules/ether_out.h"
+#include "modules/ipv4_inc.h"
+#include "modules/port_inc.h"
+#include "modules/port_out.h"
 #include "modules/tcp_inc.h"
 
 using namespace xlb;
@@ -47,6 +48,7 @@ int main(int argc, char **argv) {
   Module::Init<modules::ArpInc>();
   Module::Init<modules::Ipv4Inc>();
   Module::Init<modules::TcpInc>();
+  Module::Init<modules::CSum>();
 
 
   Worker::Launch();

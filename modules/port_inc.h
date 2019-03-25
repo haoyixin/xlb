@@ -10,10 +10,8 @@ class PortInc final : public Module {
   static_assert(std::is_base_of<Port, T>::value);
 
  public:
-  template <typename... Args>
-  explicit PortInc(uint8_t weight, Args &&... args)
-      : weight_(weight),
-        port_(Singleton<T>::instance(std::forward<Args>(args)...)) {}
+  explicit PortInc(uint8_t weight)
+      : weight_(weight), port_(Singleton<T>::instance()) {}
 
   void InitInMaster() override {
     if constexpr (!Master) return;
@@ -35,11 +33,8 @@ class PortInc final : public Module {
           batch.SetCnt(port_.Recv(ctx->worker()->current()->id(), batch.pkts(),
                                   Packet::kMaxBurst));
 
-          // TODO: come on
           if (batch.cnt() > 0) {
-            DLOG(INFO) << "Recieve " << batch.cnt() << " packets in "
-                       << (Master ? "master" : "slave") << " thread";
-            HandOn<EtherInc, T>(ctx, &batch);
+            Handle<EtherInc, T>(ctx, &batch);
           }
 
           return {.packets = batch.cnt()};

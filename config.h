@@ -6,6 +6,7 @@
 #include "3rdparty/visit_struct.hpp"
 
 #include "utils/singleton.h"
+#include "headers/ether.h"
 
 namespace xlb {
 
@@ -14,7 +15,7 @@ struct Config {
   struct Nic {
     std::string name;
     std::string pci_address;
-    // TODO: mac_address
+    headers::Ethernet::Address mac_address;
 
     std::vector<std::string> local_ips;
     //    std::string netmask;

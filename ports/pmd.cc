@@ -37,11 +37,11 @@ const struct rte_eth_conf default_eth_conf(struct rte_eth_dev_info &dev_info) {
   ret.link_speeds = ETH_LINK_SPEED_AUTONEG;
   ret.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_PROTO_MASK;
 
-  ret.fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
-  ret.fdir_conf.mask.ipv4_mask.src_ip = UINT32_MAX;
-  ret.fdir_conf.mask.ipv4_mask.dst_ip = UINT32_MAX;
-  ret.fdir_conf.drop_queue = UINT8_MAX;
-  ret.fdir_conf.status = RTE_FDIR_REPORT_STATUS;
+  //  ret.fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
+  //  ret.fdir_conf.mask.ipv4_mask.src_ip = UINT32_MAX;
+  //  ret.fdir_conf.mask.ipv4_mask.dst_ip = UINT32_MAX;
+  //  ret.fdir_conf.drop_queue = UINT8_MAX;
+  //  ret.fdir_conf.status = RTE_FDIR_REPORT_STATUS;
 
   return ret;
 }
@@ -207,6 +207,10 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
 
   rte_eth_macaddr_get(dpdk_port_id_,
                       reinterpret_cast<ether_addr *>(conf_.addr.bytes));
+
+  // TODO: do it in Config::validate
+  CONFIG.nic.mac_address = conf_.addr;
+
   CHECK(!rte_eth_dev_set_mtu(dpdk_port_id_, CONFIG.nic.mtu));
 
   conf_.mtu = CONFIG.nic.mtu;
@@ -215,7 +219,10 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
   CHECK(!rte_eth_stats_reset(dpdk_port_id_));
 }
 
-PMD::~PMD() { rte_eth_dev_stop(dpdk_port_id_); }
+PMD::~PMD() {
+  DLOG(INFO) << "Stopping dpdk port: " << (int)dpdk_port_id_;
+  rte_eth_dev_stop(dpdk_port_id_);
+}
 
 struct Port::Status PMD::Status() {
   struct rte_eth_link dpdk_status {};

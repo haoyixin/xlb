@@ -12,24 +12,10 @@ class Ipv4Inc : public Module {
   }
 
   template <typename Tag = NoneTag>
-  void Process(Context *ctx, PacketBatch *batch) {
-    PacketBatch tcp_batch{};
+  void Process(Context *ctx, Packet *packet);
 
-    for (Packet &p : *batch) {
-      auto *ipv4_hdr = p.head_data<Ipv4 *>(sizeof(Ethernet));
-
-      if (unlikely(ipv4_hdr->dst == kni_ip_addr_))
-        ctx->HoldPacket(&p);
-      else if (likely(ipv4_hdr->protocol == Ipv4::kTcp))
-        tcp_batch.Push(&p);
-      else
-        ctx->DropPacket(&p);
-    }
-
-    DLOG(INFO) << "Process " << batch->cnt() << " packets in Ipv4Inc";
-
-    HandOn<TcpInc>(ctx, &tcp_batch);
-  }
+ protected:
+  bool fragmented(const Ipv4 *hdr) const;
 
  private:
   be32_t &kni_ip_addr_;

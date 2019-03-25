@@ -45,8 +45,9 @@ class Scheduler {
     class Context {
      public:
       Context() = default;
-      void DropPacket(Packet *pkt);
-      void HoldPacket(Packet *pkt);
+      void Drop(Packet *pkt);
+      void Hold(Packet *pkt);
+      void Hold(PacketBatch *pkts);
 
       auto worker() { return worker_; }
       auto &stage_batch() { return stage_batch_; }
@@ -92,6 +93,8 @@ class Scheduler {
   };
 
   void RegisterTask(Task::Func &&func, uint8_t weight) {
+    DLOG(INFO) << "Register task to scheduler on worker: "
+               << Worker::current()->id();
     runnable_->emplace(new Task(std::move(func), weight));
   }
 

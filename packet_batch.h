@@ -9,9 +9,9 @@
 namespace xlb {
 
 class PacketBatch {
-public:
+ public:
   class iterator {
-  public:
+   public:
     using difference_type = std::ptrdiff_t;
     using value_type = Packet;
     using pointer = Packet *;
@@ -20,12 +20,12 @@ public:
 
     iterator(PacketBatch &batch, uint16_t pos) : batch_(batch), pos_(pos) {}
 
-    iterator &operator++() { // Pre-increment
+    iterator &operator++() {  // Pre-increment
       ++pos_;
       return *this;
     }
 
-    const iterator operator++(int) { // Post-increment
+    const iterator operator++(int) {  // Post-increment
       iterator tmp(*this);
       pos_++;
       return tmp;
@@ -43,7 +43,7 @@ public:
 
     pointer operator->() { return batch_.pkts()[pos_]; }
 
-  private:
+   private:
     PacketBatch &batch_;
     uint16_t pos_;
   };
@@ -52,6 +52,7 @@ public:
   iterator end() { return iterator(*this, cnt_); }
 
   uint16_t cnt() const { return cnt_; }
+  uint16_t free_cnt() const { return kMaxCnt - cnt_; }
 
   void SetCnt(uint16_t cnt) { cnt_ = cnt; }
   void IncrCnt(uint16_t n = 1) { cnt_ += n; }
@@ -90,19 +91,18 @@ public:
   }
 
   void Free() {
-    if (!Empty())
-      Packet::Free(pkts(), cnt_);
+    if (!Empty()) Packet::Free(pkts(), cnt_);
 
     Clear();
   }
 
   static const uint16_t kMaxCnt = 64;
 
-private:
+ private:
   uint16_t cnt_;
   std::array<Packet *, kMaxCnt> pkts_;
 };
 
 static_assert(std::is_pod<PacketBatch>::value, "PacketBatch is not a POD Type");
 
-} // namespace xlb
+}  // namespace xlb

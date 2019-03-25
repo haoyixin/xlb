@@ -11,51 +11,25 @@ class EtherOut : public Module {
  public:
   EtherOut(uint8_t weight)
       : weight_(weight),
-        gw_addr_(Singleton<Ethernet::Address>::instance()),
-        kni_ring_(CONFIG.nic.socket, CONFIG.kni.ring_size, false, true) {}
-
-  void InitInMaster() override {
-    RegisterTask(
-        [this](Context *ctx) -> Result {
-          PacketBatch batch{};
-
-          if (!kni_ring_.Empty()) {
-            batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
-
-            DLOG(INFO) << "Pop " << batch.cnt()
-                       << " packets from EtherOut's ring";
-
-            HandOn<PortOut<KNI>>(ctx, &batch);
-          }
-
-          return {.packets = batch.cnt()};
-        },
-        weight_);
+        src_hw_addr_(CONFIG.nic.mac_address),
+        gw_hw_addr_(Singleton<Ethernet::Address>::instance()),
+        kni_ring_(CONFIG.nic.socket, CONFIG.kni.ring_size) {
+    DLOG(INFO) << "Source mac address: " << src_hw_addr_.ToString();
   }
+
+  void InitInMaster() override;
 
   template <typename Tag = NoneTag>
-  void Process(Context *ctx, PacketBatch *batch) {
-    if constexpr (std::is_same<Tag, KNI>::value) {
-      using Error = decltype(kni_ring_)::Error;
+  void Process(Context *ctx, Packet *packet);
 
-      DLOG(INFO) << "Ring size: " << kni_ring_.Size();
-
-      while (kni_ring_.Push(batch->pkts(), batch->cnt()) == Error::NOBUF)
-        LOG_EVERY_N(ERROR, 10) << "Too many packets are on the way to kernel";
-
-      DLOG(INFO) << "Push " << batch->cnt() << " packets to EtherOut's ring";
-    } else {
-      asm volatile("" : "=m"(gw_addr_) : :);
-      for (auto &p : *batch) p.head_data<Ethernet *>()->dst_addr = gw_addr_;
-
-      HandOn<PortOut<PMD>>(ctx, batch);
-    }
-  }
+  //  template <typename Tag = NoneTag>
+  //  void Process(Context *ctx, PacketBatch *batch);
 
  private:
   uint8_t weight_;
-  Ethernet::Address &gw_addr_;
-  utils::LockLessQueue<Packet *> kni_ring_;
+  const Ethernet::Address &src_hw_addr_;
+  const Ethernet::Address &gw_hw_addr_;
+  utils::LockLessQueue<Packet *, false, true> kni_ring_;
 };
 
 }  // namespace xlb::modules

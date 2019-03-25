@@ -144,17 +144,18 @@ Scheduler::Task::~Task() {
   context_.stage_batch_.Free();
 }
 
-void Scheduler::Task::Context::DropPacket(Packet *pkt) {
+void Scheduler::Task::Context::Drop(Packet *pkt) {
   if (dead_batch_.Full()) dead_batch_.Free();
 
   dead_batch_.Push(pkt);
 }
 
-void Scheduler::Task::Context::HoldPacket(Packet *pkt) {
-  if (!stage_batch_.Full())
+void Scheduler::Task::Context::Hold(Packet *pkt) {
     stage_batch_.Push(pkt);
-  else
-    DropPacket(pkt);
+}
+
+void Scheduler::Task::Context::Hold(PacketBatch *pkts) {
+  stage_batch_.Push(pkts);
 }
 
 }  // namespace xlb

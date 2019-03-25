@@ -10,13 +10,13 @@ struct DefaultTag {};
 template <typename T, typename Tag = DefaultTag>
 class Singleton {
  public:
-  template <typename... Args>
-  static T &instance(Args &&... args) {
-    alignas(64) static T instance_(std::forward<Args>(args)...);
+  static T &instance() {
+    alignas(64) static T instance_{};
     return instance_;
   }
 
-  // private:
+ private:
+    alignas(64) static std::array<uint8_t, sizeof(T)> instance_;
   Singleton() = delete;
   ~Singleton() = delete;
 };

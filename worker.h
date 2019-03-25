@@ -54,9 +54,6 @@ class Worker {
   }
 
  private:
-  //  using Counter = std::atomic<uint16_t>;
-  //  using Threads = std::vector<std::thread>;
-
   using Slaves = utils::Singleton<std::vector<std::thread>, Worker>;
   using Master = utils::Singleton<std::thread, Worker>;
   using Counter = utils::Singleton<std::atomic<uint8_t>, Worker>;

@@ -81,7 +81,12 @@ set(OBJS
         headers/ether.cc
         ports/pmd.cc
         ports/kni.cc
-        #        task.cc
+        modules/ether_out.cc
+        modules/ether_inc.cc
+        modules/arp_inc.cc
+        modules/ipv4_inc.cc
+        modules/tcp_inc.cc
+#        modules/csum.cc
         connection.cc)
 
 link_directories(/usr/local/lib)

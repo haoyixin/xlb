@@ -59,8 +59,10 @@ void *Worker::run() {
             << "is quitting... (core " << core_ << ", socket " << socket_
             << ")";
 
-  if (!master_ && (Counter::instance().fetch_sub(1) - 1 == 1))
+  if (!master_ && (Counter::instance().fetch_sub(1) == 1)) {
+    LOG(INFO) << "All workers have been aborted";
     slaves_aborted_ = true;
+  }
 
   delete scheduler_;
   delete random_;
@@ -76,7 +78,7 @@ Worker::Worker(uint16_t core, bool master)
       current_tsc_(0),
       current_ns_(0) {
   if (!master_) {
-    id_ = Counter::instance(0).fetch_add(1);
+    id_ = Counter::instance().fetch_add(1);
     socket_ = CONFIG.nic.socket;
   } else {
     id_ = std::numeric_limits<decltype(id_)>::max();
