@@ -5,6 +5,7 @@
 #include "module.h"
 #include "config.h"
 #include "port.h"
+#include "worker.h"
 
 #include "utils/endian.h"
 #include "utils/common.h"

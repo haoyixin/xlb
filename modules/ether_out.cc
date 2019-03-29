@@ -20,7 +20,7 @@ void EtherOut::InitInMaster() {
 template <>
 void EtherOut::Process<KNI>(Context *ctx, Packet *packet) {
   while (!kni_ring_.Push(packet))
-    LOG(ERROR) << "Too many packets are on the way to kernel";
+    LOG_W(ERROR) << "Too many packets are on the way to kernel";
 }
 
 template <>
@@ -28,7 +28,7 @@ void EtherOut::Process<PMD>(Context *ctx, Packet *packet) {
   //  asm volatile("" : "=m"(const_cast<Ethernet::Address &>(gw_hw_addr_)) : :);
   auto *hdr = packet->head_data<Ethernet *>();
   hdr->dst_addr = gw_hw_addr_;
-  hdr->src_addr = src_hw_addr_;
+  hdr->src_addr = CONFIG.nic.mac_address;
 
   ctx->Hold(packet);
 }

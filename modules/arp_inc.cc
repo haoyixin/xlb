@@ -11,8 +11,8 @@ void ArpInc::Process<PMD>(Context *ctx, Packet *packet) {
   if (arp_hdr->opcode == be16_t(Arp::kReply) &&
       arp_hdr->sender_ip_addr == gw_ip_addr_ &&
       arp_hdr->sender_hw_addr != gw_hw_addr_) {
-    LOG(INFO) << "Alter gateway address from " << gw_hw_addr_.ToString()
-              << " to " << arp_hdr->sender_hw_addr.ToString();
+    LOG_W(INFO) << "Alter gateway address from " << gw_hw_addr_ << " to "
+                << arp_hdr->sender_hw_addr;
 
     gw_hw_addr_ = arp_hdr->sender_hw_addr;
     asm volatile("" : : "m"(gw_hw_addr_) :);
@@ -21,4 +21,4 @@ void ArpInc::Process<PMD>(Context *ctx, Packet *packet) {
   Handle<EtherOut, KNI>(ctx, packet);
 }
 
-}
+}  // namespace xlb::modules

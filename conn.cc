@@ -1,10 +1,10 @@
-#include "connection.h"
+#include "conn.h"
 
 #include <cstdint>
 
 namespace xlb {
 
-void Connection::UpdateState(Connection::Tcp *hdr, Connection::Dir dir) {
+void Conn::UpdateState(Conn::Tcp *hdr, Conn::Dir dir) {
   State new_state =
       smt[dir][hdr->flags & Tcp::kAck
                    ? FLAG_ACK

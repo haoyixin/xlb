@@ -6,13 +6,15 @@
 
 #include <glog/logging.h>
 
+#include "utils/allocator.h"
+
 namespace xlb::utils {
 
 // Extends std::priority_queue to support decreasing the key of the top element
 // directly.
 template <typename T, typename Cmp = std::less<T>>
 class extended_priority_queue
-    : public std::priority_queue<T, std::vector<T>, Cmp> {
+ : public std::priority_queue<T, std::vector<T>, Cmp> {
  public:
   T &mutable_top() { return this->c.front(); }
 

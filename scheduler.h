@@ -93,8 +93,7 @@ class Scheduler {
   };
 
   void RegisterTask(Task::Func &&func, uint8_t weight) {
-    DLOG(INFO) << "Register task to scheduler on worker: "
-               << Worker::current()->id();
+    DLOG_W(INFO) << "Registering task with weight: " << int(weight);
     runnable_->emplace(new Task(std::move(func), weight));
   }
 

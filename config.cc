@@ -33,6 +33,7 @@ void error_reporter(std::string str) {
 } // namespace
 
 void Config::Load() {
+  utils::UnsafeSingleton<Config>::Init();
   configuru::deserialize(&CONFIG,
                          configuru::parse_file(FLAGS_config, configuru::JSON),
                          error_reporter);
@@ -96,6 +97,9 @@ void Config::validate() {
   CHECK(headers::ParseIpv4Address(kni.ip_address, &_dummy));
   CHECK(headers::ParseIpv4Address(kni.netmask, &_dummy));
   CHECK(headers::ParseIpv4Address(kni.gateway, &_dummy));
+
+  CHECK_GT(svc.max_virtual_service, 0);
+  CHECK_GT(svc.max_real_service, 0);
 }
 
 } // namespace xlb

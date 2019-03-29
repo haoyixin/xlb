@@ -6,12 +6,14 @@
 
 #include "headers/tcp.h"
 
+#include "common.h"
+#include "service.h"
+#include "tuple.h"
+
 namespace xlb {
 
-class alignas(64) [[gnu::packed]] Connection {
+class alignas(64) [[gnu::packed]] Conn {
  private:
-  using be32_t = utils::be32_t;
-  using be16_t = utils::be16_t;
   using Tcp = headers::Tcp;
 
  public:
@@ -32,19 +34,32 @@ class alignas(64) [[gnu::packed]] Connection {
 
   enum Dir : uint8_t { DIR_ORIGINAL = 0, DIR_REPLY, DIR_MAX };
 
-  enum Flag : uint8_t { FLAG_SYN = 0, FLAG_SYNACK, FLAG_FIN, FLAG_ACK, FLAG_RST, FLAG_NONE, FLAG_MAX };
+  enum Flag : uint8_t {
+    FLAG_SYN = 0,
+    FLAG_SYNACK,
+    FLAG_FIN,
+    FLAG_ACK,
+    FLAG_RST,
+    FLAG_NONE,
+    FLAG_MAX
+  };
 
-  void UpdateState(Tcp *hdr, Dir dir);
+  void UpdateState(Tcp * hdr, Dir dir);
 
   State state() { return state_; }
 
  private:
-  be32_t cip, vip, lip, rip;
-  be16_t cport, vport, lport, rport;
+  Tuple2 client_;
+  Tuple2 local_;
+  VirtSvc::Ptr virt_;
+  RealSvc::Ptr real_;
+
+  //  be32_t cip, vip, lip, rip;
+  //  be16_t cport, vport, lport, rport;
 
   State state_;
 
-// state machine table
+  // state machine table
   static constexpr State smt[DIR_MAX][FLAG_MAX][STATE_MAX] = {
       {/* ORIGINAL */
        /*syn*/ {STATE_SYN_SENT, STATE_SYN_SENT, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE,

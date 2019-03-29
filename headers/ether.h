@@ -18,14 +18,12 @@ struct [[gnu::packed]] Ethernet {
     Address(const uint8_t *addr) { utils::Copy(bytes, addr, kSize); }
     Address(const std::string &str);
 
-    static const size_t kSize = 6;
+    static constexpr size_t kSize = 6;
 
-    // Parses str in "aA:Bb:00:11:22:33" format and saves the address in parsed
     // Returns false if the format is incorrect.
     //   (in that case, the content of parsed is undefined.)
     bool FromString(const std::string &str);
 
-    // Returns "aa:bb:00:11:22:33" (all in lower case)
     std::string ToString() const;
 
     void Randomize();
@@ -68,6 +66,11 @@ struct [[gnu::packed]] Ethernet {
     }
 
     uint8_t bytes[kSize];
+
+    friend std::ostream &operator<<(std::ostream &os, const Address &addr) {
+      os << addr.ToString();
+      return os;
+    }
   };
 
   enum Type : uint16_t {

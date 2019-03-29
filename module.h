@@ -64,14 +64,12 @@ class Module {
   void RegisterTask(Func &&func, uint8_t weight) {
     auto worker = Worker::current();
 
-    //    CHECK(!Worker::current());
+    DCHECK(Worker::current());
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 
   // Avoid virtual function calls, reduce branch prediction failure, and let the
   // compiler do deeper optimization
-  // 'HandOn' means that the lifetime management of packets in batch will be
-  // handled by the next module.
   template <typename T, typename Tag = NoneTag>
   void Handle(Context *ctx, PacketBatch *batch) {
     static_assert(std::is_base_of<Module, T>::value);

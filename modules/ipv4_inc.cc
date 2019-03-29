@@ -14,12 +14,12 @@ void Ipv4Inc::Process<PMD>(Context *ctx, Packet *packet) {
 
   if (unlikely(!packet->rx_ip_cksum_good())) {
     ctx->Drop(packet);
-    DLOG(ERROR) << "Invalid ipv4 checksum";
+    DLOG_W(ERROR) << "Invalid ipv4 checksum";
   }
 
   if (unlikely(fragmented(ipv4_hdr))) {
     ctx->Drop(packet);
-    DLOG(ERROR) << "Fragmented ipv4 packet";
+    DLOG_W(ERROR) << "Fragmented ipv4 packet";
   }
 
   if (unlikely(ipv4_hdr->dst == kni_ip_addr_))

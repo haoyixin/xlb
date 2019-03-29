@@ -14,6 +14,7 @@
 
 #include "utils/boost.h"
 #include "utils/numa.h"
+#include "utils/allocator.h"
 
 #include "config.h"
 
@@ -118,6 +119,7 @@ void InitDpdk() {
   if (!dpdk_initialized.test_and_set()) {
     LOG(INFO) << "Initializing DPDK";
     init_eal();
+    utils::InitDefaultAllocator(CONFIG.nic.socket);
   }
 }
 

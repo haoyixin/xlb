@@ -21,8 +21,8 @@ namespace pmr = std::experimental::pmr;
 
 namespace xlb::utils {
 
-//template <typename K>
-//struct XHash {
+// template <typename K>
+// struct XHash {
 //  uint32_t operator()(const K &key) { return XXH32(&key, sizeof(key), 0); }
 //};
 
@@ -102,11 +102,10 @@ class alignas(64) XMap {
     uint8_t entry_idx_;
   };
 
-  explicit XMap(uint32_t num_buckets, int socket = SOCKET_ID_ANY)
+  explicit XMap(uint32_t num_buckets)
       : bucket_mask_(align_ceil_pow2(num_buckets) - 1),
         num_entries_(0),
-        allocator_(socket),
-        buckets_(bucket_mask_ + 1, &allocator_) {}
+        buckets_(bucket_mask_ + 1, &DefaultAllocator()) {}
 
   XMap(XMap &) = delete;
   XMap &operator=(XMap &) = delete;
@@ -173,6 +172,14 @@ class alignas(64) XMap {
     return Emplace(key, std::move(value));
   }
 
+  Entry *InsertUnsafe(const K &key, const V &value) {
+    return EmplaceUnsafe(key, value);
+  }
+
+  Entry *InsertUnsafe(const K &key, V &&value) {
+    return EmplaceUnsafe(key, std::move(value));
+  }
+
   bool Remove(const K &key) {
     uint32_t prim_hash = hash(key);
     Bucket *prim_bkt = &buckets_[prim_hash & bucket_mask_];
@@ -183,7 +190,8 @@ class alignas(64) XMap {
     Entry *entry;
     if ((entry = remove_in_bucket(*prim_bkt, buckets_[sec_hash & bucket_mask_],
                                   key, sec_hash)) != nullptr) {
-      entry->value.~V();
+      entry->~Entry();
+      //      entry->value.~V();
       return true;
     }
 
@@ -280,7 +288,7 @@ class alignas(64) XMap {
 
    private:
     alignas(64) bitset<64> bloom_filter_;
-    alignas(8) bitset<kEntriesPerBucket> busy_mask_;
+    alignas(4) bitset<kEntriesPerBucket> busy_mask_;
     alignas(2) bitset<kEntriesPerBucket> secondary_mask_;
     alignas(4) uint32_t move_counter_ = 0u;
     alignas(16) std::array<Entry, kEntriesPerBucket> entries_;
@@ -412,8 +420,6 @@ class alignas(64) XMap {
   uint32_t bucket_mask_;
 
   uint32_t num_entries_;
-
-  MemoryResource allocator_;
 
   std::vector<Bucket, pmr::polymorphic_allocator<Bucket>> buckets_;
 };

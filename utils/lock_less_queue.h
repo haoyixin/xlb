@@ -6,6 +6,7 @@
 
 #include <glog/logging.h>
 
+#include "utils/allocator.h"
 #include "utils/singleton.h"
 
 namespace xlb::utils {
@@ -20,10 +21,10 @@ class LockLessQueue {
  public:
   static const size_t kDefaultRingSize = 512;
 
-  explicit LockLessQueue(int socket = SOCKET_ID_ANY,
-                         size_t capacity = kDefaultRingSize) {
+  explicit LockLessQueue(size_t capacity = kDefaultRingSize) {
     unsigned flags = 0;
     size_t actual_capacity = align_ceil_pow2(capacity);
+    int socket = DefaultAllocator().socket();
 
     if constexpr (SP)
       flags |= RING_F_SP_ENQ;

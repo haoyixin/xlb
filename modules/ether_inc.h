@@ -15,16 +15,15 @@ namespace xlb::modules {
 
 class EtherInc final : public Module {
  public:
-  EtherInc(uint8_t weight)
-      : weight_(weight), kni_ring_(CONFIG.nic.socket, CONFIG.kni.ring_size) {
-    DLOG(INFO) << "Init with weight: " << static_cast<int>(weight_)
+  EtherInc(uint8_t weight) : weight_(weight), kni_ring_(CONFIG.kni.ring_size) {
+    DLOG(INFO) << "Init with weight: " << int(weight_)
                << " ring size: " << kni_ring_.Capacity();
   }
 
   void InitInSlave(uint16_t wid) override;
 
   template <typename Tag = NoneTag>
-  void Process(Context *ctx, PacketBatch *batch);
+  inline void Process(Context *ctx, PacketBatch *batch);
 
  private:
   uint8_t weight_;

@@ -70,6 +70,8 @@ set(OBJS
         worker.cc
         config.cc
         control.cc
+        service.cc
+        table.cc
         pb/xlb.pb.cc
         utils/copy.cc
         utils/simd.cc
@@ -86,8 +88,9 @@ set(OBJS
         modules/arp_inc.cc
         modules/ipv4_inc.cc
         modules/tcp_inc.cc
+        modules/dnat.cc
 #        modules/csum.cc
-        connection.cc)
+        conn.cc)
 
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)

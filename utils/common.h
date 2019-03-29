@@ -6,18 +6,17 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
-
 
 #if __cplusplus < 201703L  // pre-C++17?
 #error Must be built with C++17
 #endif
 
 /* Hint for performance optimization. Same as _nDCHECK() of TI compilers */
-#define promise(cond)          \
-  ({                           \
-    if (!(cond))               \
-      __builtin_unreachable(); \
+#define promise(cond)                     \
+  ({                                      \
+    if (!(cond)) __builtin_unreachable(); \
   })
 #define promise_unreachable() __builtin_unreachable();
 
@@ -176,4 +175,26 @@ struct PairHasher {
     b *= kMul;
     return static_cast<size_t>(b);
   }
+};
+
+inline size_t hash_combine(size_t h1, size_t h2) {
+  return h2 ^ (h1 + 0x9e3779b9 + (h2 << 6) + (h2 >> 2));
+}
+
+template <typename T>
+using unsafe_ptr = std::__shared_ptr<T, __gnu_cxx::_S_single>;
+
+template <typename T, typename A, typename... Args>
+inline unsafe_ptr<T> allocate_unsafe(const A &a, Args &&... args) {
+  return std::__allocate_shared<T, __gnu_cxx::_S_single, A>(
+      a, std::forward<Args>(args)...);
+}
+
+using idx_t = uint32_t;
+
+template <typename T>
+struct expose_protected_ctor : public T {
+  template <typename... Args>
+  explicit expose_protected_ctor(Args &&... args)
+      : T(std::forward<Args>(args)...) {}
 };

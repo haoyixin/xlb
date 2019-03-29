@@ -10,18 +10,17 @@ void TcpInc::Process<PMD>(Context *ctx, Packet *packet) {
 
   if (unlikely(!packet->rx_l4_cksum_good())) {
     ctx->Drop(packet);
-    DLOG(ERROR) << "Invalid tcp checksum";
+    DLOG_W(ERROR) << "Invalid tcp checksum";
   }
 
   // TODO: dnat -> snat -> csum
 
-  DLOG(INFO) << "Tcp packet from: " << ToIpv4Address(ip_hdr->src)
+  DLOG_W(INFO) << "Tcp packet from: " << ToIpv4Address(ip_hdr->src)
              << " port: " << tcp_hdr->src_port
              << " to: " << ToIpv4Address(ip_hdr->dst)
-             << " port: " << tcp_hdr->dst_port
-             << " in worker: " << ctx->worker()->current()->id();
+             << " port: " << tcp_hdr->dst_port;
 
-  DLOG(INFO) << packet->Dump();
+  DLOG_W(INFO) << packet->Dump();
 
   ctx->Drop(packet);
 }

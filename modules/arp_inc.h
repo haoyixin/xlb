@@ -16,7 +16,7 @@ class ArpInc : public Module {
   }
 
   template <typename Tag = NoneTag>
-  void Process(Context *ctx, Packet *packet);
+  inline void Process(Context *ctx, Packet *packet);
 
  private:
   be32_t &gw_ip_addr_;

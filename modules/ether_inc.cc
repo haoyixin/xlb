@@ -20,7 +20,7 @@ void EtherInc::InitInSlave(uint16_t wid) {
 template <>
 void EtherInc::Process<KNI>(Context *ctx, PacketBatch *batch) {
   while (!kni_ring_.Push(batch->pkts(), batch->cnt()))
-    LOG(ERROR) << "Too many packets from kernel are on the fly";
+    LOG_W(ERROR) << "Too many packets from kernel are on the fly";
 }
 
 template <>

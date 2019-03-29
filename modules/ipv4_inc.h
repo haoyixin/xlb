@@ -12,10 +12,10 @@ class Ipv4Inc : public Module {
   }
 
   template <typename Tag = NoneTag>
-  void Process(Context *ctx, Packet *packet);
+  inline void Process(Context *ctx, Packet *packet);
 
  protected:
-  bool fragmented(const Ipv4 *hdr) const;
+  inline bool fragmented(const Ipv4 *hdr) const;
 
  private:
   be32_t &kni_ip_addr_;

@@ -7,6 +7,7 @@
 #include "module.h"
 
 #include "utils/common.h"
+#include "utils/allocator.h"
 
 namespace xlb {
 

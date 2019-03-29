@@ -4,10 +4,10 @@
 #include <pthread.h>
 #include <rte_lcore.h>
 
+#include "utils/common.h"
 #include "utils/format.h"
 #include "utils/numa.h"
 #include "utils/singleton.h"
-#include "utils/common.h"
 
 #include "packet_pool.h"
 #include "scheduler.h"
@@ -41,12 +41,9 @@ void *Worker::run() {
   CHECK_NOTNULL(packet_pool_);
 
   if (!master_)
-    while (!master_started_)
-      INST_BARRIER();
+    while (!master_started_) INST_BARRIER();
 
-
-  LOG(INFO) << (master_ ? "Master " : "Worker ") << "(" << id_ << ") "
-            << "is running on core " << core_ << " (socket " << socket_ << ")";
+  LOG_W(INFO) << "Running on core " << core_ << " (socket " << socket_ << ")";
 
   scheduler_ = new Scheduler();
 
@@ -93,8 +90,10 @@ void Worker::Launch() {
   Master::instance() = std::thread(
       [=]() { (new (&current_) Worker(CONFIG.master_core, true))->run(); });
 
+  auto &slaves = Slaves::instance();
+
   for (auto core : CONFIG.slave_cores)
-    Slaves::instance().emplace_back(
+    slaves.emplace_back(
         [=]() { (new (&current_) Worker(core, false))->run(); });
 }
 

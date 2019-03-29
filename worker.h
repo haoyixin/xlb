@@ -84,6 +84,18 @@ class Worker {
   static bool master_started_;
 
   static __thread Worker current_;
+
+  friend std::ostream &operator<<(std::ostream &os, const Worker &worker) {
+    if (worker.master_)
+      os << "[Master]";
+    else
+      os << "[Slave(" << worker.id_ << ")]";
+
+    return os;
+  }
 };
+
+#define DLOG_W(_L) DLOG(_L) << *(Worker::current()) << " "
+#define LOG_W(_L) LOG(_L) << *(Worker::current()) << " "
 
 }  // namespace xlb
