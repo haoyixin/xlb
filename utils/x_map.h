@@ -156,8 +156,8 @@ class alignas(64) XMap {
     Entry *entry;
     if ((entry = const_cast<Entry *>(
              find_in_bucket(*prim_bkt, *sec_bkt, key, sec_hash))) != nullptr) {
-      entry->value.~V();
-      new (&entry->value) V(std::forward<Args>(args)...);
+//      entry->value.~V();
+//      new (&entry->value) V(std::forward<Args>(args)...);
 
       return entry;
     }
@@ -421,7 +421,7 @@ class alignas(64) XMap {
 
   uint32_t num_entries_;
 
-  std::vector<Bucket, pmr::polymorphic_allocator<Bucket>> buckets_;
+  utils::vector<Bucket> buckets_;
 };
 
 }  // namespace xlb::utils

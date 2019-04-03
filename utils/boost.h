@@ -31,7 +31,11 @@ using boost::remove_erase_if;
 using boost::intrusive_ptr;
 
 template <typename T>
-using intrusive_ref_counter =
+using unsafe_intrusive_ref_counter =
     boost::intrusive_ref_counter<T, boost::thread_unsafe_counter>;
+
+template <typename T>
+using intrusive_ref_counter =
+    boost::intrusive_ref_counter<T, boost::thread_safe_counter>;
 
 }  // namespace xlb::utils

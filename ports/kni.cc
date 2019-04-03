@@ -48,6 +48,8 @@ KNI::KNI() : Port() {
 
   CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
                    TS("tx_bytes"), TS("tx_dropped"), TS("req_failed")>));
+
+  LOG(INFO) << "KNI initialize successful";
 }
 
 uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
@@ -62,8 +64,10 @@ uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
   if (recv > 0) {
     M::Adder<TS("rx_packets")>() << recv;
 
-    for (auto i : utils::irange(recv))
-      M::Adder<TS("rx_bytes")>() << pkts[i]->data_len();
+    uint64_t bytes = 0;
+    for (auto i : utils::irange(recv)) bytes += pkts[i]->data_len();
+
+    M::Adder<TS("rx_bytes")>() << bytes;
   }
 
   return recv;
@@ -72,8 +76,10 @@ uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
 uint16_t KNI::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
   M::Adder<TS("tx_packets")>() << cnt;
 
-  for (auto i : utils::irange(cnt))
-    M::Adder<TS("tx_bytes")>() << pkts[i]->data_len();
+  uint64_t bytes = 0;
+  for (auto i : utils::irange(cnt)) bytes += pkts[i]->data_len();
+
+  M::Adder<TS("tx_bytes")>() << bytes;
 
   auto sent =
       rte_kni_tx_burst(kni_, reinterpret_cast<struct rte_mbuf **>(pkts), cnt);

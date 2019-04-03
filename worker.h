@@ -37,6 +37,7 @@ class Worker {
   uint64_t silent_drops() const { return silent_drops_; }
   uint64_t current_tsc() const { return current_tsc_; }
   uint64_t current_ns() const { return current_ns_; }
+  uint64_t busy_loops() const { return busy_loops_; }
 
   bool master() const { return master_; }
 
@@ -52,6 +53,7 @@ class Worker {
     current_tsc_ = utils::Rdtsc();
     current_ns_ = utils::TscToNs(current_ns_);
   }
+  void IncrBusyLoops() { ++busy_loops_; }
 
  private:
   using Slaves = utils::Singleton<std::vector<std::thread>, Worker>;
@@ -78,6 +80,7 @@ class Worker {
   uint64_t silent_drops_;  // packets that have been sent to a deadend
   uint64_t current_tsc_;
   uint64_t current_ns_;
+  uint64_t busy_loops_;
 
   static bool aborting_;
   static bool slaves_aborted_;
@@ -95,7 +98,20 @@ class Worker {
   }
 };
 
-#define DLOG_W(_L) DLOG(_L) << *(Worker::current()) << " "
-#define LOG_W(_L) LOG(_L) << *(Worker::current()) << " "
+#define MASTER Worker::current()->master()
+#define BUZY_LOOPS Worker::current()->busy_loops()
+
+#define LOG_W(severity) LOG(severity) << *(Worker::current()) << " "
+
+#if DCHECK_IS_ON()
+
+#define DLOG_W(severity) DLOG(severity) << *(Worker::current()) << " "
+
+#else
+
+#define DLOG_W(severity) \
+  true ? (void) 0 : google::LogMessageVoidify() & LOG(severity)
+
+#endif
 
 }  // namespace xlb

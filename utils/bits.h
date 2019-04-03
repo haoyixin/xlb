@@ -38,7 +38,7 @@ class [[gnu::packed]] bitset {
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes using
 // std::memmove() and std::memset().
-static inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len,
+inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len,
                                        size_t shift) {
   shift = std::min(shift, len);
   memmove(buf, buf + shift, len - shift);
@@ -49,7 +49,7 @@ static inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len,
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes.
 // Will shift in 8-byte chunks if `shift` <= 8, othersize, uses
 // std::memmove() and std::memset().
-static inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
+inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
                                   const size_t shift) {
   if (len < sizeof(uint64_t) || shift > sizeof(uint64_t)) {
     return ShiftBytesLeftSmall(buf, len, shift);
@@ -76,7 +76,7 @@ static inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the right by `len` bytes and fills in with zeroes using
 // std::memmove() and std::memset().
-static inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len,
+inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len,
                                         size_t shift) {
   shift = std::min(shift, len);
   memmove(buf + shift, buf, len - shift);
@@ -87,7 +87,7 @@ static inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len,
 // Shifts `buf` to the right by `len` bytes and fills in with zeroes.
 // Will shift in 8-byte chunks if `shift` <= 8, othersize, uses
 // std::memmove() and std::memset().
-static inline void ShiftBytesRight(uint8_t *buf, const size_t len,
+inline void ShiftBytesRight(uint8_t *buf, const size_t len,
                                    const size_t shift) {
   if (len < sizeof(uint64_t) || shift > sizeof(uint64_t)) {
     return ShiftBytesRightSmall(buf, len, shift);
@@ -106,7 +106,7 @@ static inline void ShiftBytesRight(uint8_t *buf, const size_t len,
 }
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 1-byte chunks.
-static inline void MaskBytesSmall(uint8_t *buf, const uint8_t *mask,
+inline void MaskBytesSmall(uint8_t *buf, const uint8_t *mask,
                                   const size_t len) {
   for (size_t i = 0; i < len; i++) {
     buf[i] &= mask[i];
@@ -115,7 +115,7 @@ static inline void MaskBytesSmall(uint8_t *buf, const uint8_t *mask,
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 8-byte chunks if able,
 // otherwise, falls back to 1-byte chunks.
-static inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
+inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
                                const size_t len) {
   size_t n = len / sizeof(uint64_t);
   size_t leftover = len - n * sizeof(uint64_t);
@@ -134,7 +134,7 @@ static inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 16-byte chunks if able,
 // otherwise, falls back to 8-byte chunks and possibly 1-byte chunks.
-static inline void MaskBytes(uint8_t *buf, uint8_t const *mask,
+inline void MaskBytes(uint8_t *buf, uint8_t const *mask,
                              const size_t len) {
   if (len <= sizeof(uint64_t)) {
     return MaskBytes64(buf, mask, len);
@@ -162,7 +162,7 @@ static inline void MaskBytes(uint8_t *buf, uint8_t const *mask,
 
 // Dangerous Helper! Use SetBitsHigh<T>() and SetBitsLow<T>() instead.
 template <typename T, typename = std::enable_if<std::is_integral<T>::value>>
-static inline T _SetBitsHigh(size_t n) {
+inline T _SetBitsHigh(size_t n) {
   return (T{1} << n) - 1;
 }
 
@@ -172,7 +172,7 @@ static inline T _SetBitsHigh(size_t n) {
 // with all bits set if `n` is greater than the number of bits in `T`.
 // For example: SetBitsHigh<uint32_t>(9) will return 0xFF800000
 template <typename T, typename = std::enable_if<std::is_integral<T>::value>>
-static inline T SetBitsHigh(size_t n) {
+inline T SetBitsHigh(size_t n) {
   if (unlikely(n == 0)) {
     return T{0};
   }
@@ -185,7 +185,7 @@ static inline T SetBitsHigh(size_t n) {
 // all bits set if `n` is greater than the number of bits in `T`.
 // For example: SetBitsLow<uint32_t>(9) will return 0x000001FF
 template <typename T, typename = std::enable_if<std::is_integral<T>::value>>
-static inline T SetBitsLow(size_t n) {
+inline T SetBitsLow(size_t n) {
   if (unlikely(n == 0)) {
     return T{0};
   }

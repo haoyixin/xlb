@@ -1,8 +1,12 @@
 #pragma once
 
+#include <stack>
+
 #include "common.h"
 
 #include "headers/ip.h"
+
+#include "utils/allocator.h"
 
 namespace xlb {
 
@@ -87,3 +91,9 @@ inline bool operator!=(const xlb::Tuple4 &lhs, const xlb::Tuple4 &rhs) {
 }
 
 }  // namespace xlb
+
+//namespace xlb {
+//
+//using TPool = std::stack<Tuple2, utils::vector<Tuple2>>;
+//
+//}

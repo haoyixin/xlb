@@ -1,55 +1,69 @@
-#include "service.h"
+#include <utility>
+
 #include "config.h"
+#include "service.h"
 #include "table.h"
+#include "worker.h"
+
+#include "utils/allocator.h"
+#include "utils/boost.h"
 
 namespace xlb {
 
-SvcMetrics::Ptr VirtSvc::MakeMetrics(xlb::Tuple2 &tuple) {
-  DLOG_W(INFO) << "[VirtSvc::MakeMetrics]: " << tuple;
-  return make_shared<expose_protected_ctor<SvcMetrics>>("virt", tuple);
+void SvcBase::CommitMetrics() {
+  metrics_->conns_.count_ << conns_;
+  metrics_->packets_in_.count_ << packets_in_;
+  metrics_->bytes_in_.count_ << bytes_in_;
+  metrics_->packets_out_.count_ << packets_out_;
+  metrics_->bytes_out_.count_ << bytes_out_;
+  ResetMetrics();
+}
+
+void SvcBase::ResetMetrics() {
+  conns_ = 0;
+  packets_in_ = 0;
+  bytes_in_ = 0;
+  packets_out_ = 0;
+  bytes_out_ = 0;
 }
 
 RealSvc::Ptr VirtSvc::SelectRs(Tuple2 &ctuple) {
-  if (unlikely(rs_vec_.empty())) return nullptr;
+  if (unlikely(rs_vec_.empty())) return {};
 
   // TODO: abstract selector
 
   return rs_vec_[std::hash<Tuple2>()(ctuple) % rs_vec_.size()];
 }
 
-RealSvc::Ptr VirtSvc::FindRs(Tuple2 &tuple) {
-  auto iter = utils::find_if(
-      rs_vec_, [&tuple](auto &rs) { return rs->tuple() == tuple; });
+void RealSvc::BindLocalIp(be32_t ip) {
+  // Meaningless when called in the master thread
+  DCHECK(!MASTER);
 
-  if (iter != rs_vec_.end()) return *iter;
+  DLOG_W(INFO) << "Binding local ip: " << ToIpv4Address(ip)
+               << " to RealSvc: " << tuple_;
 
-  return {};
-}
-
-RealSvc::Ptr VirtSvc::EmplaceRsUnsafe(Tuple2 &tuple, SvcMetrics::Ptr &metric) {
-  DLOG_W(INFO) << "Adding RealSvc: " << tuple;
-  return rs_vec_.emplace_back(new RealSvc(this, tuple, metric));
-}
-
-bool VirtSvc::Full() { return rs_vec_.size() >= CONFIG.svc.max_real_service; }
-
-void VirtSvc::Destroy() {
-  DLOG_W(INFO) << "Destroying VirtSvc: " << tuple_;
-  vtable_->vs_map_.Remove(tuple_);
-}
-
-SvcMetrics::Ptr RealSvc::MakeMetrics(xlb::Tuple2 &tuple) {
-  DLOG_W(INFO) << "[RealSvc::MakeMetrics]: " << tuple;
-  return make_shared<expose_protected_ctor<SvcMetrics>>("real", tuple);
-}
-
-void RealSvc::Destroy() {
-  if (vs_ != nullptr) {
-    DLOG_W(INFO) << "Destroying RealSvc: " << tuple_
-                 << " in VirtSvc: " << vs_->tuple_;
-    utils::remove_erase_if(vs_->rs_vec_,
-                           [this](auto &rs) { return rs->tuple() == tuple_; });
+  for (auto i :
+       utils::irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max())) {
+    local_tuple_pool_.emplace(Tuple2{ip, be16_t{i}});
   }
+}
+
+bool RealSvc::GetLocal(Tuple2 &tuple) {
+  if (local_tuple_pool_.empty())
+    return false;
+
+  tuple = local_tuple_pool_.top();
+
+  local_tuple_pool_.pop();
+  return true;
+}
+
+void RealSvc::PutLocal(const Tuple2 &tuple) { local_tuple_pool_.push(tuple); }
+
+RealSvc::~RealSvc() {
+  DLOG_W(INFO) << "Lazy destroying RealSvc: " << tuple_;
+  // Means that it cannot be reused
+  stable_->rs_map_.erase(tuple_);
 }
 
 }  // namespace xlb

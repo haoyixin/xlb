@@ -1,6 +1,7 @@
 #pragma once
 
 #include <3rdparty/typestring.hh>
+#include <3rdparty/bvar/combiner.h>
 
 #include <bvar/bvar.h>
 

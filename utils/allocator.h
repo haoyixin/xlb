@@ -10,6 +10,8 @@
 #include <experimental/memory_resource>
 #include <memory>
 #include <new>
+#include <unordered_map>
+#include <vector>
 
 #include "utils/common.h"
 #include "utils/singleton.h"
@@ -20,6 +22,16 @@ namespace xlb::utils {
 
 template <typename T>
 using vector = std::vector<T, pmr::polymorphic_allocator<T>>;
+
+template <typename K, typename V>
+using unordered_map =
+    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
+                       pmr::polymorphic_allocator<std::pair<const K, V>>>;
+
+template <typename K, typename V>
+using unordered_multimap =
+    std::unordered_multimap<K, V, std::hash<K>, std::equal_to<K>,
+                            pmr::polymorphic_allocator<std::pair<const K, V>>>;
 
 template <typename T>
 class Allocator {
@@ -93,4 +105,17 @@ inline unsafe_ptr<T> make_unsafe(Args &&... args) {
       &DefaultAllocator(), std::forward<Args>(args)...);
 }
 
+template <typename T>
+inline utils::vector<T> make_vector(size_t n) {
+  auto vec = utils::vector<T>(&DefaultAllocator());
+  vec.reserve(n);
+  return vec;
+}
+
 }  // namespace xlb::utils
+
+namespace xlb {
+
+#define ALLOC &utils::UnsafeSingleton<utils::MemoryResource>::instance()
+
+}  // namespace xlb

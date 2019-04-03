@@ -6,8 +6,8 @@
 
 #include "module.h"
 
-#include "utils/common.h"
 #include "utils/allocator.h"
+#include "utils/common.h"
 
 namespace xlb {
 
@@ -64,6 +64,7 @@ void Scheduler::MasterLoop() {
   uint64_t cycles{};
 
   auto worker = Worker::current();
+  worker->UpdateTsc();
   checkpoint_ = worker->current_tsc();
 
   for (auto &m : Modules::instance()) m->InitInMaster();
@@ -83,14 +84,16 @@ void Scheduler::MasterLoop() {
 
     cycles = ctx->worker_->current_tsc() - checkpoint_;
 
-    if (idle)
+    if (idle) {
       M::Adder<TS("idle_cycles_master")>() << cycles;
-    else
+    } else {
+      ctx->worker_->IncrBusyLoops();
       M::Adder<TS("busy_cycles_master")>() << cycles;
+    }
 
     checkpoint_ = ctx->worker_->current_tsc();
 
-    idle = (ctx->task_->func_(ctx).packets != 0);
+    idle = (ctx->task_->func_(ctx).packets == 0);
   }
 }
 
@@ -118,14 +121,16 @@ void Scheduler::SlaveLoop() {
 
     cycles = ctx->worker_->current_tsc() - checkpoint_;
 
-    if (idle)
+    if (idle) {
       M::Adder<TS("idle_cycles_slaves")>() << cycles;
-    else
+    } else {
+      ctx->worker_->IncrBusyLoops();
       M::Adder<TS("busy_cycles_slaves")>() << cycles;
+    }
 
     checkpoint_ = ctx->worker_->current_tsc();
 
-    idle = (ctx->task_->func_(ctx).packets != 0);
+    idle = (ctx->task_->func_(ctx).packets == 0);
   }
 }
 
@@ -151,9 +156,7 @@ void Scheduler::Task::Context::Drop(Packet *pkt) {
   dead_batch_.Push(pkt);
 }
 
-void Scheduler::Task::Context::Hold(Packet *pkt) {
-    stage_batch_.Push(pkt);
-}
+void Scheduler::Task::Context::Hold(Packet *pkt) { stage_batch_.Push(pkt); }
 
 void Scheduler::Task::Context::Hold(PacketBatch *pkts) {
   stage_batch_.Push(pkts);

@@ -31,6 +31,7 @@ const struct rte_eth_conf default_eth_conf(struct rte_eth_dev_info &dev_info) {
   ret.rxmode.mq_mode = ETH_MQ_RX_RSS;
   ret.rxmode.offloads = (DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_TCP_CKSUM |
                          DEV_RX_OFFLOAD_CRC_STRIP | DEV_RX_OFFLOAD_VLAN_STRIP);
+  ret.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
   ret.rxmode.ignore_offload_bitfield = 1;
   ret.txmode.offloads = (DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM);
 
@@ -193,7 +194,8 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
         dpdk_port_id_, i, dev_info_.rx_desc_lim.nb_max, sid, &eth_rxconf,
         utils::Singleton<PacketPool>::instance().pool()));
 
-  CHECK(!rte_eth_dev_set_vlan_offload(dpdk_port_id_, ETH_VLAN_STRIP_OFFLOAD));
+  //  CHECK(!rte_eth_dev_set_vlan_offload(dpdk_port_id_,
+  //  ETH_VLAN_STRIP_OFFLOAD));
 
   CHECK(!rte_flow_flush(dpdk_port_id_, nullptr));
 
@@ -217,10 +219,19 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
 
   // Reset hardware stat counters, as they may still contain previous data
   CHECK(!rte_eth_stats_reset(dpdk_port_id_));
+
+  struct rte_eth_link dpdk_status {};
+  // Call the blocking version update cache once
+  rte_eth_link_get(dpdk_port_id_, &dpdk_status);
+
+  LOG(INFO) << "PMD initialize successful, speed: " << dpdk_status.link_speed
+            << " full-duplex: " << dpdk_status.link_duplex
+            << " auto-neg: " << dpdk_status.link_autoneg
+            << " up: " << dpdk_status.link_status;
 }
 
 PMD::~PMD() {
-  DLOG(INFO) << "Stopping dpdk port: " << (int)dpdk_port_id_;
+  LOG(INFO) << "Stopping dpdk port: " << dpdk_port_id_;
   rte_eth_dev_stop(dpdk_port_id_);
 }
 
@@ -242,8 +253,10 @@ struct Port::Status PMD::Status() {
 uint16_t PMD::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
   M::Adder<TS("tx_packets")>() << cnt;
 
-  for (auto i : utils::irange(cnt))
-    M::Adder<TS("tx_bytes")>() << pkts[i]->data_len();
+  uint64_t bytes = 0;
+  for (auto i : utils::irange(cnt)) bytes += pkts[i]->data_len();
+
+  M::Adder<TS("tx_bytes")>() << bytes;
 
   auto sent = rte_eth_tx_burst(dpdk_port_id_, qid,
                                reinterpret_cast<struct rte_mbuf **>(pkts), cnt);
@@ -258,8 +271,10 @@ uint16_t PMD::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
   if (recv > 0) {
     M::Adder<TS("rx_packets")>() << recv;
 
-    for (auto i : utils::irange(recv))
-      M::Adder<TS("rx_bytes")>() << pkts[i]->data_len();
+    uint64_t bytes = 0;
+    for (auto i : utils::irange(recv)) bytes += pkts[i]->data_len();
+
+    M::Adder<TS("rx_bytes")>() << bytes;
   }
 
   return recv;

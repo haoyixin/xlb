@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <stack>
 
 #include "utils/endian.h"
 
@@ -11,6 +12,7 @@
 #include "tuple.h"
 
 namespace xlb {
+
 
 class alignas(64) [[gnu::packed]] Conn {
  private:
@@ -104,6 +106,8 @@ class alignas(64) [[gnu::packed]] Conn {
       [STATE_LAST_ACK] = 30,    [STATE_TIME_WAIT] = 0, [STATE_CLOSE] = 0,
       [STATE_SYN_SENT2] = 0,
   };
+
+  friend class ConnTable;
 };
 
 }  // namespace xlb

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "utils/allocator.h"
-#include "utils/unsafe_index_pool.h"
 #include "utils/x_map.h"
 
 #include "common.h"
@@ -11,43 +10,65 @@
 
 namespace xlb {
 
-class SvcBase : public utils::intrusive_ref_counter<SvcBase> {
+class SvcBase : public utils::unsafe_intrusive_ref_counter<SvcBase> {
  public:
-  SvcBase() = delete;
   virtual ~SvcBase() = default;
 
-  SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : tuple_(tuple), metrics_(metric) {}
-
-  auto &m_conns() const { return metrics_->conns().count(); }
-  auto &m_packets() const { return metrics_->packets().count(); }
-  auto &m_bytes() const { return metrics_->bytes().count(); }
+  SvcBase(class SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
+      : tuple_(tuple), metrics_(metric), stable_(stable) {
+    ResetMetrics();
+  }
 
   auto &tuple() const { return tuple_; }
+
+  void IncrConns(uint64_t n) { conns_ += n; }
+  void IncrPacketsIn(uint64_t n) { packets_in_ += n; }
+  void IncrBytesIn(uint64_t n) { bytes_in_ += n; }
+  void IncrPacketsOut(uint64_t n) { packets_out_ += n; }
+  void INcrBytesOut(uint64_t n) { bytes_out_ += n; }
+
+  inline void CommitMetrics();
+  inline void ResetMetrics();
 
  protected:
   Tuple2 tuple_;
   SvcMetrics::Ptr metrics_;
+  class SvcTable *stable_;
+
+ private:
+  uint64_t conns_;
+  uint64_t packets_in_;
+  uint64_t bytes_in_;
+  uint64_t packets_out_;
+  uint64_t bytes_out_;
+
+  DISALLOW_IMPLICIT_CONSTRUCTORS(SvcBase);
 };
 
 class RealSvc : public SvcBase {
  public:
   using Ptr = utils::intrusive_ptr<RealSvc>;
 
-  RealSvc() = delete;
-  ~RealSvc() override = default;
+  ~RealSvc() override;
 
-  inline void Destroy();
+  void BindLocalIp(const be32_t ip);
 
-  inline static SvcMetrics::Ptr MakeMetrics(Tuple2 &tuple);
+  // Return false if empty
+  bool GetLocal(Tuple2 &tuple);
+  void PutLocal(const Tuple2 &tuple);
 
  private:
-  RealSvc(class VirtSvc *vs, Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : SvcBase(tuple, metric), vs_(vs) {}
+  RealSvc(class SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
+      : SvcBase(stable, tuple, metric),
+        local_tuple_pool_(
+            utils::make_vector<Tuple2>(std::numeric_limits<uint16_t>::max())) {}
 
-  class VirtSvc *vs_{};
+  std::stack<Tuple2, utils::vector<Tuple2>> local_tuple_pool_;
 
   friend class VirtSvc;
+  friend class SvcTable;
+
+  DISALLOW_IMPLICIT_CONSTRUCTORS(RealSvc);
 };
 
 class VirtSvc : public SvcBase {
@@ -55,34 +76,22 @@ class VirtSvc : public SvcBase {
   using Ptr = utils::intrusive_ptr<VirtSvc>;
   using RsVec = utils::vector<RealSvc::Ptr>;
 
-  VirtSvc() = delete;
   ~VirtSvc() override = default;
-
-  inline void Destroy();
-
-  inline static SvcMetrics::Ptr MakeMetrics(Tuple2 &tuple);
 
   inline RealSvc::Ptr SelectRs(Tuple2 &ctuple);
 
-  inline bool Full();
-  inline RealSvc::Ptr FindRs(Tuple2 &tuple);
-
-  // Confirm that the tuple does not exist and the rs_vec_ is not 'Full' is the
-  // responsibility of the caller
-  inline RealSvc::Ptr EmplaceRsUnsafe(Tuple2 &tuple, SvcMetrics::Ptr &metric);
-
  private:
-  VirtSvc(class VTable *vtable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : SvcBase(tuple, metric),
-        rs_vec_(&utils::DefaultAllocator()),
-        vtable_(vtable) {}
+  VirtSvc(class SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
+      : SvcBase(stable, tuple, metric), rs_vec_(ALLOC) {
+    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
+  }
 
   RsVec rs_vec_;
 
-  class VTable *vtable_;
-
-  friend VTable;
   friend RealSvc;
+  friend class SvcTable;
+
+  DISALLOW_IMPLICIT_CONSTRUCTORS(VirtSvc);
 };
 
 }  // namespace xlb

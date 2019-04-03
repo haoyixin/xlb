@@ -252,7 +252,7 @@ class alignas(64) Packet {
   // 3. reference counter == 1
   // 4. the data buffer is embedded in the mbuf
   static inline void Free(Packet **pkts, size_t cnt) {
-    DCHECK_LE(cnt, kMaxBurst);
+    DCHECK_LE(cnt, kMaxBurst * 2);
 
     // rte_mempool_put_bulk() crashes when called with cnt == 0
     if (unlikely(cnt <= 0)) {

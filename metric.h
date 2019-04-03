@@ -1,7 +1,10 @@
 #pragma once
 
+#include <3rdparty/bvar/combiner.h>
+
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include <bvar/bvar.h>
 
@@ -14,66 +17,67 @@ namespace xlb {
 
 class Metric {
  public:
-  Metric() = delete;
   ~Metric() = default;
 
-  auto &count() const { return count_; }
-  auto &per_second() const { return count_; }
+  void Hide();
 
  private:
-  Metric(std::string_view prefix, std::string_view name)
-      : count_(), per_second_(&count_) {
-    count_.expose_as(std::string(prefix), combine_name(name, "count"));
-    per_second_.expose_as(std::string(prefix), combine_name(name, "second"));
-
-    DLOG_W(INFO) << "Exposed metrics prefix: " << prefix << " name: " << name;
-  }
-
-  static std::string combine_name(std::string_view name,
-                                  std::string_view suffix) {
-    return utils::Format("%s_%s", std::string(name).c_str(),
-                         std::string(suffix).c_str());
-  }
+  Metric(std::string_view prefix, std::string_view name);
 
   bvar::Adder<uint64_t> count_;
   bvar::PerSecond<bvar::Adder<uint64_t>> per_second_;
 
   friend class SvcMetrics;
+  friend class SvcBase;
+
+  DISALLOW_IMPLICIT_CONSTRUCTORS(Metric);
 };
 
-class SvcMetrics {
+class SvcMetrics : public utils::intrusive_ref_counter<SvcMetrics> {
  public:
-  using Ptr = shared_ptr<SvcMetrics>;
+  using Ptr = utils::intrusive_ptr<SvcMetrics>;
 
-  SvcMetrics() = delete;
   ~SvcMetrics() = default;
 
-  auto &conns() const { return conns_; }
-  auto &packets() const { return packets_; }
-  auto &bytes() const { return bytes_; }
+  void Hide();
 
  protected:
-  SvcMetrics(std::string_view type, Tuple2 &tuple)
-      : conns_(combine_prefix(type), combine_name(tuple, "conns")),
-        packets_(combine_prefix(type), combine_name(tuple, "packets")),
-        bytes_(combine_prefix(type), combine_name(tuple, "bytes")) {}
+  SvcMetrics(std::string_view type, Tuple2 &tuple);
 
  private:
-  static std::string combine_prefix(std::string_view type) {
-    return utils::Format("xlb_service_%s", std::string(type).c_str());
-  }
-
-  static std::string combine_name(const Tuple2 &tuple, std::string_view name) {
-    return utils::Format("%s_%d_%s", headers::ToIpv4Address(tuple.ip).c_str(),
-                         tuple.port.value(), std::string(name).c_str());
-  }
-
   Metric conns_;
-  Metric packets_;
-  Metric bytes_;
+  Metric packets_in_;
+  Metric bytes_in_;
+  Metric packets_out_;
+  Metric bytes_out_;
 
-  friend class VirtSvc;
-  friend class RealSvc;
+  friend class SvcMetricsPool;
+  friend class SvcBase;
+
+  DISALLOW_IMPLICIT_CONSTRUCTORS(SvcMetrics);
+};
+
+class SvcMetricsPool {
+ public:
+  SvcMetricsPool() : vs_map_(ALLOC), rs_map_(ALLOC) {
+    vs_map_.reserve(CONFIG.svc.max_virtual_service);
+    rs_map_.reserve(CONFIG.svc.max_real_service);
+  }
+  ~SvcMetricsPool() = default;
+
+  SvcMetrics::Ptr GetVs(Tuple2 &tuple);
+  SvcMetrics::Ptr GetRs(Tuple2 &tuple);
+
+  void PurgeVs(Tuple2 &tuple);
+  void PurgeRs(Tuple2 &tuple);
+
+ private:
+  using SvcMetricsMap = utils::unordered_map<Tuple2, SvcMetrics::Ptr>;
+
+  SvcMetricsMap vs_map_;
+  SvcMetricsMap rs_map_;
+
+  DISALLOW_COPY_AND_ASSIGN(SvcMetricsPool);
 };
 
 }  // namespace xlb

@@ -44,6 +44,8 @@ class Scheduler {
    public:
     class Context {
      public:
+      static constexpr size_t kMaxCounters = 8;
+
       Context() = default;
       void Drop(Packet *pkt);
       void Hold(Packet *pkt);
@@ -51,6 +53,7 @@ class Scheduler {
 
       auto worker() { return worker_; }
       auto &stage_batch() { return stage_batch_; }
+//      auto &counters() { return counters_; }
 
      private:
       Task *task_;
@@ -60,6 +63,9 @@ class Scheduler {
       // A packet batch for storing packets to free
       PacketBatch dead_batch_;
       PacketBatch stage_batch_;
+
+      //  User-defined counters
+//      alignas(32) std::array<uint64_t, kMaxCounters> counters_;
 
       friend Scheduler;
       friend Task;
@@ -93,7 +99,6 @@ class Scheduler {
   };
 
   void RegisterTask(Task::Func &&func, uint8_t weight) {
-    DLOG_W(INFO) << "Registering task with weight: " << int(weight);
     runnable_->emplace(new Task(std::move(func), weight));
   }
 

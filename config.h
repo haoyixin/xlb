@@ -5,8 +5,8 @@
 
 #include "3rdparty/visit_struct.hpp"
 
-#include "utils/singleton.h"
 #include "headers/ether.h"
+#include "utils/singleton.h"
 
 namespace xlb {
 
@@ -40,8 +40,10 @@ struct Config {
   };
 
   struct Svc {
-      size_t max_virtual_service;
-      size_t max_real_service;
+    size_t max_virtual_service;
+    size_t max_real_service;
+    size_t max_real_per_virtual;
+    size_t max_conn;
   };
 
   std::string rpc_ip_port;
@@ -67,6 +69,7 @@ struct Config {
 VISITABLE_STRUCT(xlb::Config::Nic, name, pci_address, local_ips, mtu);
 VISITABLE_STRUCT(xlb::Config::Mem, hugepage, channel, packet_pool);
 VISITABLE_STRUCT(xlb::Config::Kni, ip_address, netmask, gateway, ring_size);
-VISITABLE_STRUCT(xlb::Config::Svc, max_virtual_service, max_real_service);
+VISITABLE_STRUCT(xlb::Config::Svc, max_virtual_service, max_real_service,
+                 max_real_per_virtual, max_conn);
 VISITABLE_STRUCT(xlb::Config, rpc_ip_port, slave_cores, master_core, nic, mem,
                  kni, svc);

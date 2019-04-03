@@ -4,28 +4,42 @@
 #include <cstdlib>
 #include <ctime>
 
-#include <rte_cycles.h>
 #include <sys/time.h>
+
 
 namespace xlb::utils {
 
-static inline uint64_t Rdtsc(void) { return rte_get_timer_cycles(); }
+extern uint64_t tsc_hz;
 
-static inline uint64_t TscToNs(uint64_t cycles) {
-  return cycles * 1e9 / rte_get_timer_hz();
+inline uint64_t Rdtsc() {
+  union {
+    uint64_t tsc_64;
+    struct {
+      uint32_t lo_32;
+      uint32_t hi_32;
+    };
+  } tsc;
+
+  asm volatile("rdtsc" : "=a"(tsc.lo_32), "=d"(tsc.hi_32));
+
+  return tsc.tsc_64;
 }
 
-static inline double TscToUs(uint64_t cycles) {
-  return cycles * 1e6 / rte_get_timer_hz();
+inline uint64_t TscToNs(uint64_t cycles) {
+  return cycles * 1e9 / tsc_hz;
 }
 
-static inline double TscToMs(uint64_t cycles) {
-  return cycles * 1e3 / rte_get_timer_hz();
+inline double TscToUs(uint64_t cycles) {
+  return cycles * 1e6 / tsc_hz;
+}
+
+inline double TscToMs(uint64_t cycles) {
+  return cycles * 1e3 / tsc_hz;
 }
 
 /* Return current time in seconds since the Epoch.
  * This is consistent with Python's time.time() */
-static inline double GetEpochTime() {
+inline double GetEpochTime() {
   struct timeval tv {};
   gettimeofday(&tv, nullptr);
   return tv.tv_sec + tv.tv_usec / 1e6;
@@ -33,7 +47,7 @@ static inline double GetEpochTime() {
 
 /* CPU time (in seconds) spent by the current thread.
  * Use it only relatively. */
-static inline double GetCpuTime() {
+inline double GetCpuTime() {
   struct timespec ts {};
   if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
     return ts.tv_sec + ts.tv_nsec / 1e9;

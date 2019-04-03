@@ -92,15 +92,14 @@ class PacketBatch {
 
   void Free() {
     if (!Empty()) Packet::Free(pkts(), cnt_);
-
-    Clear();
+//    Clear();
   }
 
-  static const uint16_t kMaxCnt = 64;
+  static const uint16_t kMaxCnt = Packet::kMaxBurst * 2;
 
  private:
-  uint16_t cnt_;
   std::array<Packet *, kMaxCnt> pkts_;
+  uint16_t cnt_;
 };
 
 static_assert(std::is_pod<PacketBatch>::value, "PacketBatch is not a POD Type");

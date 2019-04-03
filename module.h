@@ -5,6 +5,8 @@
 #include <functional>
 #include <string>
 
+#include <cxxabi.h>
+
 #include "utils/singleton.h"
 
 #include "packet_batch.h"
@@ -65,6 +67,8 @@ class Module {
     auto worker = Worker::current();
 
     DCHECK(Worker::current());
+    DLOG_W(INFO) << "Registering task of module: " << module_name(this)
+                 << " with weight: " << unsigned(weight);
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 
@@ -88,6 +92,10 @@ class Module {
   }
 
  private:
+  static std::string module_name(Module *module) {
+    return abi::__cxa_demangle(typeid(*module).name(), 0, 0, 0) + 14;
+  }
+
   DISALLOW_COPY_AND_ASSIGN(Module);
 };
 

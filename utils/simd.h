@@ -16,7 +16,7 @@
 
 std::string m128i_to_str(__m128i a);
 
-static inline __m128i gather_m128i(void *a, void *b) {
+inline __m128i gather_m128i(void *a, void *b) {
 #if 1
   /* faster (in a tight loop test. sometimes slower...) */
   __m128i t = _mm_loadl_epi64((__m128i *)a);
@@ -30,7 +30,7 @@ static inline __m128i gather_m128i(void *a, void *b) {
 
 std::string m256i_to_str(__m256i a);
 
-static inline __m256d concat_two_m128d(__m128d lo, __m128d hi) {
+inline __m256d concat_two_m128d(__m128d lo, __m128d hi) {
 #if 1
   /* faster */
   return _mm256_insertf128_pd(_mm256_castpd128_pd256(lo), hi, 1);
@@ -40,7 +40,7 @@ static inline __m256d concat_two_m128d(__m128d lo, __m128d hi) {
 #endif
 }
 
-static inline __m256i concat_two_m128i(__m128i lo, __m128i hi) {
+inline __m256i concat_two_m128i(__m128i lo, __m128i hi) {
 #if __AVX2__
   return _mm256_inserti128_si256(_mm256_castsi128_si256(lo), hi, 1);
 #else
@@ -48,7 +48,7 @@ static inline __m256i concat_two_m128i(__m128i lo, __m128i hi) {
 #endif
 }
 
-static inline uint64_t m128i_extract_u64(__m128i a, int i) {
+inline uint64_t m128i_extract_u64(__m128i a, int i) {
 #if __x86_64
   DCHECK(i == 0 || i == 1) << "selector must be either 0 or 1";
 
@@ -70,4 +70,4 @@ static inline uint64_t m128i_extract_u64(__m128i a, int i) {
 #endif
 }
 
-#endif // __AVX__
+#endif  // __AVX__

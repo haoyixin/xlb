@@ -100,6 +100,8 @@ void Config::validate() {
 
   CHECK_GT(svc.max_virtual_service, 0);
   CHECK_GT(svc.max_real_service, 0);
+  CHECK_GT(svc.max_real_per_virtual, 0);
+  CHECK_GT(svc.max_conn, 0);
 }
 
 } // namespace xlb

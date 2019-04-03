@@ -72,6 +72,7 @@ set(OBJS
         control.cc
         service.cc
         table.cc
+        metric.cc
         pb/xlb.pb.cc
         utils/copy.cc
         utils/simd.cc
@@ -79,6 +80,7 @@ set(OBJS
         utils/format.cc
         utils/endian.cc
         utils/iface.cc
+        utils/time.cc
         headers/ip.cc
         headers/ether.cc
         ports/pmd.cc

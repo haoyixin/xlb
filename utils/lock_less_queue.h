@@ -17,6 +17,8 @@ struct RingId {};
 template <typename T, bool SP, bool SC>
 class LockLessQueue {
   static_assert(sizeof(T) <= 8);
+  // TODO: union wrapper for unaligned type
+  static_assert(alignof(T) == 8);
 
  public:
   static const size_t kDefaultRingSize = 512;
@@ -48,7 +50,7 @@ class LockLessQueue {
     if (ring_) rte_ring_free(ring_);
   }
 
-  bool Push(T &obj) {
+  bool Push(const T &obj) {
     if constexpr (SP)
       return rte_ring_sp_enqueue(ring_, reinterpret_cast<void *>(obj)) == 0;
     else

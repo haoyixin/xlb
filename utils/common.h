@@ -198,3 +198,4 @@ struct expose_protected_ctor : public T {
   explicit expose_protected_ctor(Args &&... args)
       : T(std::forward<Args>(args)...) {}
 };
+

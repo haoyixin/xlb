@@ -12,9 +12,9 @@
 
 #include <glog/logging.h>
 
+#include "utils/allocator.h"
 #include "utils/boost.h"
 #include "utils/numa.h"
-#include "utils/allocator.h"
 
 #include "config.h"
 
@@ -103,7 +103,7 @@ void init_eal() {
 
   disable_syslog();
   CHECK_GE(rte_eal_init(rte_args.Argc(), rte_args.Argv()), 0);
-  CHECK_EQ(rte_eal_hpet_init(1), 0);
+  //  CHECK_EQ(rte_eal_hpet_init(1), 0);
   rte_dump_physmem_layout(stdout);
 
   enable_syslog();

@@ -29,7 +29,7 @@ class PortInc final : public Module {
   void register_task() {
     RegisterTask(
         [this](Context *ctx) -> Result {
-          PacketBatch batch{};
+          PacketBatch batch;
           batch.SetCnt(port_.Recv(ctx->worker()->current()->id(), batch.pkts(),
                                   Packet::kMaxBurst));
 

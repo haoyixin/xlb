@@ -9,14 +9,12 @@
 
 namespace xlb::utils {
 
-static inline void Copy16(void *__restrict__ dst,
-                          const void *__restrict__ src) {
+inline void Copy16(void *__restrict__ dst, const void *__restrict__ src) {
   _mm_storeu_si128(reinterpret_cast<__m128i *>(dst),
                    _mm_loadu_si128(reinterpret_cast<const __m128i *>(src)));
 }
 
-static inline void Copy32(void *__restrict__ dst,
-                          const void *__restrict__ src) {
+inline void Copy32(void *__restrict__ dst, const void *__restrict__ src) {
 #if __AVX2__
   _mm256_storeu_si256(
       reinterpret_cast<__m256i *>(dst),
@@ -29,8 +27,8 @@ static inline void Copy32(void *__restrict__ dst,
 }
 
 // Copy exactly "bytes" (<= 64). Works best if size is a compile-time constant.
-static inline void CopySmall(void *__restrict__ dst,
-                             const void *__restrict__ src, size_t bytes) {
+inline void CopySmall(void *__restrict__ dst, const void *__restrict__ src,
+                      size_t bytes) {
   DCHECK_LE(bytes, 64);
 
   auto *d = reinterpret_cast<char *__restrict__>(dst);
@@ -108,9 +106,8 @@ static inline void CopySmall(void *__restrict__ dst,
 // Inline version of Copy(). Use only when performance is critial. Since the
 // function is inlined whenever used, the compiled code will be substantially
 // larger. See Copy() for more details.
-static inline void CopyInlined(void *__restrict__ dst,
-                               const void *__restrict__ src, size_t bytes,
-                               bool sloppy = false) {
+inline void CopyInlined(void *__restrict__ dst, const void *__restrict__ src,
+                        size_t bytes, bool sloppy = false) {
 #if __AVX2__
   using block_t = __m256i;
   auto copy_block = [](void *__restrict__ d, const void *__restrict__ s) {
@@ -214,8 +211,8 @@ void CopyNonInlined(void *__restrict__ dst, const void *__restrict__ src,
 // 31 bytes. It will generate much smaller and usually faster code. Use this
 // option only if overwriting some data at the end is acceptable, such as
 // rewriting the payload data of class Packet.
-static inline void Copy(void *__restrict__ dst, const void *__restrict__ src,
-                        size_t bytes, bool sloppy = false) {
+inline void Copy(void *__restrict__ dst, const void *__restrict__ src,
+                 size_t bytes, bool sloppy = false) {
   // If the size is a compile-time constant, inlining can generate compact code
   if (__builtin_constant_p(bytes)) {
     CopyInlined(dst, src, bytes, sloppy);
