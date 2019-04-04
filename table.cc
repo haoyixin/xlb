@@ -168,6 +168,13 @@ inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
   conn->client_ = cli_tp;
   conn->virt_ = vs_ptr;
   conn->real_ = rs_ptr;
+
+  timer_.Schedule(conn, 3);
+  timer_.Reschedule(conn, 3);
+  timer_.Advance(10);
+//  timer_.ScheduleInRange(conn, 3, 5);
+//  auto x = timer_.TicksToNextEvent();
+  auto y = timer_.now();
 }
 
 }  // namespace xlb

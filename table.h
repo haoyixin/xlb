@@ -3,6 +3,7 @@
 #include <stack>
 
 #include "utils/x_map.h"
+#include "utils/timer.h"
 
 #include "common.h"
 #include "conn.h"
@@ -87,8 +88,12 @@ class ConnTable {
   IdxMap idx_map_;
   std::stack<idx_t, utils::vector<idx_t>> idx_pool_;
 
+  utils::TimerWheel<Conn> timer_;
+
   friend Conn;
   DISALLOW_COPY_AND_ASSIGN(ConnTable);
 };
+
+#define CTABLE utils::UnsafeSingletonTLS<ConnTable>::instance()
 
 }  // namespace xlb

@@ -7,6 +7,7 @@
 #include <glog/logging.h>
 
 #include "utils/allocator.h"
+#include "utils/common.h"
 #include "utils/singleton.h"
 
 namespace xlb::utils {
@@ -40,6 +41,7 @@ class LockLessQueue {
     ring_ = rte_ring_create(name.c_str(), actual_capacity, socket, flags);
 
     DLOG(INFO) << "Created ring on socket: " << socket << " name: " << name
+               << " element-type: " << demangle<T>()
                << " capacity: " << actual_capacity
                << " error: " << rte_strerror(rte_errno);
 

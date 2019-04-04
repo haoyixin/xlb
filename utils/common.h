@@ -9,6 +9,8 @@
 #include <memory>
 #include <string>
 
+#include <cxxabi.h>
+
 #if __cplusplus < 201703L  // pre-C++17?
 #error Must be built with C++17
 #endif
@@ -198,4 +200,23 @@ struct expose_protected_ctor : public T {
   explicit expose_protected_ctor(Args &&... args)
       : T(std::forward<Args>(args)...) {}
 };
+
+template <typename T>
+std::string demangle() {
+  char *c = abi::__cxa_demangle(typeid(T).name(), 0, 0, 0);
+  std::string s{c};
+  std::free(c);
+
+  return s;
+}
+
+template <typename T>
+std::string demangle(T *obj) {
+  char *c = abi::__cxa_demangle(typeid(*obj).name(), 0, 0, 0);
+  std::string s{c};
+  std::free(c);
+
+  return s;
+}
+
 

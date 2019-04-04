@@ -4,6 +4,7 @@
 #include <stack>
 
 #include "utils/endian.h"
+#include "utils/timer.h"
 
 #include "headers/tcp.h"
 
@@ -14,7 +15,7 @@
 namespace xlb {
 
 
-class alignas(64) [[gnu::packed]] Conn {
+class alignas(64) [[gnu::packed]] Conn : public utils::EventBase<Conn> {
  private:
   using Tcp = headers::Tcp;
 
@@ -49,6 +50,7 @@ class alignas(64) [[gnu::packed]] Conn {
   void UpdateState(Tcp * hdr, Dir dir);
 
   State state() { return state_; }
+  void execute() override {}
 
  private:
   Tuple2 client_;
