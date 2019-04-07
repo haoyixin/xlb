@@ -36,7 +36,7 @@ class Worker {
 
   uint64_t silent_drops() const { return silent_drops_; }
   uint64_t current_tsc() const { return current_tsc_; }
-  uint64_t current_ns() const { return current_ns_; }
+  //  uint64_t current_ns() const { return current_ns_; }
   uint64_t busy_loops() const { return busy_loops_; }
 
   bool master() const { return master_; }
@@ -51,7 +51,7 @@ class Worker {
   void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
   void UpdateTsc() {
     current_tsc_ = utils::Rdtsc();
-    current_ns_ = utils::TscToNs(current_ns_);
+    //    current_ns_ = utils::TscToNs(current_ns_);
   }
   void IncrBusyLoops() { ++busy_loops_; }
 
@@ -79,7 +79,7 @@ class Worker {
 
   uint64_t silent_drops_;  // packets that have been sent to a deadend
   uint64_t current_tsc_;
-  uint64_t current_ns_;
+  //  uint64_t current_ns_;
   uint64_t busy_loops_;
 
   static bool aborting_;
@@ -99,7 +99,7 @@ class Worker {
 };
 
 #define MASTER Worker::current()->master()
-#define BUZY_LOOPS Worker::current()->busy_loops()
+#define TSC Worker::current()->current_tsc()
 
 #define LOG_W(severity) LOG(severity) << *(Worker::current()) << " "
 
@@ -110,7 +110,7 @@ class Worker {
 #else
 
 #define DLOG_W(severity) \
-  true ? (void) 0 : google::LogMessageVoidify() & LOG(severity)
+  true ? (void)0 : google::LogMessageVoidify() & LOG(severity)
 
 #endif
 

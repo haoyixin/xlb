@@ -8,6 +8,7 @@
 #include "utils/format.h"
 #include "utils/numa.h"
 #include "utils/singleton.h"
+#include "utils/time.h"
 
 #include "packet_pool.h"
 #include "scheduler.h"
@@ -72,8 +73,7 @@ Worker::Worker(uint16_t core, bool master)
       core_(core),
       packet_pool_(&utils::Singleton<PacketPool>::instance()),
       silent_drops_(0),
-      current_tsc_(0),
-      current_ns_(0) {
+      current_tsc_(utils::Rdtsc()) {
   if (!master_) {
     id_ = Counter::instance().fetch_add(1);
     socket_ = CONFIG.nic.socket;

@@ -18,6 +18,12 @@
 
 namespace pmr = std::experimental::pmr;
 
+namespace xlb {
+
+#define ALLOC &utils::UnsafeSingleton<utils::MemoryResource>::instance()
+
+}  // namespace xlb
+
 namespace xlb::utils {
 
 template <typename T>
@@ -76,46 +82,56 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
     rte_free(p);
   }
 
-  bool do_is_equal(const std::experimental::pmr::memory_resource &other) const
-      noexcept override {
+  bool do_is_equal(const pmr::memory_resource &other) const noexcept override {
     return this == &other;
   }
 
  private:
   int socket_;
+
+  friend struct INew;
+};
+
+struct INew {
+  static void *operator new(std::size_t sz) {
+    return (ALLOC)->do_allocate(sz, 0);
+  }
+  static void *operator new(std::size_t sz, std::align_val_t al) {
+    return (ALLOC)->do_allocate(sz, static_cast<size_t>(al));
+  }
+  static void *operator new[](std::size_t sz) {
+    return (ALLOC)->do_allocate(sz, 0);
+  }
+  static void *operator new[](std::size_t sz, std::align_val_t al) {
+    return (ALLOC)->do_allocate(sz, static_cast<size_t>(al));
+  }
+  static void operator delete(void *ptr) { (ALLOC)->do_deallocate(ptr, 0, 0); }
+  static void operator delete[](void *ptr) {
+    (ALLOC)->do_deallocate(ptr, 0, 0);
+  }
 };
 
 inline void InitDefaultAllocator(int socket) {
   UnsafeSingleton<MemoryResource>::Init(socket);
 }
 
-inline auto &DefaultAllocator() {
-  return UnsafeSingleton<MemoryResource>::instance();
-}
-
 template <typename T, typename... Args>
 inline std::shared_ptr<T> make_shared(Args &&... args) {
   return std::allocate_shared<T, pmr::polymorphic_allocator<T>>(
-      &DefaultAllocator(), std::forward<Args>(args)...);
+      ALLOC, std::forward<Args>(args)...);
 }
 
 template <typename T, typename... Args>
 inline unsafe_ptr<T> make_unsafe(Args &&... args) {
   return allocate_unsafe<T, pmr::polymorphic_allocator<T>>(
-      &DefaultAllocator(), std::forward<Args>(args)...);
+      ALLOC, std::forward<Args>(args)...);
 }
 
 template <typename T>
 inline utils::vector<T> make_vector(size_t n) {
-  auto vec = utils::vector<T>(&DefaultAllocator());
+  auto vec = utils::vector<T>(ALLOC);
   vec.reserve(n);
   return vec;
 }
 
 }  // namespace xlb::utils
-
-namespace xlb {
-
-#define ALLOC &utils::UnsafeSingleton<utils::MemoryResource>::instance()
-
-}  // namespace xlb

@@ -75,10 +75,10 @@ class UnsafeSingletonTLS {
     }
   };
 
-  alignas(alignof(T)) static __thread std::array<uint8_t, sizeof(T)> instance_;
-
   static __thread std::atomic<bool> inited_;
   static thread_local Dtor dtor_;
+
+  alignas(alignof(T)) static __thread std::array<uint8_t, sizeof(T)> instance_;
 };
 
 template <typename T, typename Tag>

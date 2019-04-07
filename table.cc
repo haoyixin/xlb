@@ -21,10 +21,11 @@ VirtSvc::Ptr SvcTable::EnsureVsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric) {
 
   // There is a very small probability of returning nullptr
   if (entry != nullptr) {
-    if (entry->value != nullptr) return entry->value;
-
-    DLOG_W(INFO) << "Creating VirtSvc: " << tuple;
-    entry->value = new VirtSvc(this, tuple, metric);
+    if (entry->value == nullptr) {
+      DLOG_W(INFO) << "Creating VirtSvc: " << tuple;
+      entry->value = new VirtSvc(this, tuple, metric);
+    }
+    return entry->value;
   } else {
     last_error_ = "virtual service map collision exceeded";
     return {};
@@ -120,7 +121,10 @@ Conn *ConnTable::Find(xlb::Tuple4 &tuple) {
 }
 
 inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
-  Tuple4 orig_tp{cli_tp, vs_ptr->tuple()};
+  Tuple4 orig_tp;
+
+  orig_tp.src = cli_tp;
+  orig_tp.dst=vs_ptr->tuple();
 
   IdxMap::Entry *orig_ent = idx_map_.Emplace(orig_tp, 0);
 
@@ -146,7 +150,10 @@ inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
     return nullptr;
   }
 
-  Tuple4 rep_tp{rs_ptr->tuple(), loc_tp};
+  Tuple4 rep_tp;
+
+  rep_tp.src = rs_ptr->tuple();
+  rep_tp.dst = loc_tp;
 
   auto idx = idx_pool_.top();
   idx_pool_.pop();
@@ -170,11 +177,11 @@ inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
   conn->real_ = rs_ptr;
 
   timer_.Schedule(conn, 3);
-  timer_.Reschedule(conn, 3);
+//  timer_.Reschedule(conn, 3);
   timer_.Advance(10);
 //  timer_.ScheduleInRange(conn, 3, 5);
 //  auto x = timer_.TicksToNextEvent();
-  auto y = timer_.now();
+  auto y = timer_.Now();
 }
 
 }  // namespace xlb

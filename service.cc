@@ -10,21 +10,33 @@
 
 namespace xlb {
 
-void SvcBase::CommitMetrics() {
+SvcBase::SvcBase(SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
+    : tuple_(tuple), metrics_(metric), stable_(stable) {
+  reset_metrics();
+  stable_->timer_.Schedule(this, kCommitInterval * tsc_sec);
+}
+
+void SvcBase::commit_metrics(){
   metrics_->conns_.count_ << conns_;
   metrics_->packets_in_.count_ << packets_in_;
   metrics_->bytes_in_.count_ << bytes_in_;
   metrics_->packets_out_.count_ << packets_out_;
   metrics_->bytes_out_.count_ << bytes_out_;
-  ResetMetrics();
+  reset_metrics();
 }
 
-void SvcBase::ResetMetrics() {
+void SvcBase::reset_metrics(){
   conns_ = 0;
   packets_in_ = 0;
   bytes_in_ = 0;
   packets_out_ = 0;
   bytes_out_ = 0;
+}
+
+
+void SvcBase::execute(xlb::TimerWheel<xlb::SvcBase> *timer) {
+  commit_metrics();
+  timer->Schedule(this, kCommitInterval * tsc_sec);
 }
 
 RealSvc::Ptr VirtSvc::SelectRs(Tuple2 &ctuple) {

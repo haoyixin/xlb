@@ -15,7 +15,7 @@
 namespace xlb {
 
 
-class alignas(64) [[gnu::packed]] Conn : public utils::EventBase<Conn> {
+class alignas(64) [[gnu::packed]] Conn : public EventBase<Conn> {
  private:
   using Tcp = headers::Tcp;
 
@@ -50,7 +50,9 @@ class alignas(64) [[gnu::packed]] Conn : public utils::EventBase<Conn> {
   void UpdateState(Tcp * hdr, Dir dir);
 
   State state() { return state_; }
-  void execute() override {}
+  void execute(TimerWheel<Conn> *timer) override {
+    // TODO: destroy or somewhat ?
+  }
 
  private:
   Tuple2 client_;

@@ -105,7 +105,7 @@ class alignas(64) XMap {
   explicit XMap(uint32_t num_buckets)
       : bucket_mask_(align_ceil_pow2(num_buckets) - 1),
         num_entries_(0),
-        buckets_(bucket_mask_ + 1, &DefaultAllocator()) {}
+        buckets_(bucket_mask_ + 1, ALLOC) {}
 
   XMap(XMap &) = delete;
   XMap &operator=(XMap &) = delete;

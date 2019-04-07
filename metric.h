@@ -33,7 +33,7 @@ class Metric {
   DISALLOW_IMPLICIT_CONSTRUCTORS(Metric);
 };
 
-class SvcMetrics : public utils::intrusive_ref_counter<SvcMetrics> {
+class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
  public:
   using Ptr = utils::intrusive_ptr<SvcMetrics>;
 

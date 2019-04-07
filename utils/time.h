@@ -11,6 +11,11 @@ namespace xlb::utils {
 
 extern uint64_t tsc_hz;
 
+extern uint64_t tsc_ns;
+extern uint64_t tsc_us;
+extern uint64_t tsc_ms;
+extern uint64_t tsc_sec;
+
 inline uint64_t Rdtsc() {
   union {
     uint64_t tsc_64;
@@ -26,15 +31,19 @@ inline uint64_t Rdtsc() {
 }
 
 inline uint64_t TscToNs(uint64_t cycles) {
-  return cycles * 1e9 / tsc_hz;
+  return cycles / tsc_ns;
 }
 
-inline double TscToUs(uint64_t cycles) {
-  return cycles * 1e6 / tsc_hz;
+inline uint64_t TscToUs(uint64_t cycles) {
+  return cycles / tsc_us;
 }
 
-inline double TscToMs(uint64_t cycles) {
-  return cycles * 1e3 / tsc_hz;
+inline uint64_t TscToMs(uint64_t cycles) {
+  return cycles / tsc_ms;
+}
+
+inline uint64_t TscToSec(uint64_t cycles) {
+  return cycles / tsc_sec;
 }
 
 /* Return current time in seconds since the Epoch.

@@ -27,7 +27,7 @@ class LockLessQueue {
   explicit LockLessQueue(size_t capacity = kDefaultRingSize) {
     unsigned flags = 0;
     size_t actual_capacity = align_ceil_pow2(capacity);
-    int socket = DefaultAllocator().socket();
+    int socket = (ALLOC)->socket();
 
     if constexpr (SP)
       flags |= RING_F_SP_ENQ;

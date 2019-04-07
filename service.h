@@ -10,14 +10,12 @@
 
 namespace xlb {
 
-class SvcBase : public utils::unsafe_intrusive_ref_counter<SvcBase> {
+class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
+                public EventBase<SvcBase>,
+                public INew {
  public:
-  virtual ~SvcBase() = default;
-
-  SvcBase(class SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : tuple_(tuple), metrics_(metric), stable_(stable) {
-    ResetMetrics();
-  }
+  SvcBase(class SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric);
+  ~SvcBase() override = default;
 
   auto &tuple() const { return tuple_; }
 
@@ -27,10 +25,14 @@ class SvcBase : public utils::unsafe_intrusive_ref_counter<SvcBase> {
   void IncrPacketsOut(uint64_t n) { packets_out_ += n; }
   void INcrBytesOut(uint64_t n) { bytes_out_ += n; }
 
-  inline void CommitMetrics();
-  inline void ResetMetrics();
+  void execute(TimerWheel<SvcBase> *timer) override;
 
  protected:
+  static constexpr uint64_t kCommitInterval = 3;
+
+  inline void reset_metrics();
+  inline void commit_metrics();
+
   Tuple2 tuple_;
   SvcMetrics::Ptr metrics_;
   class SvcTable *stable_;
