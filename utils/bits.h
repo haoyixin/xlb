@@ -21,17 +21,20 @@ class [[gnu::packed]] bitset {
                          std::conditional_t<N <= 32, uint32_t, uint64_t>>>;
 
   template <typename T>
-  bool operator[](T index) const { return (data_ & (1u << index)) != 0; }
+  bool operator[](T index) const { return (data_ & (kOne << index)) != 0; }
 
-  bool all() const { return (data_ & ((1u << N) - 1)) == ((1u << N) - 1); }
-  bool any() const { return (data_ & ((1u << N) - 1)) != 0; }
-  bool none() const { return (data_ & ((1u << N) - 1)) == 0; }
+  bool all() const { return (data_ & ((kOne << N) - kOne)) == ((kOne << N) - kOne); }
+  bool any() const { return (data_ & ((kOne << N) - kOne)) != 0; }
+  bool none() const { return (data_ & ((kOne << N) - kOne)) == 0; }
 
-  void set(size_t index) { data_ |= ((1u << index)); }
+  void set(size_t index) { data_ |= ((kOne << index)); }
   void reset() { data_ = 0u; }
-  void reset(size_t index) { data_ &= (~((1u << index))); }
+  void reset(size_t index) { data_ &= (~((kOne << index))); }
+
+  data_type raw() const { return data_; }
 
  private:
+  static constexpr data_type kOne = std::numeric_limits<data_type >::min() + 1;
   data_type data_ = 0u;
 };
 

@@ -35,6 +35,8 @@ class alignas(64) XMap {
     V value;
   };
 
+  static_assert(std::is_copy_constructible<K>::value &&
+                std::is_move_constructible<K>::value);
   static_assert(sizeof(Entry) == 16);
 
   class iterator {
@@ -156,8 +158,8 @@ class alignas(64) XMap {
     Entry *entry;
     if ((entry = const_cast<Entry *>(
              find_in_bucket(*prim_bkt, *sec_bkt, key, sec_hash))) != nullptr) {
-//      entry->value.~V();
-//      new (&entry->value) V(std::forward<Args>(args)...);
+      //      entry->value.~V();
+      //      new (&entry->value) V(std::forward<Args>(args)...);
 
       return entry;
     }
@@ -253,13 +255,19 @@ class alignas(64) XMap {
     void MoveIntoSecondary(uint32_t sec_hash, uint8_t prim_idx,
                            Bucket * sec_bkt, uint8_t sec_idx) {
       sec_bkt->OccupySecondary(sec_hash, sec_idx, *this);
-      sec_bkt->entries_[sec_idx] = std::move(entries_[prim_idx]);
+      if constexpr (std::is_move_constructible<V>::value)
+        sec_bkt->entries_[sec_idx] = std::move(entries_[prim_idx]);
+      else
+        sec_bkt->entries_[sec_idx] = entries_[prim_idx];
       RemoveInPrimary(prim_idx);
     }
 
     void MoveIntoPrimary(uint8_t sec_idx, Bucket * prim_bkt, uint8_t prim_idx) {
       prim_bkt->OccupyPrimary(prim_idx);
-      prim_bkt->entries_[prim_idx] = std::move(entries_[sec_idx]);
+      if constexpr (std::is_move_constructible<V>::value)
+        prim_bkt->entries_[prim_idx] = std::move(entries_[sec_idx]);
+      else
+        prim_bkt->entries_[prim_idx] = entries_[sec_idx];
       RemoveInSecondary(sec_idx, *prim_bkt);
     }
 
@@ -349,6 +357,8 @@ class alignas(64) XMap {
 
       return entry;
     }
+
+    DLOG(INFO) << "[emplace_in_bucket] collision exceeded";
 
     return nullptr;
   }
