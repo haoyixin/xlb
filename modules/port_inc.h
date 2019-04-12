@@ -30,8 +30,7 @@ class PortInc final : public Module {
     RegisterTask(
         [this](Context *ctx) -> Result {
           PacketBatch batch;
-          batch.SetCnt(port_.Recv(ctx->worker()->current()->id(), batch.pkts(),
-                                  Packet::kMaxBurst));
+          batch.SetCnt(port_.Recv(W_ID, batch.pkts(), Packet::kMaxBurst));
 
           if (batch.cnt() > 0) {
             Handle<EtherInc, T>(ctx, &batch);

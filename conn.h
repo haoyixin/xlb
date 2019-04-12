@@ -14,45 +14,54 @@
 
 namespace xlb {
 
+// TODO: not to expose these
 
-class alignas(64) [[gnu::packed]] Conn : public EventBase<Conn> {
- private:
-  using Tcp = headers::Tcp;
+enum ip_conntrack_dir : uint8_t {
+  IP_CT_DIR_ORIGINAL,
+  IP_CT_DIR_REPLY,
+  IP_CT_DIR_MAX
+};
 
+enum tcp_conntrack : uint8_t {
+  TCP_CONNTRACK_NONE,
+  TCP_CONNTRACK_SYN_SENT,
+  TCP_CONNTRACK_SYN_RECV,
+  TCP_CONNTRACK_ESTABLISHED,
+  TCP_CONNTRACK_FIN_WAIT,
+  TCP_CONNTRACK_CLOSE_WAIT,
+  TCP_CONNTRACK_LAST_ACK,
+  TCP_CONNTRACK_TIME_WAIT,
+  TCP_CONNTRACK_CLOSE,
+  TCP_CONNTRACK_LISTEN, /* obsolete */
+#define TCP_CONNTRACK_SYN_SENT2 TCP_CONNTRACK_LISTEN
+  TCP_CONNTRACK_MAX,
+  TCP_CONNTRACK_IGNORE,
+};
+
+/* What TCP flags are set from RST/SYN/FIN/ACK. */
+enum tcp_bit_set : uint8_t {
+  TCP_SYN_SET,
+  TCP_SYNACK_SET,
+  TCP_FIN_SET,
+  TCP_ACK_SET,
+  TCP_RST_SET,
+  TCP_NONE_SET,
+  TCP_MAX_SET,
+};
+
+inline tcp_bit_set get_conntrack_index(const Tcp *tcph);
+
+class alignas(64) Conn : public EventBase<Conn> {
  public:
-  enum State : uint8_t {
-    STATE_NONE = 0,
-    STATE_SYN_SENT,
-    STATE_SYN_RECV,
-    STATE_ESTABLISHED,
-    STATE_FIN_WAIT,
-    STATE_CLOSE_WAIT,
-    STATE_LAST_ACK,
-    STATE_TIME_WAIT,
-    STATE_CLOSE,
-    STATE_SYN_SENT2,
-    STATE_MAX,
-    STATE_IGNORE
-  };
+  Conn() = default;
+  ~Conn() override = default;
 
-  enum Dir : uint8_t { DIR_ORIGINAL = 0, DIR_REPLY, DIR_MAX };
+  void execute(TimerWheel<Conn> *timer) override;
 
-  enum Flag : uint8_t {
-    FLAG_SYN = 0,
-    FLAG_SYNACK,
-    FLAG_FIN,
-    FLAG_ACK,
-    FLAG_RST,
-    FLAG_NONE,
-    FLAG_MAX
-  };
+  // Here you need to ensure that the tuple belongs to this connection
+  inline ip_conntrack_dir direction(Tuple4 &tuple);
 
-  void UpdateState(Tcp * hdr, Dir dir);
-
-  State state() { return state_; }
-  void execute(TimerWheel<Conn> *timer) override {
-    // TODO: destroy or somewhat ?
-  }
+  tcp_conntrack UpdateState(tcp_bit_set index, ip_conntrack_dir dir);
 
  private:
   Tuple2 client_;
@@ -60,58 +69,15 @@ class alignas(64) [[gnu::packed]] Conn : public EventBase<Conn> {
   VirtSvc::Ptr virt_;
   RealSvc::Ptr real_;
 
-  //  be32_t cip, vip, lip, rip;
-  //  be16_t cport, vport, lport, rport;
+  tcp_conntrack state_;
 
-  State state_;
+  inline idx_t index() const;
 
-  // state machine table
-  static constexpr State smt[DIR_MAX][FLAG_MAX][STATE_MAX] = {
-      {/* ORIGINAL */
-       /*syn*/ {STATE_SYN_SENT, STATE_SYN_SENT, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE,
-                STATE_IGNORE, STATE_IGNORE, STATE_SYN_SENT, STATE_SYN_SENT, STATE_SYN_SENT2},
-       /*synack*/
-       {STATE_MAX, STATE_MAX, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE,
-        STATE_IGNORE, STATE_IGNORE, STATE_SYN_RECV},
-       /*fin*/
-       {STATE_MAX, STATE_MAX, STATE_FIN_WAIT, STATE_FIN_WAIT, STATE_LAST_ACK, STATE_LAST_ACK,
-        STATE_LAST_ACK, STATE_TIME_WAIT, STATE_CLOSE, STATE_MAX},
-       /*ack*/
-       {STATE_ESTABLISHED, STATE_MAX, STATE_ESTABLISHED, STATE_ESTABLISHED, STATE_CLOSE_WAIT,
-        STATE_CLOSE_WAIT, STATE_TIME_WAIT, STATE_TIME_WAIT, STATE_CLOSE, STATE_MAX},
-       /*rst*/
-       {STATE_MAX, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE,
-        STATE_CLOSE, STATE_CLOSE, STATE_CLOSE},
-       /*STATE_NONE*/
-       {STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX,
-        STATE_MAX, STATE_MAX}},
-      {/* REPLY */
-       /*syn*/ {STATE_MAX, STATE_SYN_SENT2, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX,
-                STATE_MAX, STATE_MAX, STATE_SYN_SENT2},
-       /*synack*/
-       {STATE_MAX, STATE_SYN_RECV, STATE_SYN_RECV, STATE_IGNORE, STATE_IGNORE, STATE_IGNORE,
-        STATE_IGNORE, STATE_IGNORE, STATE_IGNORE, STATE_SYN_RECV},
-       /*fin*/
-       {STATE_MAX, STATE_MAX, STATE_FIN_WAIT, STATE_FIN_WAIT, STATE_LAST_ACK, STATE_LAST_ACK,
-        STATE_LAST_ACK, STATE_TIME_WAIT, STATE_CLOSE, STATE_MAX},
-       /*ack*/
-       {STATE_MAX, STATE_IGNORE, STATE_SYN_RECV, STATE_ESTABLISHED, STATE_CLOSE_WAIT,
-        STATE_CLOSE_WAIT, STATE_TIME_WAIT, STATE_TIME_WAIT, STATE_CLOSE, STATE_IGNORE},
-       /*rst*/
-       {STATE_MAX, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE, STATE_CLOSE,
-        STATE_CLOSE, STATE_CLOSE, STATE_CLOSE},
-       /*STATE_NONE*/
-       {STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX, STATE_MAX,
-        STATE_MAX, STATE_MAX}}};
-
-  static constexpr uint8_t timeouts[STATE_MAX] = {
-      [STATE_NONE] = 2,         [STATE_SYN_SENT] = 30, [STATE_SYN_RECV] = 30,
-      [STATE_ESTABLISHED] = 90, [STATE_FIN_WAIT] = 30, [STATE_CLOSE_WAIT] = 30,
-      [STATE_LAST_ACK] = 30,    [STATE_TIME_WAIT] = 0, [STATE_CLOSE] = 0,
-      [STATE_SYN_SENT2] = 0,
-  };
+  friend inline std::ostream &operator<<(std::ostream &os, const Conn &conn);
 
   friend class ConnTable;
 };
+
+static_assert(sizeof(Conn) == 128);
 
 }  // namespace xlb

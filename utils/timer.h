@@ -23,7 +23,7 @@ template <typename T>
 class EventBase;
 
 template <typename T>
-class TimerWheel {
+class alignas(64) TimerWheel {
  public:
   explicit TimerWheel(Tick now = 0) : slots_(), bitmap_(), now_() {
     if (now != 0)
@@ -47,7 +47,7 @@ class TimerWheel {
     auto update_now = [&] {
       now_[0] += partial_delta;
       delta -= partial_delta;
-      DVLOG(2) << "[update_now] now: " << now_[0]
+      DVLOG(4) << "[update_now] now: " << now_[0]
                << " partial_delta: " << partial_delta << " delta: " << delta
                << " level: " << level;
       if (level > 0)
@@ -55,44 +55,44 @@ class TimerWheel {
           now_[i] = now_[0] >> (kWidthBits * i);
     };
     auto found = [&] {
-      DVLOG(2) << "[found] level: " << level << " slot_index: " << slot_index;
+      DVLOG(4) << "[found] level: " << level << " slot_index: " << slot_index;
       update_now();
       slots_[level][slot_index].execute();
     };
     auto update_partial = [&] {
       partial_delta +=
           (slot_index - (now_[level] & kMask) << kWidthBits * level);
-      DVLOG(2) << "[update_partial] partial_delta: " << partial_delta;
+      DVLOG(4) << "[update_partial] partial_delta: " << partial_delta;
     };
     auto carry = [&] {
-      DVLOG(2) << "[carry] level: " << level;
+      DVLOG(4) << "[carry] level: " << level;
       ++now_[level + 1];
     };
     auto find_first = [&] {
       slot_index = bitmap_[level]._Find_first();
-      DVLOG(2) << "[find_first] level: " << level
+      DVLOG(4) << "[find_first] level: " << level
                << " slot_index: " << slot_index;
     };
 
   START:
     if (delta == 0) {
-      DVLOG(2) << "[START] returned";
+      DVLOG(4) << "[START] returned";
       return;
     }
 
-    DVLOG(2) << "[START] delta: " << delta << " now: " << now_[0];
+    DVLOG(4) << "[START] delta: " << delta << " now: " << now_[0];
 
     outermost_changed_level =
         63 - __builtin_clzl(now_[0] + delta ^ now_[0]) >> 3;
     partial_delta = 0;
 
-    DVLOG(2) << "[START] outermost_changed_level: " << outermost_changed_level;
+    DVLOG(4) << "[START] outermost_changed_level: " << outermost_changed_level;
 
     DCHECK_LE(outermost_changed_level, kMaxLevel);
 
     if (outermost_changed_level > 0) {
       level = 0;
-      DVLOG(2) << "[STEP1] process first level: " << level;
+      DVLOG(4) << "[STEP1] process first level: " << level;
       find_first();
       DCHECK_NE(slot_index, 0);
       DCHECK_GE(slot_index, now_[level] & kMask);
@@ -100,14 +100,14 @@ class TimerWheel {
       update_partial();
       if (slot_index != kNumSlots) {
         found();
-        DVLOG(2) << "[STEP1] restart delta: " << delta;
+        DVLOG(4) << "[STEP1] restart delta: " << delta;
         goto START;
       }
 
       carry();
       for (auto i : irange(1ul, outermost_changed_level)) {
         level = i;
-        DVLOG(2) << "[STEP2] process middle level: " << level;
+        DVLOG(4) << "[STEP2] process middle level: " << level;
         if ((now_[level] & kMask) == 0) goto NEXT_LEVEL;
 
         find_first();
@@ -117,7 +117,7 @@ class TimerWheel {
         update_partial();
         if (slot_index != kNumSlots) {
           found();
-          DVLOG(2) << "[STEP2] restart delta: " << delta;
+          DVLOG(4) << "[STEP2] restart delta: " << delta;
           goto START;
         }
 
@@ -127,26 +127,26 @@ class TimerWheel {
     }
 
     level = outermost_changed_level;
-    DVLOG(2) << "[STEP3] process outermost_changed_level: " << level;
+    DVLOG(4) << "[STEP3] process outermost_changed_level: " << level;
     find_first();
     update_partial();
 
     if (partial_delta > delta) {
       partial_delta = delta;
       update_now();
-      DVLOG(2) << "[STEP3] returned";
+      DVLOG(4) << "[STEP3] returned";
       return;
     }
 
     found();
-    DVLOG(2) << "[STEP3] restart delta: " << delta;
+    DVLOG(4) << "[STEP3] restart delta: " << delta;
     goto START;
   }
 
   void AdvanceTo(Tick abs) {
     DCHECK_GT(abs, now_[0]);
 
-    DVLOG(1) << "[AdvanceTo] tick: " << abs;
+    DVLOG(2) << "[AdvanceTo] tick: " << abs;
 
     Advance(abs - now_[0]);
     DCHECK_EQ(now_[0], abs);
@@ -165,7 +165,7 @@ class TimerWheel {
   void ScheduleInRange(T* event, Tick start, Tick end) {
     DCHECK_GT(end, start);
 
-    DVLOG(1) << "[ScheduleInRange] start: " << start << " end: " << end;
+    DVLOG(2) << "[ScheduleInRange] start: " << start << " end: " << end;
 
     if (event->Active()) {
       auto current = event->scheduled_at() - now_[0];
@@ -204,7 +204,7 @@ class TimerWheel {
         events_->prev_ = nullptr;
       }
 
-      DVLOG(2) << "[pop_event] level: " << level_ << " index: " << index_
+      DVLOG(4) << "[pop_event] level: " << level_ << " index: " << index_
                << " scheduled_at: " << event->scheduled_at();
 
       event->next_ = nullptr;
@@ -213,12 +213,12 @@ class TimerWheel {
     }
 
     void set() {
-      DVLOG(2) << "[set] level: " << level_ << " index: " << index_;
+      DVLOG(4) << "[set] level: " << level_ << " index: " << index_;
       TimerWheel::from_slot(this)->bitmap_[level_].set(index_);
     }
 
     void reset() {
-      DVLOG(2) << "[reset] level: " << level_ << " index: " << index_;
+      DVLOG(4) << "[reset] level: " << level_ << " index: " << index_;
       events_ = nullptr;
       TimerWheel::from_slot(this)->bitmap_[level_].reset(index_);
     }
@@ -230,18 +230,18 @@ class TimerWheel {
         while (events_) {
           auto event = pop_event();
           if (tw->now_[0] >= event->scheduled_at()) {
-            DVLOG(2) << "[execute] now: " << tw->now_[0] << " level: " << level_
+            DVLOG(4) << "[execute] now: " << tw->now_[0] << " level: " << level_
                      << " index: " << index_;
             event->execute(tw);
           } else {
-            DVLOG(2) << "[reschedule] now: " << tw->now_[0]
+            DVLOG(4) << "[reschedule] now: " << tw->now_[0]
                      << " to: " << event->scheduled_at();
             tw->Schedule(event, event->scheduled_at() - tw->now_[0]);
           }
         }
       } else {
         while (events_) {
-          DVLOG(2) << "[execute] now: " << tw->now_[0] << " level: " << level_
+          DVLOG(4) << "[execute] now: " << tw->now_[0] << " level: " << level_
                    << " index: " << index_;
           pop_event()->execute(tw);
         }
@@ -269,7 +269,7 @@ class TimerWheel {
     size_t slot_index = (abs >> kWidthBits * level) & kMask;
     auto slot = &slots_[level][slot_index];
 
-    DVLOG(1) << "[schedule_to] at level: " << level
+    DVLOG(2) << "[schedule_to] at level: " << level
              << " slot_index: " << slot_index << " scheduled_at: " << abs
              << " now: " << now_[0];
 
@@ -310,13 +310,24 @@ class EventBase {
   virtual ~EventBase() { Cancel(); }
 
   void Cancel() {
-    DVLOG(1) << "[Cancel] scheduled_at: " << scheduled_at_;
+    DVLOG(4) << "[Cancel] scheduled_at: " << scheduled_at_;
     if (!Active()) {
-      DVLOG(1) << "[Cancel] not scheduled";
+      DVLOG(4) << "[Cancel] not scheduled";
       return;
     }
 
     relink(nullptr);
+  }
+
+  void Schedule(Tick delta) {
+    DCHECK_NOTNULL(slot_);
+    TimerWheel<T>::from_slot(slot_)->Schedule(this, delta);
+  }
+
+  void ScheduleInRange(Tick start, Tick end) {
+    DCHECK_NOTNULL(slot_);
+    TimerWheel<T>::from_slot(slot_)->ScheduleInRange(static_cast<T*>(this),
+                                                     start, end);
   }
 
   bool Active() const { return slot_ != nullptr; }
@@ -330,12 +341,12 @@ class EventBase {
   // slot to be NULL).
   void relink(typename TimerWheel<T>::Slot* new_slot) {
     if (new_slot == slot_) {
-      DVLOG(2) << "[relink] returned";
+      DVLOG(4) << "[relink] returned";
       return;
     }
 
     if (slot_) {
-      DVLOG(2) << "[relink] slot_ != nullptr, level: " << slot_->level_
+      DVLOG(4) << "[relink] slot_ != nullptr, level: " << slot_->level_
                << " index: " << slot_->index_;
 
       auto prev = prev_;
@@ -356,7 +367,7 @@ class EventBase {
     }
 
     if (new_slot) {
-      DVLOG(2) << "[relink] new_slot_ != nullptr, level: " << new_slot->level_
+      DVLOG(4) << "[relink] new_slot_ != nullptr, level: " << new_slot->level_
                << " index: " << new_slot->index_;
       auto old = new_slot->events_;
       next_ = old;
@@ -365,7 +376,7 @@ class EventBase {
       new_slot->events_ = static_cast<T*>(this);
       new_slot->set();
     } else {
-      DVLOG(2) << "[relink] new_slot_ == nullptr";
+      DVLOG(4) << "[relink] new_slot_ == nullptr";
       next_ = nullptr;
     }
 

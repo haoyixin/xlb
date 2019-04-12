@@ -8,7 +8,6 @@
 
 #include "utils/allocator.h"
 #include "utils/common.h"
-#include "utils/singleton.h"
 
 namespace xlb::utils {
 
@@ -25,6 +24,8 @@ class LockLessQueue {
   static const size_t kDefaultRingSize = 512;
 
   explicit LockLessQueue(size_t capacity = kDefaultRingSize) {
+    static std::atomic<size_t> counter = 0;
+
     unsigned flags = 0;
     size_t actual_capacity = align_ceil_pow2(capacity);
     int socket = (ALLOC)->socket();
@@ -34,22 +35,23 @@ class LockLessQueue {
     else if constexpr (SC)
       flags |= RING_F_SC_DEQ;
 
-    auto name =
-        Format("LockLessQueue[%d]",
-               Singleton<std::atomic<size_t>, RingId>::instance().fetch_add(1));
+    auto name = Format("[%s(%d, %d)]", demangle<T>().c_str(),
+                       counter.fetch_add(1), flags);
 
     ring_ = rte_ring_create(name.c_str(), actual_capacity, socket, flags);
 
-    DLOG(INFO) << "Created ring on socket: " << socket << " name: " << name
-               << " element-type: " << demangle<T>()
-               << " capacity: " << actual_capacity
+    DLOG(INFO) << "[LockLessQueue] Created ring on socket: " << socket
+               << " name: " << name << " capacity: " << actual_capacity
                << " error: " << rte_strerror(rte_errno);
 
     CHECK_NOTNULL(ring_);
   }
 
   ~LockLessQueue() {
-    if (ring_) rte_ring_free(ring_);
+    if (ring_) {
+      DLOG(INFO) << "Free ring name: " << ring_->name;
+      rte_ring_free(ring_);
+    }
   }
 
   bool Push(const T &obj) {

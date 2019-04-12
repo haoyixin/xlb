@@ -111,6 +111,10 @@ class alignas(64) Packet {
   void set_l3_len(size_t len) { mbuf_.l3_len = len; }
   void set_l4_len(size_t len) { mbuf_.l4_len = len; }
 
+  size_t l2_len() { return mbuf_.l2_len; }
+  size_t l3_len() { return mbuf_.l3_len; }
+  size_t l4_len() { return mbuf_.l4_len; }
+
   uint64_t ol_flags() { return ol_flags_; }
   void set_ol_flags(uint64_t bit) { ol_flags_ |= bit; }
 

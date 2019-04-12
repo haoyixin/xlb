@@ -34,7 +34,7 @@ class Worker {
   PacketPool *packet_pool() const { return packet_pool_; }
   utils::Random *random() const { return random_; }
 
-  uint64_t silent_drops() const { return silent_drops_; }
+  //  uint64_t silent_drops() const { return silent_drops_; }
   uint64_t current_tsc() const { return current_tsc_; }
   //  uint64_t current_ns() const { return current_ns_; }
   uint64_t busy_loops() const { return busy_loops_; }
@@ -48,7 +48,7 @@ class Worker {
 
   static void confirm_master() { master_started_ = true; }
 
-  void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
+  //  void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
   void UpdateTsc() {
     current_tsc_ = utils::Rdtsc();
     //    current_ns_ = utils::TscToNs(current_ns_);
@@ -56,15 +56,10 @@ class Worker {
   void IncrBusyLoops() { ++busy_loops_; }
 
  private:
-  using Slaves = utils::Singleton<std::vector<std::thread>, Worker>;
-  using Master = utils::Singleton<std::thread, Worker>;
-  using Counter = utils::Singleton<std::atomic<uint8_t>, Worker>;
-
   explicit Worker(uint16_t core, bool master);
 
   // The entry point of worker threads.
   void *run();
-  //  void *run_master();
 
   bool master_;
 
@@ -77,14 +72,17 @@ class Worker {
   Scheduler *scheduler_;
   utils::Random *random_;
 
-  uint64_t silent_drops_;  // packets that have been sent to a deadend
+  //  uint64_t silent_drops_;  // packets that have been sent to a deadend
   uint64_t current_tsc_;
-  //  uint64_t current_ns_;
   uint64_t busy_loops_;
 
   static bool aborting_;
   static bool slaves_aborted_;
   static bool master_started_;
+
+  static std::atomic<uint16_t> counter_;
+  static std::vector<std::thread> slave_threads_;
+  static std::thread master_thread_;
 
   static __thread Worker current_;
 
@@ -98,19 +96,28 @@ class Worker {
   }
 };
 
-#define MASTER Worker::current()->master()
-#define TSC Worker::current()->current_tsc()
+#define W_CURRENT (Worker::current())
 
-#define LOG_W(severity) LOG(severity) << *(Worker::current()) << " "
+#define W_MASTER (W_CURRENT->master())
+#define W_TSC (W_CURRENT->current_tsc())
+#define W_ID (W_CURRENT->id())
+
+#define W_LOG(severity) (LOG(severity) << *W_CURRENT << " ")
 
 #if DCHECK_IS_ON()
 
-#define DLOG_W(severity) DLOG(severity) << *(Worker::current()) << " "
+#define W_DLOG(severity) (DLOG(severity) << *W_CURRENT << " ")
+#define W_DVLOG(verboselevel) DVLOG(verboselevel) << *W_CURRENT << " "
 
 #else
 
-#define DLOG_W(severity) \
+#define W_DLOG(severity) \
   true ? (void)0 : google::LogMessageVoidify() & LOG(severity)
+
+#define W_DVLOG(verboselevel)         \
+  (true || !VLOG_IS_ON(verboselevel)) \
+      ? (void)0                       \
+      : google::LogMessageVoidify() & LOG(INFO)
 
 #endif
 

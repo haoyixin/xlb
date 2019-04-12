@@ -12,14 +12,16 @@ namespace xlb::headers {
 bool ParseIpv4Address(const std::string &str, be32_t *addr);
 
 // be32 -> string
-std::string ToIpv4Address(be32_t addr);
+std::string ToIpv4Address(const be32_t &addr);
 
 // An IPv4 header definition loosely based on the BSD version.
 struct [[gnu::packed]] Ipv4 {
-  enum Flag : uint16_t {
-    kMF = 1 << 13,  // More fragments
-    kDF = 1 << 14,  // Do not fragment
-  };
+//  enum Flag : uint16_t {
+//    kMF = 1 << 13,  // More fragments
+//    kDF = 1 << 14,  // Do not fragment
+//  };
+
+  static constexpr uint16_t kOffsetMask = 0x1fff;
 
   enum Proto : uint8_t {
     kIcmp = 1,
@@ -49,12 +51,25 @@ struct [[gnu::packed]] Ipv4 {
   uint8_t type_of_service;  // Type of service.
   be16_t length;            // Length.
   be16_t id;                // ID.
-  be16_t fragment_offset;   // Fragment offset.
-  uint8_t ttl;              // Time to live.
-  uint8_t protocol;         // Protocol.
-  uint16_t checksum;        // Checksum.
-  be32_t src;               // Source address.
-  be32_t dst;               // Destination address.
+  union {
+    be16_t fragment_offset;  // Fragment offset.
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    struct {
+      uint8_t : 8;
+      bool : 1, df : 1, mf : 1, : 5;
+    };
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    struct {
+      uint8_t : 1, df : 1, mf : 1, : 5;
+      uint8_t : 8;
+    };
+#endif
+  };
+  uint8_t ttl;        // Time to live.
+  uint8_t protocol;   // Protocol.
+  uint16_t checksum;  // Checksum.
+  be32_t src;         // Source address.
+  be32_t dst;         // Destination address.
 };
 
 static_assert(std::is_pod<Ipv4>::value, "not a POD type");

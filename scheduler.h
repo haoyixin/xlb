@@ -24,8 +24,8 @@ class Scheduler {
   virtual ~Scheduler();
 
   // Runs the scheduler loop forever.
-  void MasterLoop();
-  void SlaveLoop();
+  template <bool master>
+  void Loop();
 
   template <typename I, typename B>
   static double CpuUsage() {
@@ -44,28 +44,20 @@ class Scheduler {
    public:
     class Context {
      public:
-      static constexpr size_t kMaxCounters = 8;
-
       Context() = default;
       void Drop(Packet *pkt);
       void Hold(Packet *pkt);
       void Hold(PacketBatch *pkts);
 
-      auto worker() { return worker_; }
       auto &stage_batch() { return stage_batch_; }
-//      auto &counters() { return counters_; }
 
      private:
       Task *task_;
-      Worker *worker_;
       uint64_t silent_drops_;
 
       // A packet batch for storing packets to free
       PacketBatch dead_batch_;
       PacketBatch stage_batch_;
-
-      //  User-defined counters
-//      alignas(32) std::array<uint64_t, kMaxCounters> counters_;
 
       friend Scheduler;
       friend Task;

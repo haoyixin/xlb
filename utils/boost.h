@@ -4,6 +4,8 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/range/irange.hpp>
+#include <boost/range/algorithm/sort.hpp>
+#include <boost/range/algorithm/unique.hpp>
 //#include <boost/range/begin.hpp>
 //#include <boost/range/end.hpp>
 //#include <boost/functional/hash.hpp>
@@ -21,6 +23,9 @@ using boost::irange;
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
 using boost::algorithm::trim;
+
+using boost::sort;
+using boost::unique;
 
 // using boost::begin;
 // using boost::end;

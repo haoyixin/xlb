@@ -16,7 +16,7 @@ namespace xlb::modules {
 class EtherInc final : public Module {
  public:
   EtherInc(uint8_t weight) : weight_(weight), kni_ring_(CONFIG.kni.ring_size) {
-    DLOG(INFO) << "Init with weight: " << int(weight_)
+    DLOG(INFO) << "[EtherInc] Init with weight: " << int(weight_)
                << " ring size: " << kni_ring_.Capacity();
   }
 

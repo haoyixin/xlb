@@ -12,6 +12,7 @@
 #include "utils/time.h"
 #include "utils/timer.h"
 
+#include "headers/ether.h"
 #include "headers/ip.h"
 #include "headers/tcp.h"
 
@@ -28,6 +29,7 @@ using utils::irange;
 using utils::EventBase;
 using utils::Rdtsc;
 using utils::TimerWheel;
+using utils::tsc_hz;
 using utils::tsc_ms;
 using utils::tsc_sec;
 
@@ -38,6 +40,8 @@ using utils::intrusive_ref_counter;
 using utils::unsafe_intrusive_ref_counter;
 
 using headers::Tcp;
+using headers::Ipv4;
 using headers::ToIpv4Address;
+using headers::Ethernet;
 
 }  // namespace xlb

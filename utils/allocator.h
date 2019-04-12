@@ -20,7 +20,7 @@ namespace pmr = std::experimental::pmr;
 
 namespace xlb {
 
-#define ALLOC &utils::UnsafeSingleton<utils::MemoryResource>::instance()
+#define ALLOC (&utils::UnsafeSingleton<utils::MemoryResource>::instance())
 
 }  // namespace xlb
 
@@ -72,6 +72,8 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
 
  protected:
   void *do_allocate(std::size_t bytes, std::size_t alignment) override {
+    DVLOG(1) << "[do_allocate] bytes: " << bytes << " alignment: " << alignment;
+
     if (auto p = rte_malloc_socket(nullptr, bytes, alignment, socket_))
       return p;
 
@@ -94,20 +96,20 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
 
 struct INew {
   static void *operator new(std::size_t sz) {
-    return (ALLOC)->do_allocate(sz, 0);
+    return ALLOC->do_allocate(sz, 0);
   }
   static void *operator new(std::size_t sz, std::align_val_t al) {
-    return (ALLOC)->do_allocate(sz, static_cast<size_t>(al));
+    return ALLOC->do_allocate(sz, static_cast<size_t>(al));
   }
   static void *operator new[](std::size_t sz) {
-    return (ALLOC)->do_allocate(sz, 0);
+    return ALLOC->do_allocate(sz, 0);
   }
   static void *operator new[](std::size_t sz, std::align_val_t al) {
-    return (ALLOC)->do_allocate(sz, static_cast<size_t>(al));
+    return ALLOC->do_allocate(sz, static_cast<size_t>(al));
   }
   static void operator delete(void *ptr) { (ALLOC)->do_deallocate(ptr, 0, 0); }
   static void operator delete[](void *ptr) {
-    (ALLOC)->do_deallocate(ptr, 0, 0);
+    ALLOC->do_deallocate(ptr, 0, 0);
   }
 };
 
@@ -129,6 +131,7 @@ inline unsafe_ptr<T> make_unsafe(Args &&... args) {
 
 template <typename T>
 inline utils::vector<T> make_vector(size_t n) {
+  DVLOG(1) << "[make_vector] size: " << n;
   auto vec = utils::vector<T>(ALLOC);
   vec.reserve(n);
   return vec;

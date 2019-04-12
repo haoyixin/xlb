@@ -66,12 +66,13 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
 }
  */
 
-void set_lip_affinity(uint16_t port_id, const std::string &dst_ip,
+void set_lip_affinity(uint16_t port_id, const utils::be32_t &dst,
                       uint16_t qid) {
-  LOG(INFO) << "Set local ip affinity: " << dst_ip << " to rxq: " << qid;
+  LOG(INFO) << "[PMD] Set local ip affinity: " << headers::ToIpv4Address(dst)
+            << " to rxq: " << qid;
 
-  utils::be32_t dst{};
-  headers::ParseIpv4Address(dst_ip, &dst);
+  //  utils::be32_t dst{};
+  //  headers::ParseIpv4Address(dst_ip, &dst);
 
   rte_flow_attr attr{.group = 0, .priority = 0, .ingress = 1};
 
@@ -122,7 +123,8 @@ void init_driver() {
 
   CHECK_NE(num_dpdk_ports, 0);
 
-  LOG(INFO) << static_cast<int>(num_dpdk_ports) << " nics have been recognized";
+  LOG(INFO) << "[PMD] " << static_cast<int>(num_dpdk_ports)
+            << " nics have been recognized";
 
   for (auto i : utils::irange((uint16_t)0, num_dpdk_ports)) {
     struct rte_eth_dev_info dev_info {};
@@ -135,7 +137,7 @@ void init_driver() {
 
     if (dev_info.pci_dev) {
       pci_info = utils::Format(
-          "%08x:%02hhx:%02hhx.%02hhx %04hx:%04hx  ",
+          "%08x:%02hhx:%02hhx.%02hhx %04hx:%04hx",
           dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus,
           dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function,
           dev_info.pci_dev->id.vendor_id, dev_info.pci_dev->id.device_id);
@@ -144,11 +146,12 @@ void init_driver() {
     numa_node = rte_eth_dev_socket_id(static_cast<int>(i));
     rte_eth_macaddr_get(i, reinterpret_cast<ether_addr *>(mac_addr.bytes));
 
-    LOG(INFO) << "DPDK port_id " << static_cast<int>(i) << " ("
-              << dev_info.driver_name << ")   RXQ " << dev_info.max_rx_queues
-              << " TXQ " << dev_info.max_tx_queues << "  "
-              << mac_addr.ToString() << "  " << pci_info << " numa_node "
-              << numa_node;
+    LOG(INFO) << "[PMD] DPDK port_id: " << static_cast<int>(i)
+              << " driver: " << dev_info.driver_name
+              << " RXQ: " << dev_info.max_rx_queues
+              << " TXQ: " << dev_info.max_tx_queues
+              << " mac_address: " << mac_addr.ToString()
+              << " pci_address: " << pci_info << " numa_node: " << numa_node;
   }
 }
 
@@ -199,10 +202,13 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
 
   CHECK(!rte_flow_flush(dpdk_port_id_, nullptr));
 
-  for (auto i : utils::irange(CONFIG.nic.local_ips.size())) {
-    set_lip_affinity(dpdk_port_id_, CONFIG.nic.local_ips[i],
-                     i % CONFIG.slave_cores.size());
-  }
+  //  for (auto i : utils::irange(CONFIG.nic.local_ips.size())) {
+  //    set_lip_affinity(dpdk_port_id_, CONFIG.nic.local_ips[i],
+  //                     i % CONFIG.slave_cores.size());
+  //  }
+
+  for (auto &pair : CONFIG.slave_local_ips)
+    set_lip_affinity(dpdk_port_id_, pair.second, pair.first);
 
   CHECK(!rte_eth_dev_start(dpdk_port_id_));
   CHECK_NE(dpdk_port_id_, kDpdkPortUnknown);
@@ -224,7 +230,7 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
   // Call the blocking version update cache once
   rte_eth_link_get(dpdk_port_id_, &dpdk_status);
 
-  LOG(INFO) << "PMD initialize successful, speed: " << dpdk_status.link_speed
+  LOG(INFO) << "[PMD] initialize successful, speed: " << dpdk_status.link_speed
             << " full-duplex: " << dpdk_status.link_duplex
             << " auto-neg: " << dpdk_status.link_autoneg
             << " up: " << dpdk_status.link_status;

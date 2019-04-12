@@ -15,7 +15,7 @@ class Ipv4Inc : public Module {
   inline void Process(Context *ctx, Packet *packet);
 
  protected:
-  inline bool fragmented(const Ipv4 *hdr) const;
+//  inline bool fragmented(const Ipv4 *hdr) const;
 
  private:
   be32_t &kni_ip_addr_;

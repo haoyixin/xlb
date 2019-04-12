@@ -20,7 +20,7 @@ void EtherInc::InitInSlave(uint16_t wid) {
 template <>
 void EtherInc::Process<KNI>(Context *ctx, PacketBatch *batch) {
   while (!kni_ring_.Push(batch->pkts(), batch->cnt()))
-    LOG_W(ERROR) << "Too many packets from kernel are on the fly";
+    W_LOG(ERROR) << "Too many packets from kernel are on the fly";
 }
 
 template <>
@@ -28,6 +28,7 @@ void EtherInc::Process<PMD>(Context *ctx, PacketBatch *batch) {
 
   for (Packet &p : *batch) {
     auto &type = p.head_data<Ethernet *>()->ether_type;
+    p.set_l2_len(sizeof(Ethernet));
 
     if (likely(type == be16_t(Ethernet::kIpv4)))
       Handle<Ipv4Inc, PMD>(ctx, &p);

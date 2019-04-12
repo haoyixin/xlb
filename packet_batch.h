@@ -67,7 +67,7 @@ class PacketBatch {
 
   void Clear() { cnt_ = 0; }
 
-  // WARNING: this function has no bounds checks as we want maximum performance.
+  // WARNING: all function has no bounds checks as we want maximum performance.
   void Push(Packet *pkt) { pkts_[cnt_++] = pkt; }
   void Push(PacketBatch *batch) {
     xlb::utils::CopyInlined(pkts_.data() + cnt_, batch->pkts(),
@@ -90,10 +90,7 @@ class PacketBatch {
                             cnt_ * sizeof(Packet *));
   }
 
-  void Free() {
-    if (!Empty()) Packet::Free(pkts(), cnt_);
-//    Clear();
-  }
+  void Free() { Packet::Free(pkts(), cnt_); }
 
   static const uint16_t kMaxCnt = Packet::kMaxBurst * 2;
 

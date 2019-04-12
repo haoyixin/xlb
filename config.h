@@ -2,11 +2,13 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "3rdparty/visit_struct.hpp"
 
 #include "headers/ether.h"
 #include "utils/singleton.h"
+#include "utils/endian.h"
 
 namespace xlb {
 
@@ -15,13 +17,11 @@ struct Config {
   struct Nic {
     std::string name;
     std::string pci_address;
+    // Set when pmd is initialized
     headers::Ethernet::Address mac_address;
-
     std::vector<std::string> local_ips;
-    //    std::string netmask;
-    //    std::string gateway;
-
     uint16_t mtu;
+    // Set when verifying configuration
     int socket;
     // TODO: offload & vlan
   };
@@ -49,6 +49,7 @@ struct Config {
   std::string rpc_ip_port;
   std::vector<uint16_t> slave_cores;
   uint8_t master_core;
+  std::unordered_multimap<uint16_t, utils::be32_t> slave_local_ips;
 
   // TODO: support multi numa node
   Nic nic;
@@ -62,7 +63,7 @@ struct Config {
   void validate();
 };
 
-#define CONFIG utils::UnsafeSingleton<Config>::instance()
+#define CONFIG (utils::UnsafeSingleton<Config>::instance())
 
 }  // namespace xlb
 

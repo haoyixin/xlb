@@ -30,13 +30,13 @@ void enable_syslog() { setlogmask(0xff); }
 // for log messages during rte_eal_init()
 ssize_t dpdk_log_init_writer(void *, const char *data, size_t len) {
   enable_syslog();
-  LOG(INFO) << std::string(data, len);
+  LOG(INFO) << "[DPDK] " << std::string(data, len);
   disable_syslog();
   return len;
 }
 
 ssize_t dpdk_log_writer(void *, const char *data, size_t len) {
-  LOG(INFO) << std::string(data, len);
+  LOG(INFO)<< "[DPDK] " << std::string(data, len);
   return len;
 }
 
@@ -117,7 +117,7 @@ void init_eal() {
 
 void InitDpdk() {
   if (!dpdk_initialized.test_and_set()) {
-    LOG(INFO) << "Initializing DPDK";
+    LOG(INFO) << "[DPDK] Initializing DPDK";
     init_eal();
     utils::InitDefaultAllocator(CONFIG.nic.socket);
   }

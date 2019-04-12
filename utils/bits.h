@@ -10,6 +10,8 @@
 
 namespace xlb::utils {
 
+// If the size exceeds 64, use std::bitset (The focus is [[gnu::packed]])
+// TODO: ffs function
 template <size_t N>
 class [[gnu::packed]] bitset {
   static_assert(N > 0 && N <= 64);
@@ -21,28 +23,32 @@ class [[gnu::packed]] bitset {
                          std::conditional_t<N <= 32, uint32_t, uint64_t>>>;
 
   template <typename T>
-  bool operator[](T index) const { return (data_ & (kOne << index)) != 0; }
+  bool operator[](T index) const {
+    return (data_ & kOne << index) != kZero;
+  }
 
-  bool all() const { return (data_ & ((kOne << N) - kOne)) == ((kOne << N) - kOne); }
-  bool any() const { return (data_ & ((kOne << N) - kOne)) != 0; }
-  bool none() const { return (data_ & ((kOne << N) - kOne)) == 0; }
+  bool all() const {
+    return (data_ & (kOne << N) - kOne) == (kOne << N) - kOne;
+  }
+  bool any() const { return (data_ & (kOne << N) - kOne) != kZero; }
+  bool none() const { return (data_ & (kOne << N) - kOne) == kZero; }
 
-  void set(size_t index) { data_ |= ((kOne << index)); }
-  void reset() { data_ = 0u; }
-  void reset(size_t index) { data_ &= (~((kOne << index))); }
+  void set(size_t index) { data_ |= kOne << index; }
+  void reset() { data_ = kZero; }
+  void reset(size_t index) { data_ &= ~(kOne << index); }
 
   data_type raw() const { return data_; }
 
  private:
-  static constexpr data_type kOne = std::numeric_limits<data_type >::min() + 1;
-  data_type data_ = 0u;
+  static constexpr data_type kZero = std::numeric_limits<data_type>::min();
+  static constexpr data_type kOne = kZero + 1;
+  data_type data_ = kZero;
 };
 
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes using
 // std::memmove() and std::memset().
-inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len,
-                                       size_t shift) {
+inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len, size_t shift) {
   shift = std::min(shift, len);
   memmove(buf, buf + shift, len - shift);
   memset(buf + len - shift, 0, shift);
@@ -52,8 +58,7 @@ inline void ShiftBytesLeftSmall(uint8_t *buf, const size_t len,
 // Shifts `buf` to the left by `len` bytes and fills in with zeroes.
 // Will shift in 8-byte chunks if `shift` <= 8, othersize, uses
 // std::memmove() and std::memset().
-inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
-                                  const size_t shift) {
+inline void ShiftBytesLeft(uint8_t *buf, const size_t len, const size_t shift) {
   if (len < sizeof(uint64_t) || shift > sizeof(uint64_t)) {
     return ShiftBytesLeftSmall(buf, len, shift);
   }
@@ -79,8 +84,7 @@ inline void ShiftBytesLeft(uint8_t *buf, const size_t len,
 // TODO: add support for shifting at bit granularity
 // Shifts `buf` to the right by `len` bytes and fills in with zeroes using
 // std::memmove() and std::memset().
-inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len,
-                                        size_t shift) {
+inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len, size_t shift) {
   shift = std::min(shift, len);
   memmove(buf + shift, buf, len - shift);
   memset(buf, 0, shift);
@@ -91,7 +95,7 @@ inline void ShiftBytesRightSmall(uint8_t *buf, const size_t len,
 // Will shift in 8-byte chunks if `shift` <= 8, othersize, uses
 // std::memmove() and std::memset().
 inline void ShiftBytesRight(uint8_t *buf, const size_t len,
-                                   const size_t shift) {
+                            const size_t shift) {
   if (len < sizeof(uint64_t) || shift > sizeof(uint64_t)) {
     return ShiftBytesRightSmall(buf, len, shift);
   }
@@ -110,7 +114,7 @@ inline void ShiftBytesRight(uint8_t *buf, const size_t len,
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 1-byte chunks.
 inline void MaskBytesSmall(uint8_t *buf, const uint8_t *mask,
-                                  const size_t len) {
+                           const size_t len) {
   for (size_t i = 0; i < len; i++) {
     buf[i] &= mask[i];
   }
@@ -118,8 +122,7 @@ inline void MaskBytesSmall(uint8_t *buf, const uint8_t *mask,
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 8-byte chunks if able,
 // otherwise, falls back to 1-byte chunks.
-inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
-                               const size_t len) {
+inline void MaskBytes64(uint8_t *buf, uint8_t const *mask, const size_t len) {
   size_t n = len / sizeof(uint64_t);
   size_t leftover = len - n * sizeof(uint64_t);
   auto *buf64 = reinterpret_cast<uint64_t *>(buf);
@@ -137,8 +140,7 @@ inline void MaskBytes64(uint8_t *buf, uint8_t const *mask,
 
 // Applies the `len`-byte bitmask `mask` to `buf`, in 16-byte chunks if able,
 // otherwise, falls back to 8-byte chunks and possibly 1-byte chunks.
-inline void MaskBytes(uint8_t *buf, uint8_t const *mask,
-                             const size_t len) {
+inline void MaskBytes(uint8_t *buf, uint8_t const *mask, const size_t len) {
   if (len <= sizeof(uint64_t)) {
     return MaskBytes64(buf, mask, len);
   }

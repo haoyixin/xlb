@@ -18,17 +18,18 @@ class SvcTable {
       : vs_map_(CONFIG.svc.max_virtual_service),
         rs_map_(ALLOC),
         rs_vs_map_(ALLOC),
-        timer_(TSC) {
+        timer_(W_TSC) {
     rs_map_.reserve(CONFIG.svc.max_virtual_service);
     rs_vs_map_.reserve(CONFIG.svc.max_real_per_virtual *
                        CONFIG.svc.max_virtual_service);
 
-    DLOG_W(INFO) << "Initializing SvcTable succeed";
+    W_LOG(INFO) << "[SvcTable] Initializing succeed";
   }
   ~SvcTable() = default;
 
   inline VirtSvc::Ptr FindVs(Tuple2 &tuple);
 
+  // TODO: make sure local ip is not used as vip or rsip
   inline VirtSvc::Ptr EnsureVsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric);
   inline RealSvc::Ptr EnsureRsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric);
 
@@ -64,7 +65,7 @@ class SvcTable {
   DISALLOW_COPY_AND_ASSIGN(SvcTable);
 };
 
-#define STABLE utils::UnsafeSingletonTLS<SvcTable>::instance()
+#define STABLE (utils::UnsafeSingletonTLS<SvcTable>::instance())
 
 class ConnTable {
  public:
@@ -72,18 +73,15 @@ class ConnTable {
       : conns_(align_ceil_pow2(CONFIG.svc.max_conn), ALLOC),
         idx_map_(conns_.capacity()),
         idx_pool_(utils::make_vector<idx_t>(conns_.capacity())),
-        timer_(TSC) {
+        timer_(W_TSC) {
     // Since 0 means trick of empty
-    for (auto idx : irange((size_t)1, conns_.capacity())) idx_pool_.push(idx);
+    for (auto idx : irange(1ul, conns_.capacity())) idx_pool_.push(idx);
+    W_LOG(INFO) << "[ConnTable] Initializing succeed";
   }
   ~ConnTable() = default;
 
   inline Conn *Find(Tuple4 &tuple);
-
   inline Conn *EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp);
-
-  // Conn will only be destroyed when the timer fires
-  //  inline bool Destroy(Conn *conn);
 
  private:
   using IdxMap = utils::XMap<Tuple4, idx_t>;
@@ -98,6 +96,6 @@ class ConnTable {
   DISALLOW_COPY_AND_ASSIGN(ConnTable);
 };
 
-#define CTABLE utils::UnsafeSingletonTLS<ConnTable>::instance()
+#define CTABLE (utils::UnsafeSingletonTLS<ConnTable>::instance())
 
 }  // namespace xlb

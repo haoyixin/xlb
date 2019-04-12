@@ -66,8 +66,8 @@ class Module {
     auto worker = Worker::current();
 
     DCHECK(Worker::current());
-    DLOG_W(INFO) << "Registering task of module: " << module_name()
-                 << " with weight: " << unsigned(weight);
+    W_LOG(INFO) << "[RegisterTask] module: " << module_name()
+                << " with weight: " << unsigned(weight);
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 
@@ -91,11 +91,62 @@ class Module {
   }
 
  private:
-  std::string module_name() {
-    return demangle(this).substr(14);
-  }
+  std::string module_name() { return demangle(this).substr(14); }
 
   DISALLOW_COPY_AND_ASSIGN(Module);
 };
+
+// TODO: ......
+
+template <bool master>
+void Scheduler::Loop() {
+  bool idle{true};
+  Task::Context *ctx;
+  uint64_t cycles{};
+
+  W_CURRENT->UpdateTsc();
+
+  if constexpr (master)
+    for (auto &m : Modules::instance()) m->InitInMaster();
+  else
+    for (auto &m : Modules::instance()) m->InitInSlave(W_ID);
+
+  if constexpr (master) Worker::confirm_master();
+
+  W_CURRENT->UpdateTsc();
+  checkpoint_ = W_TSC;
+
+  // The main scheduling, running, accounting master loop.
+  for (uint64_t round = 0;; ++round) {
+    if constexpr (master) {
+      if (Worker::slaves_aborted()) break;
+    } else {
+      if (Worker::aborting()) break;
+    }
+
+    ctx = next_ctx();
+    ctx->silent_drops_ = 0;
+
+    W_CURRENT->UpdateTsc();
+    cycles = W_TSC - checkpoint_;
+
+    if (idle) {
+      if constexpr (master)
+        M::Adder<TS("idle_cycles_master")>() << cycles;
+      else
+        M::Adder<TS("idle_cycles_slaves")>() << cycles;
+    } else {
+      W_CURRENT->IncrBusyLoops();
+      if constexpr (master)
+        M::Adder<TS("busy_cycles_master")>() << cycles;
+      else
+        M::Adder<TS("busy_cycles_slaves")>() << cycles;
+    }
+
+    checkpoint_ = W_TSC;
+
+    idle = (ctx->task_->func_(ctx).packets == 0);
+  }
+}
 
 }  // namespace xlb

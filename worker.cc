@@ -11,14 +11,21 @@
 #include "utils/time.h"
 
 #include "packet_pool.h"
-#include "scheduler.h"
+
+// TODO: ......
+#include "module.h"
 
 namespace xlb {
 
 __thread Worker Worker::current_ = {};
+
 bool Worker::aborting_ = false;
 bool Worker::slaves_aborted_ = false;
 bool Worker::master_started_ = false;
+
+std::atomic<uint16_t> Worker::counter_ = 0;
+std::vector<std::thread> Worker::slave_threads_ = {};
+std::thread Worker::master_thread_ = {};
 
 // The entry point of worker threads
 void *Worker::run() {
@@ -44,21 +51,21 @@ void *Worker::run() {
   if (!master_)
     while (!master_started_) INST_BARRIER();
 
-  LOG_W(INFO) << "Running on core " << core_ << " (socket " << socket_ << ")";
+  W_LOG(INFO) << "[Worker] Starting on core: " << core_
+              << " socket: " << socket_;
 
   scheduler_ = new Scheduler();
 
   if (!master_)
-    scheduler_->SlaveLoop();
+    scheduler_->Loop<false>();
   else
-    scheduler_->MasterLoop();
+    scheduler_->Loop<true>();
 
-  LOG(INFO) << (master_ ? "Master " : "Worker ") << "(" << id_ << ") "
-            << "is quitting... (core " << core_ << ", socket " << socket_
-            << ")";
+  W_LOG(INFO) << "[Worker] Quitting on core: " << core_
+              << " socket: " << socket_;
 
-  if (!master_ && (Counter::instance().fetch_sub(1) == 1)) {
-    LOG(INFO) << "All workers have been aborted";
+  if (!master_ && (counter_.fetch_sub(1) == 1)) {
+    W_LOG(INFO) << "[Worker] All slaves have been aborted";
     slaves_aborted_ = true;
   }
 
@@ -72,10 +79,9 @@ Worker::Worker(uint16_t core, bool master)
     : master_(master),
       core_(core),
       packet_pool_(&utils::Singleton<PacketPool>::instance()),
-      silent_drops_(0),
       current_tsc_(utils::Rdtsc()) {
   if (!master_) {
-    id_ = Counter::instance().fetch_add(1);
+    id_ = counter_.fetch_add(1);
     socket_ = CONFIG.nic.socket;
   } else {
     id_ = std::numeric_limits<decltype(id_)>::max();
@@ -87,23 +93,21 @@ Worker::Worker(uint16_t core, bool master)
 }
 
 void Worker::Launch() {
-  Master::instance() = std::thread(
+  master_thread_ = std::thread(
       [=]() { (new (&current_) Worker(CONFIG.master_core, true))->run(); });
 
-  auto &slaves = Slaves::instance();
-
   for (auto core : CONFIG.slave_cores)
-    slaves.emplace_back(
+    slave_threads_.emplace_back(
         [=]() { (new (&current_) Worker(core, false))->run(); });
 }
 
 void Worker::Abort() { aborting_ = true; }
 
 void Worker::Wait() {
-  for (auto &thread : Slaves::instance())
+  for (auto &thread : slave_threads_)
     if (thread.joinable()) thread.join();
 
-  if (Master::instance().joinable()) Master::instance().join();
+  if (master_thread_.joinable()) master_thread_.join();
 
   rte_eal_mp_wait_lcore();
 }

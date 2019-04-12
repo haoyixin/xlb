@@ -22,8 +22,8 @@ VirtSvc::Ptr SvcTable::EnsureVsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric) {
   // There is a very small probability of returning nullptr
   if (entry != nullptr) {
     if (entry->value == nullptr) {
-      DLOG_W(INFO) << "Creating VirtSvc: " << tuple;
-      entry->value = new VirtSvc(this, tuple, metric);
+      W_DVLOG(1) << "[STABLE] Creating VirtSvc: " << tuple;
+      entry->value = new VirtSvc(tuple, metric);
     }
     return entry->value;
   } else {
@@ -48,8 +48,8 @@ RealSvc::Ptr SvcTable::EnsureRsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric) {
     return pair.first->second;
   }
 
-  DLOG_W(INFO) << "Creating RealSvc: " << tuple;
-  pair.first->second = new RealSvc(this, tuple, metric);
+  W_DVLOG(1) << "[STABLE] Creating RealSvc: " << tuple;
+  pair.first->second = new RealSvc(tuple, metric);
 
   return pair.first->second;
 }
@@ -65,7 +65,7 @@ bool SvcTable::EnsureRsAttachedTo(VirtSvc::Ptr &vs, RealSvc::Ptr &rs) {
   for (auto it = range.first; it != range.second; ++it)
     if (it->second == vs->tuple_) return true;
 
-  DLOG_W(INFO) << "Attaching RealSvc: " << rs->tuple_
+  W_DVLOG(1) << "[STABLE] Attaching RealSvc: " << rs->tuple_
                << " to VirtSvc: " << vs->tuple_;
   // TODO: is it safe ?
   vs->rs_vec_.emplace_back(rs);
@@ -95,7 +95,7 @@ void SvcTable::EnsureVsNotExist(Tuple2 &vs) {
   VsMap::Entry *entry = vs_map_.Find(vs);
   if (entry == nullptr) return;
 
-  DLOG_W(INFO) << "Erasing VirtSvc: " << vs;
+  W_DVLOG(1) << "[STABLE] Erasing VirtSvc: " << vs;
 
   for (auto &rs : entry->value->rs_vec_) {
     auto range = rs_vs_map_.equal_range(rs->tuple_);
@@ -120,52 +120,55 @@ Conn *ConnTable::Find(xlb::Tuple4 &tuple) {
   return &conns_[entry->value];
 }
 
-inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
-  Tuple4 orig_tp;
+Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
+  IdxMap::Entry *orig_ent = idx_map_.Emplace({cli_tp, vs_ptr->tuple()}, 0);
 
-  orig_tp.src = cli_tp;
-  orig_tp.dst=vs_ptr->tuple();
-
-  IdxMap::Entry *orig_ent = idx_map_.Emplace(orig_tp, 0);
-
+  // Collision exceeded
   if (unlikely(orig_ent == nullptr)) return nullptr;
 
+  // Already exist, return directly
   if (unlikely(orig_ent->value != 0)) return &conns_[orig_ent->value];
 
+  // The table is full
   if (unlikely(idx_pool_.empty())) {
-    idx_map_.Remove(orig_tp);
+    // Clean up the map
+    idx_map_.Remove(orig_ent->key);
     return nullptr;
   }
 
   // TODO: avoid adding reference counts
   auto rs_ptr = vs_ptr->SelectRs(cli_tp);
-  if (unlikely(rs_ptr == nullptr)) {
-    idx_map_.Remove(orig_tp);
+  // No rs attached to vs
+  if (unlikely(!rs_ptr)) {
+    // Clean up the map
+    idx_map_.Remove(orig_ent->key);
     return nullptr;
   }
 
   Tuple2 loc_tp;
+  // Local tuple runs out
   if (unlikely(!rs_ptr->GetLocal(loc_tp))) {
-    idx_map_.Remove(orig_tp);
+    // Clean up the map
+    idx_map_.Remove(orig_ent->key);
     return nullptr;
   }
-
-  Tuple4 rep_tp;
-
-  rep_tp.src = rs_ptr->tuple();
-  rep_tp.dst = loc_tp;
 
   auto idx = idx_pool_.top();
   idx_pool_.pop();
 
   // Since the original does not exist, we think that the reply is the same, so
-  // use unsafe here
-  IdxMap::Entry *rep_ent = idx_map_.EmplaceUnsafe(rep_tp, idx);
+  // use unsafe here for performance
+  IdxMap::Entry *rep_ent =
+      idx_map_.EmplaceUnsafe({rs_ptr->tuple(), loc_tp}, idx);
 
+  // Collision exceeded
   if (unlikely(rep_ent == nullptr)) {
+    // Release index
     idx_pool_.push(idx);
+    // Release local tuple
     rs_ptr->PutLocal(loc_tp);
-    idx_map_.Remove(orig_tp);
+    // Clean up the map
+    idx_map_.Remove(orig_ent->key);
     return nullptr;
   }
 
@@ -176,12 +179,9 @@ inline Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
   conn->virt_ = vs_ptr;
   conn->real_ = rs_ptr;
 
-  timer_.Schedule(conn, 3);
-//  timer_.Reschedule(conn, 3);
-  timer_.Advance(10);
-//  timer_.ScheduleInRange(conn, 3, 5);
-//  auto x = timer_.TicksToNextEvent();
-  auto y = timer_.Now();
+  conn->state_ = TCP_CONNTRACK_SYN_SENT;
+
+  W_DVLOG(2) << "[CTABLE] Creating Conn: " << *conn;
 }
 
 }  // namespace xlb

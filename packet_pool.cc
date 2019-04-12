@@ -27,14 +27,13 @@ void init_packet(rte_mempool *mp, void *, void *mbuf, unsigned index) {
   pkt->set_paddr(rte_mempool_virt2iova(pkt));
 }
 
-} // namespace
+}  // namespace
 
 PacketPool::PacketPool(size_t capacity, int socket_id) {
-
   // TODO: support multi numa node
 
-  LOG(INFO) << "Creating PacketPool with " << capacity << " packets on node "
-            << (socket_id == -1 ? 0 : socket_id);
+  LOG(INFO) << "[PacketPool] Creating with capacity: " << capacity
+            << " packets on node: " << (socket_id == -1 ? 0 : socket_id);
 
   pool_ = rte_mempool_create_empty("PacketPool", capacity, sizeof(Packet),
                                    capacity > 1024 ? kMaxCacheSize : 0,
@@ -67,4 +66,4 @@ Packet *PacketPool::Alloc(size_t len) {
 
 PacketPool::~PacketPool() { rte_mempool_free(pool_); }
 
-} // namespace xlb
+}  // namespace xlb

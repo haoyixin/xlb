@@ -15,7 +15,7 @@ class PortOut final : public Module {
 
   template <typename Tag = NoneTag>
   void Process(Context *ctx, PacketBatch *batch) {
-    port_.Send(ctx->worker()->current()->id(), batch->pkts(), batch->cnt());
+    port_.Send(W_ID, batch->pkts(), batch->cnt());
   }
 
   //  template <typename Tag = NoneTag>

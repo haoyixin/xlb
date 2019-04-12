@@ -20,7 +20,7 @@ void EtherOut::InitInMaster() {
 template <>
 void EtherOut::Process<KNI>(Context *ctx, Packet *packet) {
   while (!kni_ring_.Push(packet))
-    LOG_W(ERROR) << "Too many packets are on the way to kernel";
+    W_LOG(ERROR) << "Too many packets are on the way to kernel";
 }
 
 template <>

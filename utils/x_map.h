@@ -107,13 +107,22 @@ class alignas(64) XMap {
   explicit XMap(uint32_t num_buckets)
       : bucket_mask_(align_ceil_pow2(num_buckets) - 1),
         num_entries_(0),
-        buckets_(bucket_mask_ + 1, ALLOC) {}
+        buckets_(bucket_mask_ + 1, ALLOC) {
+    DLOG(INFO) << "[XMap] create succeed, key: " << demangle<K>()
+               << " value: " << demangle<V>()
+               << " buckets: " << buckets_.size();
+  }
+
+  ~XMap() {
+    DLOG(INFO) << "[XMap] destructing, key: " << demangle<K>()
+               << " value: " << demangle<V>();
+  }
 
   XMap(XMap &) = delete;
   XMap &operator=(XMap &) = delete;
 
-  XMap(XMap &&) = default;
-  XMap &operator=(XMap &&) = default;
+  XMap(XMap &&) noexcept = default;
+  XMap &operator=(XMap &&) noexcept = default;
 
   iterator begin() { return iterator(*this, 0, 0); }
   iterator end() { return iterator(*this, buckets_.size(), 0); }
@@ -124,6 +133,8 @@ class alignas(64) XMap {
     rte_prefetch0(prim_bkt);
 
     uint32_t sec_hash = hash_secondary(prim_hash);
+
+    DVLOG(2) << "[Find] prim_hash: " << prim_hash << " sec_hash: " << sec_hash;
 
     return find_in_bucket(*prim_bkt, buckets_[sec_hash & bucket_mask_], key,
                           sec_hash);
@@ -141,6 +152,9 @@ class alignas(64) XMap {
     uint32_t prim_hash = hash(key);
     uint32_t sec_hash = hash_secondary(prim_hash);
 
+    DVLOG(2) << "[EmplaceUnsafe] prim_hash: " << prim_hash
+             << " sec_hash: " << sec_hash;
+
     return emplace_in_bucket(buckets_[prim_hash & bucket_mask_],
                              buckets_[sec_hash & bucket_mask_], key, sec_hash,
                              std::forward<Args>(args)...);
@@ -153,6 +167,10 @@ class alignas(64) XMap {
     rte_prefetch0(prim_bkt);
 
     uint32_t sec_hash = hash_secondary(prim_hash);
+
+    DVLOG(2) << "[Emplace] prim_hash: " << prim_hash
+             << " sec_hash: " << sec_hash;
+
     Bucket *sec_bkt = &buckets_[sec_hash & bucket_mask_];
 
     Entry *entry;
@@ -188,6 +206,9 @@ class alignas(64) XMap {
     rte_prefetch0(prim_bkt);
 
     uint32_t sec_hash = hash_secondary(prim_hash);
+
+    DVLOG(2) << "[Remove] prim_hash: " << prim_hash
+             << " sec_hash: " << sec_hash;
 
     Entry *entry;
     if ((entry = remove_in_bucket(*prim_bkt, buckets_[sec_hash & bucket_mask_],

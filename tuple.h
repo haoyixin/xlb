@@ -11,12 +11,17 @@
 namespace xlb {
 
 struct [[gnu::packed]] Tuple2 {
+  Tuple2(const be32_t &_ip, const be16_t &_port) : ip(_ip), port(_port) {}
+
+  Tuple2() = default;
+  ~Tuple2() = default;
+
   be32_t ip;
   be16_t port;
 
   friend std::ostream &operator<<(std::ostream &os, const Tuple2 &tuple) {
-    os << "ip: " << headers::ToIpv4Address(tuple.ip)
-       << " port: " << tuple.port.value();
+    os << "[ip: " << headers::ToIpv4Address(tuple.ip)
+       << " port: " << tuple.port.value() << "]";
     return os;
   }
 };
@@ -24,11 +29,16 @@ struct [[gnu::packed]] Tuple2 {
 static_assert(sizeof(Tuple2) == 6);
 
 struct [[gnu::packed]] Tuple4 {
+  Tuple4(const Tuple2 &_src, const Tuple2 &_dst) : src(_src), dst(_dst) {}
+
+  Tuple4() = default;
+  ~Tuple4() = default;
+
   Tuple2 src;
   Tuple2 dst;
 
   friend std::ostream &operator<<(std::ostream &os, const Tuple4 &tuple) {
-    os << "src: " << tuple.src << " dst: " << tuple.dst;
+    os << "[src: " << tuple.src << " dst: " << tuple.dst << "]";
     return os;
   }
 };
@@ -92,8 +102,8 @@ inline bool operator!=(const xlb::Tuple4 &lhs, const xlb::Tuple4 &rhs) {
 
 }  // namespace xlb
 
-//namespace xlb {
+// namespace xlb {
 //
-//using TPool = std::stack<Tuple2, utils::vector<Tuple2>>;
+// using TPool = std::stack<Tuple2, utils::vector<Tuple2>>;
 //
 //}

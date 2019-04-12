@@ -11,10 +11,11 @@ class EtherOut : public Module {
  public:
   EtherOut(uint8_t weight)
       : weight_(weight),
-//        src_hw_addr_(CONFIG.nic.mac_address),
+        //        src_hw_addr_(CONFIG.nic.mac_address),
         gw_hw_addr_(Singleton<Ethernet::Address>::instance()),
         kni_ring_(CONFIG.kni.ring_size) {
-    DLOG(INFO) << "Source mac address: " << CONFIG.nic.mac_address.ToString();
+    LOG(INFO) << "[EtherOut] Source mac address: "
+              << CONFIG.nic.mac_address.ToString();
   }
 
   void InitInMaster() override;
@@ -27,7 +28,7 @@ class EtherOut : public Module {
 
  private:
   uint8_t weight_;
-//  const Ethernet::Address &src_hw_addr_;
+  //  const Ethernet::Address &src_hw_addr_;
   const Ethernet::Address &gw_hw_addr_;
   utils::LockLessQueue<Packet *, false, true> kni_ring_;
 };

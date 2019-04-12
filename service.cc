@@ -10,13 +10,14 @@
 
 namespace xlb {
 
-SvcBase::SvcBase(SvcTable *stable, Tuple2 &tuple, SvcMetrics::Ptr &metric)
-    : tuple_(tuple), metrics_(metric), stable_(stable) {
+SvcBase::SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric)
+    : tuple_(tuple), metrics_(metric) {
   reset_metrics();
-  stable_->timer_.Schedule(this, kCommitInterval * tsc_sec);
+  //  stable_->timer_.Schedule(this, kCommitInterval * tsc_sec);
+  STABLE.timer_.ScheduleInRange(this, kTimerStart * tsc_ms, kTimerEnd * tsc_ms);
 }
 
-void SvcBase::commit_metrics(){
+void SvcBase::commit_metrics() {
   metrics_->conns_.count_ << conns_;
   metrics_->packets_in_.count_ << packets_in_;
   metrics_->bytes_in_.count_ << bytes_in_;
@@ -25,7 +26,7 @@ void SvcBase::commit_metrics(){
   reset_metrics();
 }
 
-void SvcBase::reset_metrics(){
+void SvcBase::reset_metrics() {
   conns_ = 0;
   packets_in_ = 0;
   bytes_in_ = 0;
@@ -33,10 +34,11 @@ void SvcBase::reset_metrics(){
   bytes_out_ = 0;
 }
 
-
 void SvcBase::execute(xlb::TimerWheel<xlb::SvcBase> *timer) {
+  W_DVLOG(2) << "[SvcBase] commit metrics of: " << tuple_;
+
   commit_metrics();
-  timer->Schedule(this, kCommitInterval * tsc_sec);
+  STABLE.timer_.ScheduleInRange(this, kTimerStart * tsc_ms, kTimerEnd * tsc_ms);
 }
 
 RealSvc::Ptr VirtSvc::SelectRs(Tuple2 &ctuple) {
@@ -47,22 +49,26 @@ RealSvc::Ptr VirtSvc::SelectRs(Tuple2 &ctuple) {
   return rs_vec_[std::hash<Tuple2>()(ctuple) % rs_vec_.size()];
 }
 
-void RealSvc::BindLocalIp(be32_t ip) {
+void RealSvc::bind_local_ips() {
   // Meaningless when called in the master thread
-  DCHECK(!MASTER);
+  if (W_MASTER) return;
 
-  DLOG_W(INFO) << "Binding local ip: " << ToIpv4Address(ip)
-               << " to RealSvc: " << tuple_;
+  local_tuple_pool_ = decltype(local_tuple_pool_)(
+      utils::make_vector<Tuple2>(std::numeric_limits<uint16_t>::max()));
 
-  for (auto i :
-       utils::irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max())) {
-    local_tuple_pool_.emplace(Tuple2{ip, be16_t{i}});
+  auto range = CONFIG.slave_local_ips.equal_range(W_ID);
+
+  for (auto it = range.first; it != range.second; ++it) {
+    W_DVLOG(1) << "[RealSvc] Binding local ip: " << ToIpv4Address(it->second)
+               << " to: " << tuple_;
+    for (auto i :
+         utils::irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
+      local_tuple_pool_.emplace(it->second, be16_t(i));
   }
 }
 
 bool RealSvc::GetLocal(Tuple2 &tuple) {
-  if (local_tuple_pool_.empty())
-    return false;
+  if (local_tuple_pool_.empty()) return false;
 
   tuple = local_tuple_pool_.top();
 
@@ -73,9 +79,10 @@ bool RealSvc::GetLocal(Tuple2 &tuple) {
 void RealSvc::PutLocal(const Tuple2 &tuple) { local_tuple_pool_.push(tuple); }
 
 RealSvc::~RealSvc() {
-  DLOG_W(INFO) << "Lazy destroying RealSvc: " << tuple_;
+  W_DVLOG(1) << "[RealSvc] Lazy destroying: " << tuple_;
   // Means that it cannot be reused
-  stable_->rs_map_.erase(tuple_);
+  //  stable_->rs_map_.erase(tuple_);
+  STABLE.rs_map_.erase(tuple_);
 }
 
 }  // namespace xlb

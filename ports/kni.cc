@@ -49,7 +49,7 @@ KNI::KNI() : Port() {
   CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
                    TS("tx_bytes"), TS("tx_dropped"), TS("req_failed")>));
 
-  LOG(INFO) << "KNI initialize successful";
+  LOG(INFO) << "[KNI] initialize successful";
 }
 
 uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {

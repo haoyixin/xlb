@@ -20,7 +20,7 @@ bool ParseIpv4Address(const std::string &str, be32_t *addr) {
   return true;
 }
 
-std::string ToIpv4Address(be32_t addr) {
+std::string ToIpv4Address(const be32_t &addr) {
   const union {
     be32_t addr;
     char bytes[4];

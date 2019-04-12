@@ -28,7 +28,7 @@ Metric::Metric(std::string_view prefix, std::string_view name)
   per_second_.expose_as(std::string(prefix),
                         combine_metric_name(name, "second"));
 
-  DLOG_W(INFO) << "Exposed metrics prefix: " << prefix << " name: " << name;
+  W_DLOG(INFO) << "Exposed metrics prefix: " << prefix << " name: " << name;
 }
 
 void Metric::Hide() {

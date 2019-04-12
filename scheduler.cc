@@ -35,7 +35,6 @@ Scheduler::Scheduler()
 
 Scheduler::~Scheduler() {
   for (auto &t : runnable_->container()) delete (t);
-
   for (auto &t : blocked_->container()) delete (t);
 
   delete (runnable_);
@@ -58,82 +57,6 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
   return &t->context_;
 }
 
-void Scheduler::MasterLoop() {
-  bool idle{false};
-  Task::Context *ctx;
-  uint64_t cycles{};
-
-  auto worker = Worker::current();
-  worker->UpdateTsc();
-  checkpoint_ = worker->current_tsc();
-
-  for (auto &m : Modules::instance()) m->InitInMaster();
-  worker->confirm_master();
-
-  for (auto &t : runnable_->container()) t->context_.worker_ = worker;
-
-  // The main scheduling, running, accounting master loop.
-  for (uint64_t round = 0;; ++round) {
-    if (worker->slaves_aborted()) break;
-
-    ctx = next_ctx();
-
-    ctx->worker_->UpdateTsc();
-    ctx->worker_->IncrSilentDrops(ctx->silent_drops_);
-    ctx->silent_drops_ = 0;
-
-    cycles = ctx->worker_->current_tsc() - checkpoint_;
-
-    if (idle) {
-      M::Adder<TS("idle_cycles_master")>() << cycles;
-    } else {
-      ctx->worker_->IncrBusyLoops();
-      M::Adder<TS("busy_cycles_master")>() << cycles;
-    }
-
-    checkpoint_ = ctx->worker_->current_tsc();
-
-    idle = (ctx->task_->func_(ctx).packets == 0);
-  }
-}
-
-void Scheduler::SlaveLoop() {
-  bool idle{false};
-  Task::Context *ctx;
-  uint64_t cycles{};
-
-  auto worker = Worker::current();
-  checkpoint_ = worker->current_tsc();
-
-  for (auto &m : Modules::instance()) m->InitInSlave(worker->id());
-
-  for (auto &t : runnable_->container()) t->context_.worker_ = worker;
-
-  // The main scheduling, running, accounting slave loop.
-  for (uint64_t round = 0;; ++round) {
-    if (worker->aborting()) break;
-
-    ctx = next_ctx();
-
-    ctx->worker_->UpdateTsc();
-    ctx->worker_->IncrSilentDrops(ctx->silent_drops_);
-    ctx->silent_drops_ = 0;
-
-    cycles = ctx->worker_->current_tsc() - checkpoint_;
-
-    if (idle) {
-      M::Adder<TS("idle_cycles_slaves")>() << cycles;
-    } else {
-      ctx->worker_->IncrBusyLoops();
-      M::Adder<TS("busy_cycles_slaves")>() << cycles;
-    }
-
-    checkpoint_ = ctx->worker_->current_tsc();
-
-    idle = (ctx->task_->func_(ctx).packets == 0);
-  }
-}
-
 Scheduler::Task::Task(Func &&func, uint8_t weight)
     : func_(std::move(func)),
       context_(),
@@ -146,12 +69,16 @@ Scheduler::Task::Task(Func &&func, uint8_t weight)
 }
 
 Scheduler::Task::~Task() {
-  context_.dead_batch_.Free();
-  context_.stage_batch_.Free();
+  if (!context_.dead_batch_.Empty()) context_.dead_batch_.Free();
+  if (!context_.stage_batch_.Empty()) context_.stage_batch_.Free();
 }
 
 void Scheduler::Task::Context::Drop(Packet *pkt) {
-  if (dead_batch_.Full()) dead_batch_.Free();
+  if (dead_batch_.Full()) {
+    silent_drops_ += dead_batch_.cnt();
+    dead_batch_.Free();
+    dead_batch_.Clear();
+  }
 
   dead_batch_.Push(pkt);
 }
