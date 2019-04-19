@@ -1,11 +1,6 @@
 #pragma once
 
-#include <x86intrin.h>
-#include <cstring>
-
-#include <glog/logging.h>
-
-#include "common.h"
+#include "utils/common.h"
 
 namespace xlb::utils {
 
@@ -199,8 +194,10 @@ inline void CopyInlined(void *__restrict__ dst, const void *__restrict__ src,
 // Non-inlined version of Copy().
 // Do not call this function directly, unless you know what you are doing.
 // Just use Copy()
+/*
 void CopyNonInlined(void *__restrict__ dst, const void *__restrict__ src,
                     size_t bytes, bool sloppy = false);
+                    */
 
 // Copies "bytes" data from "src" to "dst".
 // Same as memcpy() and rte_memcpy(), but significantly faster for both
@@ -211,6 +208,7 @@ void CopyNonInlined(void *__restrict__ dst, const void *__restrict__ src,
 // 31 bytes. It will generate much smaller and usually faster code. Use this
 // option only if overwriting some data at the end is acceptable, such as
 // rewriting the payload data of class Packet.
+/*
 inline void Copy(void *__restrict__ dst, const void *__restrict__ src,
                  size_t bytes, bool sloppy = false) {
   // If the size is a compile-time constant, inlining can generate compact code
@@ -220,5 +218,6 @@ inline void Copy(void *__restrict__ dst, const void *__restrict__ src,
     CopyNonInlined(dst, src, bytes, sloppy);
   }
 }
+ */
 
 }  // namespace xlb::utils

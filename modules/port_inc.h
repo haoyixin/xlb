@@ -10,8 +10,7 @@ class PortInc final : public Module {
   static_assert(std::is_base_of<Port, T>::value);
 
  public:
-  explicit PortInc(uint8_t weight)
-      : weight_(weight), port_(Singleton<T>::instance()) {}
+  explicit PortInc() : port_(Singleton<T>::instance()) {}
 
   void InitInMaster() override {
     if constexpr (!Master) return;
@@ -30,18 +29,19 @@ class PortInc final : public Module {
     RegisterTask(
         [this](Context *ctx) -> Result {
           PacketBatch batch;
+
           batch.SetCnt(port_.Recv(W_ID, batch.pkts(), Packet::kMaxBurst));
 
-          if (batch.cnt() > 0) {
-            Handle<EtherInc, T>(ctx, &batch);
-          }
+          if (!batch.Empty()) Handle<EtherInc, T>(ctx, &batch);
 
           return {.packets = batch.cnt()};
         },
-        weight_);
+        kWeight);
   }
 
  private:
+  static constexpr uint8_t kWeight = 200;
+
   uint8_t weight_;
   T &port_;
 };

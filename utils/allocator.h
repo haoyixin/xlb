@@ -1,22 +1,7 @@
 #pragma once
 
-#include <cstddef>
-
-#include <rte_config.h>
-#include <rte_malloc.h>
-
-#include <glog/logging.h>
-
-#include <experimental/memory_resource>
-#include <memory>
-#include <new>
-#include <unordered_map>
-#include <vector>
-
 #include "utils/common.h"
 #include "utils/singleton.h"
-
-namespace pmr = std::experimental::pmr;
 
 namespace xlb {
 
@@ -72,7 +57,7 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
 
  protected:
   void *do_allocate(std::size_t bytes, std::size_t alignment) override {
-    DVLOG(1) << "[do_allocate] bytes: " << bytes << " alignment: " << alignment;
+    F_DVLOG(1) << "bytes: " << bytes << " alignment: " << alignment;
 
     if (auto p = rte_malloc_socket(nullptr, bytes, alignment, socket_))
       return p;
@@ -130,8 +115,8 @@ inline unsafe_ptr<T> make_unsafe(Args &&... args) {
 }
 
 template <typename T>
-inline utils::vector<T> make_vector(size_t n) {
-  DVLOG(1) << "[make_vector] size: " << n;
+inline vector<T> make_vector(size_t n) {
+  F_DVLOG(1) << "size: " << n;
   auto vec = utils::vector<T>(ALLOC);
   vec.reserve(n);
   return vec;

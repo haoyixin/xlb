@@ -1,19 +1,6 @@
 #include "ports/kni.h"
 
-#include <atomic>
-#include <cstdlib>
-#include <thread>
-
-#include <rte_bus_pci.h>
-
-#include "utils/iface.h"
-#include "utils/singleton.h"
-
 #include "ports/pmd.h"
-
-#include "config.h"
-#include "packet_pool.h"
-#include "xbuf_layout.h"
 
 namespace xlb::ports {
 
@@ -44,17 +31,17 @@ KNI::KNI() : Port() {
 
   conf_ = pmd_port.conf();
 
-  CHECK(utils::SetHwAddr("xlb", conf_.addr));
+  CHECK(utils::SetHwAddr("xlb", conf_.addr.bytes));
 
   CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
                    TS("tx_bytes"), TS("tx_dropped"), TS("req_failed")>));
 
-  LOG(INFO) << "[KNI] initialize successful";
+  F_LOG(INFO) << "initialize successful";
 }
 
 uint16_t KNI::Recv(uint16_t qid, Packet **pkts, uint16_t cnt) {
   if (rte_kni_handle_request(kni_) != 0) {
-    LOG(ERROR) << "rte_kni_handle_request failed";
+    F_LOG(ERROR) << "rte_kni_handle_request failed";
     M::Adder<TS("req_failed")>() << 1;
   }
 
@@ -88,7 +75,7 @@ uint16_t KNI::Send(uint16_t qid, Packet **pkts, uint16_t cnt) {
 }
 
 KNI::~KNI() {
-  DLOG(INFO) << "Release kni interface";
+  F_DLOG(INFO) << "releasing kni interface";
   rte_kni_release(kni_);
 }
 

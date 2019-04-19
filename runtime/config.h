@@ -1,14 +1,6 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-
-#include "3rdparty/visit_struct.hpp"
-
-#include "headers/ether.h"
-#include "utils/singleton.h"
-#include "utils/endian.h"
+#include "runtime/common.h"
 
 namespace xlb {
 

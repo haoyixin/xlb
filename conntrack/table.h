@@ -1,16 +1,12 @@
 #pragma once
 
-#include <stack>
+#include "conntrack/common.h"
+#include "conntrack/conn.h"
+#include "conntrack/metric.h"
+#include "conntrack/service.h"
+#include "conntrack/tuple.h"
 
-#include "utils/x_map.h"
-
-#include "common.h"
-#include "conn.h"
-#include "metric.h"
-#include "service.h"
-#include "tuple.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 class SvcTable {
  public:
@@ -23,7 +19,7 @@ class SvcTable {
     rs_vs_map_.reserve(CONFIG.svc.max_real_per_virtual *
                        CONFIG.svc.max_virtual_service);
 
-    W_LOG(INFO) << "[SvcTable] Initializing succeed";
+    W_LOG(INFO) << "initializing succeed";
   }
   ~SvcTable() = default;
 
@@ -43,10 +39,12 @@ class SvcTable {
 
   const std::string &LastError() { return last_error_; }
 
+  size_t Sync() { return timer_.AdvanceTo(W_TSC); }
+
  private:
-  using VsMap = utils::XMap<Tuple2, VirtSvc::Ptr>;
-  using RsMap = utils::unordered_map<Tuple2, RealSvc *>;
-  using RelatedMap = utils::unordered_multimap<Tuple2, Tuple2>;
+  using VsMap = XMap<Tuple2, VirtSvc::Ptr>;
+  using RsMap = unordered_map<Tuple2, RealSvc *>;
+  using RelatedMap = unordered_multimap<Tuple2, Tuple2>;
 
   VsMap vs_map_;
   // In order to reuse detached rs, since local-tuple-pool in rs must be unique
@@ -65,30 +63,30 @@ class SvcTable {
   DISALLOW_COPY_AND_ASSIGN(SvcTable);
 };
 
-#define STABLE (utils::UnsafeSingletonTLS<SvcTable>::instance())
-
 class ConnTable {
  public:
   ConnTable()
       : conns_(align_ceil_pow2(CONFIG.svc.max_conn), ALLOC),
         idx_map_(conns_.capacity()),
-        idx_pool_(utils::make_vector<idx_t>(conns_.capacity())),
+        idx_pool_(make_vector<uint32_t>(conns_.capacity())),
         timer_(W_TSC) {
     // Since 0 means trick of empty
     for (auto idx : irange(1ul, conns_.capacity())) idx_pool_.push(idx);
-    W_LOG(INFO) << "[ConnTable] Initializing succeed";
+    W_LOG(INFO) << "initializing succeed";
   }
   ~ConnTable() = default;
 
   inline Conn *Find(Tuple4 &tuple);
   inline Conn *EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp);
 
- private:
-  using IdxMap = utils::XMap<Tuple4, idx_t>;
+  size_t Sync() { return timer_.AdvanceTo(W_TSC); }
 
-  utils::vector<Conn> conns_;
+ private:
+  using IdxMap = XMap<Tuple4, uint32_t>;
+
+  vector<Conn> conns_;
   IdxMap idx_map_;
-  std::stack<idx_t, utils::vector<idx_t>> idx_pool_;
+  std::stack<uint32_t, vector<uint32_t>> idx_pool_;
 
   TimerWheel<Conn> timer_;
 
@@ -96,6 +94,14 @@ class ConnTable {
   DISALLOW_COPY_AND_ASSIGN(ConnTable);
 };
 
-#define CTABLE (utils::UnsafeSingletonTLS<ConnTable>::instance())
+}  // namespace xlb::conntrack
 
-}  // namespace xlb
+namespace xlb {
+
+#define STABLE_INIT (UnsafeSingletonTLS<conntrack::SvcTable>::Init)
+#define STABLE (UnsafeSingletonTLS<conntrack::SvcTable>::instance())
+
+#define CTABLE_INIT (UnsafeSingletonTLS<conntrack::ConnTable>::Init)
+#define CTABLE (UnsafeSingletonTLS<conntrack::ConnTable>::instance())
+
+}

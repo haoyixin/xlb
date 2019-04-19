@@ -1,27 +1,18 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include "headers/ether.h"
-
-#include "utils/boost.h"
-#include "utils/common.h"
-#include "utils/format.h"
-#include "utils/metric.h"
-
-#include "packet.h"
-#include "packet_batch.h"
+#include "runtime/common.h"
+#include "runtime/packet.h"
+#include "runtime/packet_batch.h"
 
 namespace xlb {
 
 class Port {
-public:
+ public:
   struct Status {
-    uint32_t speed;   // speed in mbps: 1000, 40000, etc. 0 for vports
-    bool full_duplex; // full-duplex enabled?
-    bool autoneg;     // auto-negotiated speed and duplex?
-    bool up;          // link up?
+    uint32_t speed;    // speed in mbps: 1000, 40000, etc. 0 for vports
+    bool full_duplex;  // full-duplex enabled?
+    bool autoneg;      // auto-negotiated speed and duplex?
+    bool up;           // link up?
   };
 
   struct Conf {
@@ -41,14 +32,14 @@ public:
 
   const Conf &conf() const { return conf_; }
 
-protected:
+ protected:
   explicit Port() : conf_() {}
 
   // Current configuration
   Conf conf_;
 
-private:
+ private:
   DISALLOW_COPY_AND_ASSIGN(Port);
 };
 
-} // namespace xlb
+}  // namespace xlb

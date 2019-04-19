@@ -1,23 +1,17 @@
 #pragma once
 
-#include <type_traits>
-
-#include <glog/logging.h>
-
 #include "modules/arp_inc.h"
 #include "modules/common.h"
 #include "modules/ether_out.h"
 #include "modules/ipv4_inc.h"
 
-#include "utils/lock_less_queue.h"
-
 namespace xlb::modules {
 
 class EtherInc final : public Module {
  public:
-  EtherInc(uint8_t weight) : weight_(weight), kni_ring_(CONFIG.kni.ring_size) {
-    DLOG(INFO) << "[EtherInc] Init with weight: " << int(weight_)
-               << " ring size: " << kni_ring_.Capacity();
+  EtherInc() : kni_ring_(CONFIG.kni.ring_size) {
+    F_DLOG(INFO) << "init with weight: "
+                 << " ring size: " << kni_ring_.Capacity();
   }
 
   void InitInSlave(uint16_t wid) override;
@@ -26,7 +20,8 @@ class EtherInc final : public Module {
   inline void Process(Context *ctx, PacketBatch *batch);
 
  private:
-  uint8_t weight_;
+  // For sending packets received from kni to pmd (in slave)
+  static constexpr uint8_t kWeight = 10;
   utils::LockLessQueue<Packet *, true, false> kni_ring_;
 };
 

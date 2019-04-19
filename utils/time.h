@@ -1,11 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <cstdlib>
-#include <ctime>
-
-#include <sys/time.h>
-
+#include "utils/common.h"
 
 namespace xlb::utils {
 
@@ -30,21 +25,13 @@ inline uint64_t Rdtsc() {
   return tsc.tsc_64;
 }
 
-inline uint64_t TscToNs(uint64_t cycles) {
-  return cycles / tsc_ns;
-}
+inline uint64_t TscToNs(uint64_t cycles) { return cycles / tsc_ns; }
 
-inline uint64_t TscToUs(uint64_t cycles) {
-  return cycles / tsc_us;
-}
+inline uint64_t TscToUs(uint64_t cycles) { return cycles / tsc_us; }
 
-inline uint64_t TscToMs(uint64_t cycles) {
-  return cycles / tsc_ms;
-}
+inline uint64_t TscToMs(uint64_t cycles) { return cycles / tsc_ms; }
 
-inline uint64_t TscToSec(uint64_t cycles) {
-  return cycles / tsc_sec;
-}
+inline uint64_t TscToSec(uint64_t cycles) { return cycles / tsc_sec; }
 
 /* Return current time in seconds since the Epoch.
  * This is consistent with Python's time.time() */

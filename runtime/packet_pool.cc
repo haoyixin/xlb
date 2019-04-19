@@ -1,14 +1,6 @@
-#include "packet_pool.h"
-
-#include <sys/mman.h>
-
-#include <rte_errno.h>
-#include <rte_mempool.h>
-
-#include "utils/numa.h"
-
-#include "config.h"
-#include "dpdk.h"
+#include "runtime/packet_pool.h"
+#include "runtime/config.h"
+#include "runtime/dpdk.h"
 
 namespace xlb {
 namespace {
@@ -32,8 +24,8 @@ void init_packet(rte_mempool *mp, void *, void *mbuf, unsigned index) {
 PacketPool::PacketPool(size_t capacity, int socket_id) {
   // TODO: support multi numa node
 
-  LOG(INFO) << "[PacketPool] Creating with capacity: " << capacity
-            << " packets on node: " << (socket_id == -1 ? 0 : socket_id);
+  F_LOG(INFO) << "creating with capacity: " << capacity
+              << " packets on node: " << (socket_id == -1 ? 0 : socket_id);
 
   pool_ = rte_mempool_create_empty("PacketPool", capacity, sizeof(Packet),
                                    capacity > 1024 ? kMaxCacheSize : 0,

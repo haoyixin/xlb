@@ -1,10 +1,7 @@
-#include "conn.h"
+#include "conntrack/conn.h"
+#include "conntrack/table.h"
 
-#include <cstdint>
-
-#include "table.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 namespace {
 
@@ -256,7 +253,7 @@ tcp_conntrack Conn::UpdateState(tcp_bit_set index, ip_conntrack_dir dir) {
   return new_state;
 }
 
-idx_t Conn::index() const { return (this - &CTABLE.conns_[0]); }
+uint32_t Conn::index() const { return (this - &CTABLE.conns_[0]); }
 
 ip_conntrack_dir Conn::direction(Tuple4 &tuple) {
   // Need to make sure local ip is not used as vip, rsip or cip
@@ -287,4 +284,4 @@ std::ostream &operator<<(std::ostream &os, const Conn &conn) {
   return os;
 }
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

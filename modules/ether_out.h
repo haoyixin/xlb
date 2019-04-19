@@ -1,21 +1,16 @@
 #pragma once
 
 #include "modules/common.h"
-
 #include "modules/port_out.h"
-#include "utils/lock_less_queue.h"
 
 namespace xlb::modules {
 
 class EtherOut : public Module {
  public:
-  EtherOut(uint8_t weight)
-      : weight_(weight),
-        //        src_hw_addr_(CONFIG.nic.mac_address),
-        gw_hw_addr_(Singleton<Ethernet::Address>::instance()),
+  EtherOut()
+      : gw_hw_addr_(Singleton<Ethernet::Address>::instance()),
         kni_ring_(CONFIG.kni.ring_size) {
-    LOG(INFO) << "[EtherOut] Source mac address: "
-              << CONFIG.nic.mac_address.ToString();
+    F_LOG(INFO) << "source mac address: " << CONFIG.nic.mac_address.ToString();
   }
 
   void InitInMaster() override;
@@ -27,7 +22,10 @@ class EtherOut : public Module {
   //  void Process(Context *ctx, PacketBatch *batch);
 
  private:
-  uint8_t weight_;
+  // For sending packets received from pmd to kni (in master)
+  static constexpr uint8_t kWeight = 200;
+
+  //  uint8_t weight_;
   //  const Ethernet::Address &src_hw_addr_;
   const Ethernet::Address &gw_hw_addr_;
   utils::LockLessQueue<Packet *, false, true> kni_ring_;

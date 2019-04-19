@@ -1,19 +1,7 @@
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <iomanip>
-#include <string>
-#include <type_traits>
-
-#include <rte_atomic.h>
-#include <rte_config.h>
-#include <rte_mbuf.h>
-
-#include <utils/copy.h>
-#include <utils/simd.h>
-
-#include "xbuf_layout.h"
+#include "runtime/common.h"
+#include "runtime/xbuf_layout.h"
 
 /* NOTE: NEVER use rte_pktmbuf_*() directly,
  *       unless you know what you are doing */
@@ -286,14 +274,15 @@ class alignas(64) Packet {
       __m128i mbuf_ptrs = _mm_set_epi64x(reinterpret_cast<uintptr_t>(mbuf1),
                                          reinterpret_cast<uintptr_t>(mbuf0));
 
-      buf_addrs_actual = gather_m128i(&mbuf0->buf_addr_, &mbuf1->buf_addr_);
+      buf_addrs_actual =
+          utils::gather_m128i(&mbuf0->buf_addr_, &mbuf1->buf_addr_);
       buf_addrs_derived = _mm_add_epi64(mbuf_ptrs, offset);
 
       /* refcnt and nb_segs must be 1 */
-      info = gather_m128i(&mbuf0->rearm_data_, &mbuf1->rearm_data_);
+      info = utils::gather_m128i(&mbuf0->rearm_data_, &mbuf1->rearm_data_);
       info = _mm_and_si128(info, info_mask);
 
-      pools = gather_m128i(&mbuf0->pool_, &mbuf1->pool_);
+      pools = utils::gather_m128i(&mbuf0->pool_, &mbuf1->pool_);
 
       vcmp1 = _mm_cmpeq_epi64(buf_addrs_derived, buf_addrs_actual);
       vcmp2 = _mm_cmpeq_epi64(info, info_simple);

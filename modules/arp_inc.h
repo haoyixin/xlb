@@ -1,7 +1,5 @@
 #pragma once
 
-#include "config.h"
-
 #include "modules/common.h"
 #include "modules/ether_out.h"
 

@@ -1,10 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <iomanip>
-#include <iostream>
-#include <vector>
+#include "utils/common.h"
 
 namespace xlb::utils {
 
@@ -49,7 +45,7 @@ class EndianBase<uint64_t> {
 //       will be different depending on whether rhs is native or big endian,
 //       which may not be immediately clear from the variable name.
 template <typename T>
-class[[gnu::packed]] BigEndian final : public EndianBase<T> {
+class [[gnu::packed]] BigEndian final : public EndianBase<T> {
  public:
   BigEndian() = default;
   BigEndian(const BigEndian<T> &o) = default;
@@ -149,7 +145,7 @@ static_assert(sizeof(be32_t) == 4, "be32_t is not 4 bytes");
 static_assert(sizeof(be64_t) == 8, "be64_t is not 8 bytes");
 
 // Copy data from val to *ptr. Set "big_endian" to store in big endian
-bool uint64_to_bin(void *ptr, uint64_t val, size_t size, bool big_endian);
+// bool uint64_to_bin(void *ptr, uint64_t val, size_t size, bool big_endian);
 
 // this is to make sure BigEndian has constexpr constructor and value()
 static_assert(be32_t(0x1234).value() == 0x1234, "Something is wrong");

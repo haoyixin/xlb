@@ -1,12 +1,6 @@
 #pragma once
 
-#include <string>
-
-#include <rte_ethdev.h>
-
-#include "utils/metric.h"
-
-#include "port.h"
+#include "ports/common.h"
 
 namespace xlb::ports {
 

@@ -1,33 +1,16 @@
-#include "config.h"
+#include "runtime/config.h"
 
 #define CONFIGURU_IMPLEMENTATION 1
+#include <3rdparty/configuru.hpp>
 
-#include "3rdparty/configuru.hpp"
-
-#include <boost/algorithm/cxx11/any_of.hpp>
-#include <boost/fiber/numa/topology.hpp>
-
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-
-#include <rte_pci.h>
-
-#include "utils/boost.h"
-#include "utils/common.h"
-#include "utils/endian.h"
-#include "utils/numa.h"
-
-#include "headers/ether.h"
-#include "headers/ip.h"
-
-DEFINE_string(config, "../config.json", "Path of config file.");
+DEFINE_string(config, "../config.json", "path of config file.");
 
 namespace xlb {
 
 namespace {
 
 void error_reporter(std::string str) {
-  LOG(FATAL) << "Failed to parse config: " << str;
+  F_LOG(FATAL) << "failed to parse config: " << str;
 }
 
 }  // namespace

@@ -1,10 +1,6 @@
 #pragma once
 
-#include <3rdparty/typestring.hh>
-#include <3rdparty/bvar/combiner.h>
-
-#include <bvar/bvar.h>
-
+#include "utils/common.h"
 #include "utils/format.h"
 
 namespace xlb::utils {
@@ -14,9 +10,11 @@ namespace xlb::utils {
 using _Adder = bvar::Adder<uint64_t>;
 using _PerSecond = bvar::PerSecond<_Adder>;
 
-template <typename P, typename C> struct Metric {
-public:
-  template <typename S, typename... SS> static bool Expose() {
+template <typename P, typename C>
+struct Metric {
+ public:
+  template <typename S, typename... SS>
+  static bool Expose() {
     using utils::Format;
     if (internal<S>::count.expose_as(
             P::data(), Format("%s_%s_count", C::data(), S::data())) != 0)
@@ -32,14 +30,19 @@ public:
       return true;
   }
 
-  template <typename S> static auto &Adder() { return internal<S>::count; }
+  template <typename S>
+  static auto &Adder() {
+    return internal<S>::count;
+  }
 
-  template <typename S> static auto &PerSecond() {
+  template <typename S>
+  static auto &PerSecond() {
     return internal<S>::per_second;
   }
 
-private:
-  template <typename S> struct internal {
+ private:
+  template <typename S>
+  struct internal {
     static _Adder count;
     static _PerSecond per_second;
   };

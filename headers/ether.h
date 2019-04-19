@@ -1,13 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <type_traits>
-
-#include "utils/endian.h"
-
-#include "utils/copy.h"
-
 #include "headers/common.h"
 
 namespace xlb::headers {
@@ -15,7 +7,7 @@ namespace xlb::headers {
 struct [[gnu::packed]] Ethernet {
   struct [[gnu::packed]] Address {
     Address() = default;
-    Address(const uint8_t *addr) { utils::Copy(bytes, addr, kSize); }
+    Address(const uint8_t *addr) { utils::CopyInlined(bytes, addr, kSize); }
     Address(const std::string &str);
 
     static constexpr size_t kSize = 6;

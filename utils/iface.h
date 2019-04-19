@@ -1,13 +1,10 @@
 #pragma once
 
-#include <string>
-
-#include "headers/ether.h"
+#include "utils/common.h"
 
 namespace xlb::utils {
 
-bool SetHwAddr(const std::string &ifname,
-               const headers::Ethernet::Address &addr);
+bool SetHwAddr(const std::string &ifname, const uint8_t *addr);
 /*
  * TODO: fix it
 bool SetIpAddr(const std::string &ifname, const std::string &addr);

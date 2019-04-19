@@ -1,10 +1,6 @@
 #pragma once
 
-#include <rte_kni.h>
-
-#include "utils/metric.h"
-
-#include "port.h"
+#include "ports/common.h"
 
 namespace xlb::ports {
 

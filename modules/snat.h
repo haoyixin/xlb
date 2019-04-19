@@ -4,7 +4,7 @@
 
 namespace xlb::modules {
 
-class DNat : public Module {
+class SNat : public Module {
  public:
 
  private:
@@ -12,4 +12,3 @@ class DNat : public Module {
 };
 
 }
-

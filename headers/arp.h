@@ -1,10 +1,8 @@
 #pragma once
 
+#include "headers/common.h"
 #include "headers/ether.h"
 #include "headers/ip.h"
-#include "utils/endian.h"
-
-#include "headers/common.h"
 
 namespace xlb::headers {
 

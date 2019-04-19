@@ -1,22 +1,5 @@
-#include "dpdk.h"
-
-#include <syslog.h>
-#include <unistd.h>
-#include <cstring>
-#include <string>
-
-#include <rte_cycles.h>
-#include <rte_eal.h>
-#include <rte_launch.h>
-#include <rte_memory.h>
-
-#include <glog/logging.h>
-
-#include "utils/allocator.h"
-#include "utils/boost.h"
-#include "utils/numa.h"
-
-#include "config.h"
+#include "runtime/dpdk.h"
+#include "runtime/config.h"
 
 namespace xlb {
 namespace {
@@ -30,13 +13,13 @@ void enable_syslog() { setlogmask(0xff); }
 // for log messages during rte_eal_init()
 ssize_t dpdk_log_init_writer(void *, const char *data, size_t len) {
   enable_syslog();
-  LOG(INFO) << "[DPDK] " << std::string(data, len);
+  F_LOG(INFO) << std::string(data, len);
   disable_syslog();
   return len;
 }
 
 ssize_t dpdk_log_writer(void *, const char *data, size_t len) {
-  LOG(INFO)<< "[DPDK] " << std::string(data, len);
+  F_LOG(INFO) << std::string(data, len);
   return len;
 }
 
@@ -117,7 +100,7 @@ void init_eal() {
 
 void InitDpdk() {
   if (!dpdk_initialized.test_and_set()) {
-    LOG(INFO) << "[DPDK] Initializing DPDK";
+    F_LOG(INFO) << "initializing dpdk";
     init_eal();
     utils::InitDefaultAllocator(CONFIG.nic.socket);
   }

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <memory>
-
-#include "config.h"
-#include "packet.h"
+#include "runtime/common.h"
+#include "runtime/config.h"
+#include "runtime/packet.h"
 
 namespace xlb {
 
@@ -11,9 +10,9 @@ namespace xlb {
 // pre-populated Packet objects, which can be fetched via Alloc().
 // Alloc() and Free() are thread-safe.
 class PacketPool {
-public:
+ public:
   explicit PacketPool(size_t capacity = CONFIG.mem.packet_pool,
-             int socket_id = CONFIG.nic.socket);
+                      int socket_id = CONFIG.nic.socket);
   ~PacketPool();
 
   // PacketPool is neither copyable nor movable.
@@ -37,13 +36,13 @@ public:
   // TODO: not to expose this
   rte_mempool *pool() { return pool_; }
 
-protected:
-  static const size_t kDefaultCapacity = (1 << 16) - 1; // 64k - 1
-  static const size_t kMaxCacheSize = 512;              // per-core cache size
+ protected:
+  static const size_t kDefaultCapacity = (1 << 16) - 1;  // 64k - 1
+  static const size_t kMaxCacheSize = 512;               // per-core cache size
 
-private:
+ private:
   rte_mempool *pool_;
   friend class Packet;
 };
 
-} // namespace xlb
+}  // namespace xlb

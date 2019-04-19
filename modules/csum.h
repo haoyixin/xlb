@@ -1,9 +1,5 @@
 #pragma once
 
-#include <type_traits>
-
-#include <rte_mbuf.h>
-
 #include "modules/common.h"
 #include "modules/ether_out.h"
 

@@ -1,21 +1,77 @@
-/* This header file contains general (not XLB specific) C/C++ definitions */
-
 #pragma once
 
-#include <unistd.h>
-
+#include <cassert>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include <cxxabi.h>
+#include <x86intrin.h>
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <bitset>
+#include <experimental/filesystem>
+#include <experimental/memory_resource>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <new>
+#include <optional>
+#include <queue>
+#include <regex>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include <boost/algorithm/cxx11/any_of.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/range/algorithm/find_if.hpp>
+#include <boost/range/algorithm/sort.hpp>
+#include <boost/range/algorithm/unique.hpp>
+#include <boost/range/algorithm_ext/erase.hpp>
+#include <boost/range/irange.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+
+#include <3rdparty/bvar/combiner.h>
+#include <3rdparty/typestring.hh>
+
+#include <bvar/bvar.h>
+#include <glog/logging.h>
+
+#include <rte_config.h>
+#include <rte_cycles.h>
+#include <rte_errno.h>
+#include <rte_malloc.h>
+#include <rte_prefetch.h>
+#include <rte_ring.h>
 
 #if __cplusplus < 201703L  // pre-C++17?
 #error Must be built with C++17
 #endif
 
-/* Hint for performance optimization. Same as _nDCHECK() of TI compilers */
+/* Hint for performance optimization */
 #define promise(cond)                     \
   ({                                      \
     if (!(cond)) __builtin_unreachable(); \
@@ -75,114 +131,19 @@ static inline uint64_t align_ceil_pow2(uint64_t v) {
   void operator=(const TypeName &) = delete
 // A macro to disallow all the implicit constructors, namely the
 // default constructor, copy constructor and operator= functions.
-//
-// This should be used in the private: declarations for a class
-// that wants to prevent anyone from instantiating it. This is
-// especially useful for classes containing only static methods.
 #define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName) \
   TypeName() = delete;                           \
   DISALLOW_COPY_AND_ASSIGN(TypeName)
 
-// Used to explicitly mark the return value of a function as unused. If you are
-// really sure you don't want to do anything with the return value of a function
-// that has been marked WARN_UNUSED_RESULT, wrap it with this. Example:
-//
-//   std::unique_ptr<MyType> my_var = ...;
-//   if (TakeOwnership(my_var.get()) == SUCCESS)
-//     ignore_result(my_var.release());
-//
+// Used to explicitly mark the return value of a function as unused.
 template <typename T>
 inline void ignore_result(const T &) {}
-
-// An RAII holder for file descriptors.  When initialized with a file desciptor,
-// takes
-// ownership of the fd, meaning that when this holder instance is destroyed the
-// fd is
-// closed.  Primarily useful in unit tests where we want to ensure that previous
-// tests
-// have been cleaned up before starting new ones.
-class unique_fd {
- public:
-  // Constructs a unique fd that owns the given fd.
-  unique_fd(int fd) : fd_(fd) {}
-
-  // Move constructor
-  unique_fd(unique_fd &&other) : fd_(other.fd_) { other.fd_ = -1; }
-
-  // Destructor, which closes the fd if not -1.
-  ~unique_fd() {
-    if (fd_ != -1) {
-      close(fd_);
-    }
-  }
-
-  // Resets this instance and closes the fd held, if any.
-  void reset() {
-    if (fd_ != -1) {
-      close(fd_);
-    }
-    fd_ = -1;
-  }
-
-  // Releases the held fd from ownership.  Returns -1 if no fd is held.
-  int release() {
-    int ret = fd_;
-    fd_ = -1;
-    return ret;
-  }
-
-  int get() const { return fd_; }
-
- private:
-  int fd_;
-
-  DISALLOW_COPY_AND_ASSIGN(unique_fd);
-};
-
-// Inserts the given item into the container in sorted order.  Starts from the
-// end of the container and swaps forward.  Assumes the container is already
-// sorted.
-template <typename T, typename U>
-inline void InsertSorted(T &container, U &item) {
-  container.push_back(item);
-
-  for (size_t i = container.size() - 1; i > 0; --i) {
-    auto &prev = container[i - 1];
-    auto &cur = container[i];
-    if (cur < prev) {
-      std::swap(prev, cur);
-    } else {
-      break;
-    }
-  }
-}
-
-// Returns the absolute difference between `lhs` and `rhs`.
-template <typename T>
-T absdiff(const T &lhs, const T &rhs) {
-  return lhs > rhs ? lhs - rhs : rhs - lhs;
-}
-
-struct PairHasher {
-  template <typename T1, typename T2>
-  std::size_t operator()(const std::pair<T1, T2> &p) const noexcept {
-    // Adopted from Google's cityhash Hash128to64(), MIT licensed
-    const uint64_t kMul = 0x9ddfea08eb382d69ULL;
-    std::size_t x = std::hash<T1>{}(p.first);
-    std::size_t y = std::hash<T2>{}(p.second);
-    uint64_t a = (x ^ y) * kMul;
-    a ^= (a >> 47);
-    uint64_t b = (x ^ y) * kMul;
-    b ^= (b >> 47);
-    b *= kMul;
-    return static_cast<size_t>(b);
-  }
-};
 
 inline size_t hash_combine(size_t h1, size_t h2) {
   return h2 ^ (h1 + 0x9e3779b9 + (h2 << 6) + (h2 >> 2));
 }
 
+// Thread unsafe version of shared_ptr
 template <typename T>
 using unsafe_ptr = std::__shared_ptr<T, __gnu_cxx::_S_single>;
 
@@ -191,8 +152,6 @@ inline unsafe_ptr<T> allocate_unsafe(const A &a, Args &&... args) {
   return std::__allocate_shared<T, __gnu_cxx::_S_single, A>(
       a, std::forward<Args>(args)...);
 }
-
-using idx_t = uint32_t;
 
 template <typename T>
 struct expose_protected_ctor : public T {
@@ -219,4 +178,24 @@ std::string demangle(T *obj) {
   return s;
 }
 
+namespace pmr = std::experimental::pmr;
+namespace fs = std::experimental::filesystem;
 
+#define F_LOG(severity) (LOG(severity) << "[" << __FUNCTION__ << "] ")
+
+#if DCHECK_IS_ON()
+
+#define F_DLOG(severity) (DLOG(severity) << "[" << __FUNCTION__ << "] ")
+#define F_DVLOG(verboselevel) DVLOG(verboselevel) << "[" << __FUNCTION__ << "] "
+
+#else
+
+#define F_DLOG(severity) \
+  true ? (void)0 : google::LogMessageVoidify() & LOG(severity)
+
+#define F_DVLOG(verboselevel)         \
+  (true || !VLOG_IS_ON(verboselevel)) \
+      ? (void)0                       \
+      : google::LogMessageVoidify() & LOG(INFO)
+
+#endif

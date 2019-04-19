@@ -1,23 +1,11 @@
 #include "utils/iface.h"
 
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-
-#include <functional>
-#include <string>
-
-#include "glog/logging.h"
-
-#include "headers/ip.h"
-
 namespace xlb::utils {
 
 namespace {
 
 bool do_command(const std::string &ifname,
-                const std::function<int(int, ifreq *)> &func) {
+                const std::function<int(int, ifreq *)> &&func) {
   int sock_fd = socket(PF_INET, SOCK_DGRAM, 0);
   if (sock_fd < 0) return false;
 
@@ -32,15 +20,12 @@ bool do_command(const std::string &ifname,
 
 }  // namespace
 
-bool SetHwAddr(const std::string &ifname,
-               const headers::Ethernet::Address &addr) {
-  if (ifname.empty() || ifname == "lo" || addr.IsZero() || addr.IsBroadcast())
-    return false;
+bool SetHwAddr(const std::string &ifname, const uint8_t *addr) {
+  if (ifname.empty() || ifname == "lo") return false;
 
   return do_command(ifname, [&addr](int fd, ifreq *ifr) -> int {
     ifr->ifr_hwaddr.sa_family = 1;
-    memcpy(ifr->ifr_hwaddr.sa_data, addr.bytes,
-           headers::Ethernet::Address::kSize);
+    memcpy(ifr->ifr_hwaddr.sa_data, addr, 6);
     return ioctl(fd, SIOCSIFHWADDR, ifr);
   });
 }

@@ -1,22 +1,14 @@
 #pragma once
 
-#include <algorithm>
-//#include <experimental/type_traits>
-#include <functional>
-#include <string>
-
-#include "utils/common.h"
-#include "utils/singleton.h"
-
-#include "packet_batch.h"
-#include "packet_pool.h"
-
-#include "scheduler.h"
-#include "worker.h"
+#include "runtime/common.h"
+#include "runtime/packet_batch.h"
+#include "runtime/packet_pool.h"
+#include "runtime/scheduler.h"
+#include "runtime/worker.h"
 
 namespace xlb {
 
-using Modules = utils::Singleton<std::vector<class Module *>>;
+using Modules = utils::Singleton<utils::vector<class Module *>>;
 
 class Module {
  protected:
@@ -66,8 +58,8 @@ class Module {
     auto worker = Worker::current();
 
     DCHECK(Worker::current());
-    W_LOG(INFO) << "[RegisterTask] module: " << module_name()
-                << " with weight: " << unsigned(weight);
+    W_LOG(INFO) << "module: " << module_name()
+                << " weight: " << unsigned(weight);
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 

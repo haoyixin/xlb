@@ -1,21 +1,11 @@
 #pragma once
 
-#include <memory>
-#include <thread>
-#include <vector>
-
-#include "utils/common.h"
-#include "utils/random.h"
-#include "utils/singleton.h"
-#include "utils/time.h"
+#include "runtime/common.h"
 
 namespace xlb {
 
 class Scheduler;
-
 class PacketPool;
-
-// class Task;
 
 class Worker {
  public:
@@ -34,9 +24,7 @@ class Worker {
   PacketPool *packet_pool() const { return packet_pool_; }
   utils::Random *random() const { return random_; }
 
-  //  uint64_t silent_drops() const { return silent_drops_; }
   uint64_t current_tsc() const { return current_tsc_; }
-  //  uint64_t current_ns() const { return current_ns_; }
   uint64_t busy_loops() const { return busy_loops_; }
 
   bool master() const { return master_; }
@@ -102,12 +90,15 @@ class Worker {
 #define W_TSC (W_CURRENT->current_tsc())
 #define W_ID (W_CURRENT->id())
 
-#define W_LOG(severity) (LOG(severity) << *W_CURRENT << " ")
+#define W_LOG(severity) \
+  (LOG(severity) << *W_CURRENT << " [" << __FUNCTION__ << "] ")
 
 #if DCHECK_IS_ON()
 
-#define W_DLOG(severity) (DLOG(severity) << *W_CURRENT << " ")
-#define W_DVLOG(verboselevel) DVLOG(verboselevel) << *W_CURRENT << " "
+#define W_DLOG(severity) \
+  (DLOG(severity) << *W_CURRENT << " [" << __FUNCTION__ << "] ")
+#define W_DVLOG(verboselevel) \
+  DVLOG(verboselevel) << *W_CURRENT << " [" << __FUNCTION__ << "] "
 
 #else
 

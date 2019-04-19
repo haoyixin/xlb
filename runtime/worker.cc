@@ -1,19 +1,7 @@
-#include "worker.h"
-
-#include <glog/logging.h>
-#include <pthread.h>
-#include <rte_lcore.h>
-
-#include "utils/common.h"
-#include "utils/format.h"
-#include "utils/numa.h"
-#include "utils/singleton.h"
-#include "utils/time.h"
-
-#include "packet_pool.h"
-
+#include "runtime/worker.h"
+#include "runtime/packet_pool.h"
 // TODO: ......
-#include "module.h"
+#include "runtime/module.h"
 
 namespace xlb {
 
@@ -51,8 +39,7 @@ void *Worker::run() {
   if (!master_)
     while (!master_started_) INST_BARRIER();
 
-  W_LOG(INFO) << "[Worker] Starting on core: " << core_
-              << " socket: " << socket_;
+  W_LOG(INFO) << "Starting on core: " << core_ << " socket: " << socket_;
 
   scheduler_ = new Scheduler();
 
@@ -61,11 +48,10 @@ void *Worker::run() {
   else
     scheduler_->Loop<true>();
 
-  W_LOG(INFO) << "[Worker] Quitting on core: " << core_
-              << " socket: " << socket_;
+  W_LOG(INFO) << "Quitting on core: " << core_ << " socket: " << socket_;
 
   if (!master_ && (counter_.fetch_sub(1) == 1)) {
-    W_LOG(INFO) << "[Worker] All slaves have been aborted";
+    W_LOG(INFO) << "All slaves have been aborted";
     slaves_aborted_ = true;
   }
 

@@ -1,8 +1,5 @@
 #include "utils/format.h"
 
-#include <cassert>
-#include <memory>
-
 namespace xlb::utils {
 
 std::string FormatVarg(const char *fmt, va_list ap) {

@@ -1,18 +1,10 @@
 #pragma once
 
-#include <cstdint>
-#include <stack>
+#include "conntrack/common.h"
+#include "conntrack/service.h"
+#include "conntrack/tuple.h"
 
-#include "utils/endian.h"
-#include "utils/timer.h"
-
-#include "headers/tcp.h"
-
-#include "common.h"
-#include "service.h"
-#include "tuple.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 // TODO: not to expose these
 
@@ -54,9 +46,9 @@ inline tcp_bit_set get_conntrack_index(const Tcp *tcph);
 class alignas(64) Conn : public EventBase<Conn> {
  public:
   Conn() = default;
-  ~Conn() override = default;
+  ~Conn() = default;
 
-  void execute(TimerWheel<Conn> *timer) override;
+  void execute(TimerWheel<Conn> *timer);
 
   // Here you need to ensure that the tuple belongs to this connection
   inline ip_conntrack_dir direction(Tuple4 &tuple);
@@ -64,20 +56,22 @@ class alignas(64) Conn : public EventBase<Conn> {
   tcp_conntrack UpdateState(tcp_bit_set index, ip_conntrack_dir dir);
 
  private:
+  tcp_conntrack state_;
+
   Tuple2 client_;
   Tuple2 local_;
+
   VirtSvc::Ptr virt_;
   RealSvc::Ptr real_;
 
-  tcp_conntrack state_;
-
-  inline idx_t index() const;
+  inline uint32_t index() const;
 
   friend inline std::ostream &operator<<(std::ostream &os, const Conn &conn);
 
   friend class ConnTable;
 };
 
-static_assert(sizeof(Conn) == 128);
+static_assert(sizeof(EventBase<Conn>) == 32);
+static_assert(sizeof(Conn) == 64);
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

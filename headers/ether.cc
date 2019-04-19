@@ -1,12 +1,4 @@
-#include "ether.h"
-
-#include <cstring>
-#include <sstream>
-
-#include "utils/copy.h"
-#include "utils/endian.h"
-#include "utils/format.h"
-#include "utils/random.h"
+#include "headers/ether.h"
 
 namespace xlb::headers {
 
@@ -19,18 +11,18 @@ Address::Address(const std::string &str) {
 }
 
 bool Address::FromString(const std::string &str) {
-  int ret = utils::Parse(str, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", &bytes[0],
-                         &bytes[1], &bytes[2], &bytes[3], &bytes[4], &bytes[5]);
+  int ret = Parse(str, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", &bytes[0],
+                  &bytes[1], &bytes[2], &bytes[3], &bytes[4], &bytes[5]);
   return (ret == Address::kSize);
 }
 
 std::string Address::ToString() const {
-  return utils::Format("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", bytes[0],
-                       bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
+  return Format("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", bytes[0], bytes[1],
+                bytes[2], bytes[3], bytes[4], bytes[5]);
 }
 
 void Address::Randomize() {
-  utils::Random rng;
+  Random rng;
 
   for (auto &byte : bytes) byte = rng.Integer() & 0xff;
 

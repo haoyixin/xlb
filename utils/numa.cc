@@ -1,24 +1,15 @@
 #include "utils/numa.h"
 
-#include <experimental/filesystem>
-#include <utility>
-#include <fstream>
-#include <regex>
-
-#include <glog/logging.h>
-
 #include "utils/boost.h"
 #include "utils/format.h"
 #include "utils/singleton.h"
-
-namespace fs = std::experimental::filesystem;
 
 namespace xlb::utils {
 
 namespace {
 
 class directory_iterator {
-private:
+ private:
   fs::directory_iterator i_;
   fs::directory_iterator e_;
   std::regex exp_;
@@ -34,7 +25,7 @@ private:
     return true;
   }
 
-public:
+ public:
   typedef std::input_iterator_tag iterator_category;
   typedef const std::pair<std::string, fs::path> value_type;
   typedef std::ptrdiff_t difference_type;
@@ -118,8 +109,7 @@ std::set<std::string> pcis_from_node(uint32_t node) {
     std::getline(std::ifstream{iter->second / "numa_node"}, content);
 
     int pci_node = std::stoi(content);
-    if ((pci_node < 0 ? 0 : pci_node) == node)
-      pcis.insert(iter->first);
+    if ((pci_node < 0 ? 0 : pci_node) == node) pcis.insert(iter->first);
   }
 
   return pcis;
@@ -184,7 +174,7 @@ std::vector<Node> create_topology() {
 }
 
 class topology : public TopologyBase {
-public:
+ public:
   topology() : TopologyBase(create_topology()) {}
 
   Node *find(std::function<bool(Node &)> func) {
@@ -195,14 +185,14 @@ public:
 
 topology &topology_singleton() { return Singleton<topology>::instance(); }
 
-#define _RETURN_ID_OPT_BY_FIELD_HAS_VALUE(_FIELD, _VALUE)                      \
-  do {                                                                         \
-    auto node = topology_singleton().find(                                     \
-        [&](auto &node) { return any_of_equal(node._FIELD, _VALUE); });        \
-    return node != nullptr ? std::make_optional(node->id) : std::nullopt;      \
+#define _RETURN_ID_OPT_BY_FIELD_HAS_VALUE(_FIELD, _VALUE)                 \
+  do {                                                                    \
+    auto node = topology_singleton().find(                                \
+        [&](auto &node) { return any_of_equal(node._FIELD, _VALUE); });   \
+    return node != nullptr ? std::make_optional(node->id) : std::nullopt; \
   } while (0)
 
-} // namespace
+}  // namespace
 
 TopologyBase &Topology() {
   return static_cast<TopologyBase &>(topology_singleton());

@@ -1,13 +1,8 @@
 #pragma once
 
-#include <atomic>
-
-#include <rte_ring.h>
-
-#include <glog/logging.h>
-
-#include "utils/allocator.h"
 #include "utils/common.h"
+#include "utils/allocator.h"
+#include "utils/format.h"
 
 namespace xlb::utils {
 
@@ -40,16 +35,16 @@ class LockLessQueue {
 
     ring_ = rte_ring_create(name.c_str(), actual_capacity, socket, flags);
 
-    DLOG(INFO) << "[LockLessQueue] Created ring on socket: " << socket
-               << " name: " << name << " capacity: " << actual_capacity
-               << " error: " << rte_strerror(rte_errno);
+    F_DLOG(INFO) << "created ring on socket: " << socket << " name: " << name
+                 << " capacity: " << actual_capacity
+                 << " error: " << rte_strerror(rte_errno);
 
     CHECK_NOTNULL(ring_);
   }
 
   ~LockLessQueue() {
     if (ring_) {
-      DLOG(INFO) << "Free ring name: " << ring_->name;
+      F_DLOG(INFO) << "free ring name: " << ring_->name;
       rte_ring_free(ring_);
     }
   }

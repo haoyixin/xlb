@@ -1,21 +1,18 @@
 #pragma once
 
-#include "utils/allocator.h"
-#include "utils/x_map.h"
+#include "conntrack/common.h"
+#include "conntrack/metric.h"
+#include "conntrack/tuple.h"
 
-#include "common.h"
-#include "config.h"
-#include "metric.h"
-#include "tuple.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
                 public EventBase<SvcBase>,
                 public INew {
  public:
   SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric);
-  ~SvcBase() override = default;
+  // WARNING: This is not a virtual function (optimized for size)
+  ~SvcBase() = default;
 
   auto &tuple() const { return tuple_; }
 
@@ -25,7 +22,7 @@ class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
   void IncrPacketsOut(uint64_t n) { packets_out_ += n; }
   void INcrBytesOut(uint64_t n) { bytes_out_ += n; }
 
-  void execute(TimerWheel<SvcBase> *timer) override;
+  void execute(TimerWheel<SvcBase> *timer);
 
  protected:
   static const uint64_t kTimerStart = 3000;
@@ -52,9 +49,9 @@ class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
 
 class alignas(64) RealSvc : public SvcBase {
  public:
-  using Ptr = utils::intrusive_ptr<RealSvc>;
+  using Ptr = intrusive_ptr<RealSvc>;
 
-  ~RealSvc() override;
+  ~RealSvc();
 
   // Return false if empty
   bool GetLocal(Tuple2 &tuple);
@@ -68,7 +65,7 @@ class alignas(64) RealSvc : public SvcBase {
 
   void bind_local_ips();
 
-  std::stack<Tuple2, utils::vector<Tuple2>> local_tuple_pool_;
+  std::stack<Tuple2, vector<Tuple2>> local_tuple_pool_;
 
   friend class VirtSvc;
   friend class SvcTable;
@@ -76,19 +73,21 @@ class alignas(64) RealSvc : public SvcBase {
   DISALLOW_IMPLICIT_CONSTRUCTORS(RealSvc);
 };
 
+static_assert(sizeof(RealSvc) == 128);
+
 class alignas(64) VirtSvc : public SvcBase {
  public:
-  using Ptr = utils::intrusive_ptr<VirtSvc>;
-  using RsVec = utils::vector<RealSvc::Ptr>;
+  using Ptr = intrusive_ptr<VirtSvc>;
+  using RsVec = vector<RealSvc::Ptr>;
 
-  ~VirtSvc() override = default;
+  ~VirtSvc() = default;
 
   inline RealSvc::Ptr SelectRs(Tuple2 &ctuple);
 
  private:
   VirtSvc(Tuple2 &tuple, SvcMetrics::Ptr &metric)
       : SvcBase(tuple, metric), rs_vec_(ALLOC) {
-//    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
+    //    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
   }
 
   RsVec rs_vec_;
@@ -99,4 +98,6 @@ class alignas(64) VirtSvc : public SvcBase {
   DISALLOW_IMPLICIT_CONSTRUCTORS(VirtSvc);
 };
 
-}  // namespace xlb
+static_assert(sizeof(VirtSvc) == 128);
+
+}  // namespace xlb::conntrack

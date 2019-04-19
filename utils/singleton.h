@@ -1,11 +1,5 @@
 #pragma once
 
-#include <array>
-#include <atomic>
-#include <utility>
-
-#include <glog/logging.h>
-
 #include "utils/common.h"
 
 namespace xlb::utils {
@@ -27,13 +21,13 @@ class Singleton {
  private:
   struct logger_t {
     logger_t() {
-      DLOG(INFO) << "[Singleton] creating type: " << demangle<T>()
-                 << " tag: " << demangle<Tag>();
+      F_DLOG(INFO) << "creating type: " << demangle<T>()
+                   << " tag: " << demangle<Tag>();
     }
 
     ~logger_t() {
-      DLOG(INFO) << "[Singleton] destructing type: " << demangle<T>()
-                 << " tag: " << demangle<Tag>();
+      F_DLOG(INFO) << "destructing type: " << demangle<T>()
+                   << " tag: " << demangle<Tag>();
     }
   };
 };
@@ -46,8 +40,8 @@ class UnsafeSingleton {
 
   template <typename... Args>
   static T &Init(Args &&... args) {
-    DLOG(INFO) << "[UnsafeSingleton] initializing type: " << demangle<T>()
-               << " tag: " << demangle<Tag>();
+    F_DLOG(INFO) << "[Unsafe] initializing type: " << demangle<T>()
+                 << " tag: " << demangle<Tag>();
     return *(new (&instance_.value) T(std::forward<Args>(args)...));
   }
 
@@ -57,8 +51,8 @@ class UnsafeSingleton {
   union Wrapper {
     constexpr Wrapper() : raw{0} {}
     ~Wrapper() {
-      DLOG(INFO) << "[UnsafeSingleton] destructing type: " << demangle<T>()
-                 << " tag: " << demangle<Tag>();
+      F_DLOG(INFO) << "[Unsafe] destructing type: " << demangle<T>()
+                   << " tag: " << demangle<Tag>();
       value.~T();
     }
 
@@ -80,8 +74,8 @@ class UnsafeSingletonTLS {
 
   template <typename... Args>
   static T &Init(Args &&... args) {
-    DLOG(INFO) << "[UnsafeSingletonTLS] initializing type: " << demangle<T>()
-               << " tag: " << demangle<Tag>();
+    F_DLOG(INFO) << "[TLS] initializing type: " << demangle<T>()
+                 << " tag: " << demangle<Tag>();
     if (!dtor_.inited) {
       new (instance_.data()) T(std::forward<Args>(args)...);
       dtor_.inited = true;
@@ -92,18 +86,18 @@ class UnsafeSingletonTLS {
   static T &instance() { return *reinterpret_cast<T *>(instance_.data()); }
 
  private:
-  struct Dtor {
-    Dtor() : inited(false){};
-    ~Dtor() {
-      DLOG(INFO) << "[UnsafeSingletonTLS] destructing type: " << demangle<T>()
-                 << " tag: " << demangle<Tag>();
+  struct dtor_t {
+    dtor_t() : inited(false){};
+    ~dtor_t() {
+      F_DLOG(INFO) << "[TLS] destructing type: " << demangle<T>()
+                   << " tag: " << demangle<Tag>();
       if (inited) instance().~T();
     }
 
     bool inited;
   };
 
-  static thread_local Dtor dtor_;
+  static thread_local dtor_t dtor_;
 
   alignas(alignof(T)) static __thread std::array<uint8_t, sizeof(T)> instance_;
 };
@@ -112,11 +106,8 @@ template <typename T, typename Tag>
 alignas(alignof(T)) __thread std::array<uint8_t, sizeof(T)> UnsafeSingletonTLS<
     T, Tag>::instance_;
 
-// template <typename T, typename Tag>
-//__thread bool UnsafeSingletonTLS<T, Tag>::Dtor::inited_ = false;
-
 template <typename T, typename Tag>
-thread_local
-    typename UnsafeSingletonTLS<T, Tag>::Dtor UnsafeSingletonTLS<T, Tag>::dtor_;
+thread_local typename UnsafeSingletonTLS<T, Tag>::dtor_t
+    UnsafeSingletonTLS<T, Tag>::dtor_;
 
 }  // namespace xlb::utils

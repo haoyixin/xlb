@@ -6,14 +6,14 @@ namespace xlb::headers {
 
 // A basic TCP header definition loosely based on the BSD version.
 struct [[gnu::packed]] Tcp {
-  //  enum Flag : uint8_t {
-  //    kFin = 0x01,
-  //    kSyn = 0x02,
-  //    kRst = 0x04,
-  //    kPsh = 0x08,
-  //    kAck = 0x10,
-  //    kUrg = 0x20,
-  //  };
+  enum Flag : uint8_t {
+    kFin = 0x01,
+    kSyn = 0x02,
+    kRst = 0x04,
+    kPsh = 0x08,
+    kAck = 0x10,
+    kUrg = 0x20,
+  };
 
   be16_t src_port;  // Source port.
   be16_t dst_port;  // Destination port.

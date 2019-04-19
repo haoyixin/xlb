@@ -1,23 +1,23 @@
-#include "metric.h"
+#include "conntrack/metric.h"
 
-namespace xlb {
+namespace xlb::conntrack {
 
 namespace {
 
 std::string combine_metric_name(std::string_view name,
                                 std::string_view suffix) {
-  return utils::Format("%s_%s", std::string(name).c_str(),
-                       std::string(suffix).c_str());
+  return Format("%s_%s", std::string(name).c_str(),
+                std::string(suffix).c_str());
 }
 
 std::string combine_prefix(std::string_view type) {
-  return utils::Format("xlb_service_%s", std::string(type).c_str());
+  return Format("xlb_service_%s", std::string(type).c_str());
 }
 
 std::string combine_svc_metric_name(const Tuple2 &tuple,
                                     std::string_view name) {
-  return utils::Format("%s_%d_%s", headers::ToIpv4Address(tuple.ip).c_str(),
-                       tuple.port.value(), std::string(name).c_str());
+  return Format("%s_%d_%s", headers::ToIpv4Address(tuple.ip).c_str(),
+                tuple.port.value(), std::string(name).c_str());
 }
 
 }  // namespace
@@ -93,4 +93,4 @@ void SvcMetricsPool::PurgeRs(Tuple2 &tuple) {
   }
 }
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

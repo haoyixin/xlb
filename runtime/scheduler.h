@@ -1,18 +1,8 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <type_traits>
-#include <vector>
-
-#include "utils/common.h"
-#include "utils/extended_priority_queue.h"
-#include "utils/metric.h"
-#include "utils/singleton.h"
-#include "utils/time.h"
-
-#include "packet_batch.h"
-#include "worker.h"
+#include "runtime/common.h"
+#include "runtime/packet_batch.h"
+#include "runtime/worker.h"
 
 namespace xlb {
 
@@ -40,9 +30,9 @@ class Scheduler {
   }
 
   // Functor used by a Worker's Scheduler to run a task in a module.
-  class Task {
+  class alignas(64) Task : public utils::INew {
    public:
-    class Context {
+    class alignas(64) Context {
      public:
       Context() = default;
       void Drop(Packet *pkt);
@@ -82,10 +72,11 @@ class Scheduler {
 
    private:
     Func func_;
-    Context context_;
 
     uint8_t current_weight_;
     uint8_t max_weight_;
+
+    alignas(64) Context context_;
 
     friend Scheduler;
   };

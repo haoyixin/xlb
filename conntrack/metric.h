@@ -1,19 +1,9 @@
 #pragma once
 
-#include <3rdparty/bvar/combiner.h>
+#include "conntrack/common.h"
+#include "conntrack/tuple.h"
 
-#include <string>
-#include <string_view>
-#include <unordered_map>
-
-#include <bvar/bvar.h>
-
-#include "headers/ip.h"
-
-#include "common.h"
-#include "tuple.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 class Metric {
  public:
@@ -35,7 +25,7 @@ class Metric {
 
 class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
  public:
-  using Ptr = utils::intrusive_ptr<SvcMetrics>;
+  using Ptr = intrusive_ptr<SvcMetrics>;
 
   ~SvcMetrics() = default;
 
@@ -72,7 +62,7 @@ class SvcMetricsPool {
   void PurgeRs(Tuple2 &tuple);
 
  private:
-  using SvcMetricsMap = utils::unordered_map<Tuple2, SvcMetrics::Ptr>;
+  using SvcMetricsMap = unordered_map<Tuple2, SvcMetrics::Ptr>;
 
   SvcMetricsMap vs_map_;
   SvcMetricsMap rs_map_;
@@ -80,4 +70,4 @@ class SvcMetricsPool {
   DISALLOW_COPY_AND_ASSIGN(SvcMetricsPool);
 };
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

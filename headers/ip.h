@@ -1,9 +1,5 @@
 #pragma once
 
-#include <string>
-
-#include "utils/endian.h"
-
 #include "headers/common.h"
 
 namespace xlb::headers {
@@ -16,10 +12,10 @@ std::string ToIpv4Address(const be32_t &addr);
 
 // An IPv4 header definition loosely based on the BSD version.
 struct [[gnu::packed]] Ipv4 {
-//  enum Flag : uint16_t {
-//    kMF = 1 << 13,  // More fragments
-//    kDF = 1 << 14,  // Do not fragment
-//  };
+  enum Flag : uint16_t {
+    kMF = 1 << 13,  // More fragments
+    kDF = 1 << 14,  // Do not fragment
+  };
 
   static constexpr uint16_t kOffsetMask = 0x1fff;
 
@@ -75,6 +71,7 @@ struct [[gnu::packed]] Ipv4 {
 static_assert(std::is_pod<Ipv4>::value, "not a POD type");
 static_assert(sizeof(Ipv4) == 20, "struct Ipv4 is incorrect");
 
+/*
 struct Ipv4Prefix {
   // Implicit default constructor is not allowed
   Ipv4Prefix() = delete;
@@ -98,5 +95,6 @@ struct Ipv4Prefix {
   be32_t addr{};
   be32_t mask{};
 };
+ */
 
 }  // namespace xlb::headers

@@ -1,6 +1,6 @@
-#include "table.h"
+#include "conntrack/table.h"
 
-namespace xlb {
+namespace xlb::conntrack {
 
 VirtSvc::Ptr SvcTable::FindVs(Tuple2 &tuple) {
   VsMap::Entry *entry = vs_map_.Find(tuple);
@@ -66,7 +66,7 @@ bool SvcTable::EnsureRsAttachedTo(VirtSvc::Ptr &vs, RealSvc::Ptr &rs) {
     if (it->second == vs->tuple_) return true;
 
   W_DVLOG(1) << "[STABLE] Attaching RealSvc: " << rs->tuple_
-               << " to VirtSvc: " << vs->tuple_;
+             << " to VirtSvc: " << vs->tuple_;
   // TODO: is it safe ?
   vs->rs_vec_.emplace_back(rs);
   rs_vs_map_.emplace(rs->tuple_, vs->tuple_);
@@ -85,8 +85,8 @@ void SvcTable::EnsureRsDetachedFrom(Tuple2 &vs, Tuple2 &rs) {
 
   if (attached) {
     auto vs_ptr = vs_map_.Find(vs)->value;
-    utils::remove_erase_if(
-        vs_ptr->rs_vec_, [&rs](auto &rs_ptr) { return rs_ptr->tuple_ == rs; });
+    remove_erase_if(vs_ptr->rs_vec_,
+                    [&rs](auto &rs_ptr) { return rs_ptr->tuple_ == rs; });
     rs_vs_map_.erase(it);
   }
 }
@@ -112,7 +112,7 @@ void SvcTable::EnsureVsNotExist(Tuple2 &vs) {
 
 bool SvcTable::RsDetached(Tuple2 &rs) { return rs_vs_map_.count(rs) == 0; }
 
-Conn *ConnTable::Find(xlb::Tuple4 &tuple) {
+Conn *ConnTable::Find(Tuple4 &tuple) {
   IdxMap ::Entry *entry = idx_map_.Find(tuple);
 
   if (entry == nullptr) return nullptr;
@@ -184,4 +184,4 @@ Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp) {
   W_DVLOG(2) << "[CTABLE] Creating Conn: " << *conn;
 }
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

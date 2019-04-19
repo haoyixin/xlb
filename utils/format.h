@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include <cstdarg>
-#include <string>
+#include "utils/common.h"
 
 namespace xlb::utils {
 

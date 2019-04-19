@@ -1,6 +1,6 @@
 #pragma once
 
-#include <atomic>
+#include "runtime/common.h"
 
 namespace xlb {
 

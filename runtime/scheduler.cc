@@ -1,13 +1,5 @@
-#include "scheduler.h"
-
-#include <utility>
-
-#include <glog/logging.h>
-
-#include "module.h"
-
-#include "utils/allocator.h"
-#include "utils/common.h"
+#include "runtime/scheduler.h"
+#include "runtime/module.h"
 
 namespace xlb {
 
@@ -59,9 +51,9 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
 
 Scheduler::Task::Task(Func &&func, uint8_t weight)
     : func_(std::move(func)),
-      context_(),
       current_weight_(weight),
-      max_weight_(weight) {
+      max_weight_(weight),
+      context_() {
   CHECK_NE(weight, 0);
   context_.dead_batch_.Clear();
   context_.stage_batch_.Clear();

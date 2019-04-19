@@ -1,11 +1,6 @@
 #pragma once
 
-#include <algorithm>
-#include <queue>
-#include <vector>
-
-#include <glog/logging.h>
-
+#include "utils/common.h"
 #include "utils/allocator.h"
 
 namespace xlb::utils {
@@ -14,11 +9,11 @@ namespace xlb::utils {
 // directly.
 template <typename T, typename Cmp = std::less<T>>
 class extended_priority_queue
- : public std::priority_queue<T, std::vector<T>, Cmp> {
+ : public std::priority_queue<T, vector<T>, Cmp> {
  public:
   T &mutable_top() { return this->c.front(); }
 
-  const std::vector<T> &container() const { return this->c; }
+  const vector<T> &container() const { return this->c; }
 
   // Notifies the priority queue that the key of the top element may have been
   // decreased, necessitating a reorganization of the heap structure.
@@ -53,6 +48,7 @@ class extended_priority_queue
     // DCHECK(std::is_heap(v.begin(), v.end()));
   }
 
+  /*
   template <class F>
   inline bool delete_single_element(F func) {
     auto &v = this->c;
@@ -65,6 +61,7 @@ class extended_priority_queue
     }
     return false;
   }
+   */
 };
 
 }  // namespace xlb::utils

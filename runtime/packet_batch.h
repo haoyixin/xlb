@@ -1,10 +1,7 @@
 #pragma once
 
-#include <array>
-
-#include "utils/copy.h"
-
-#include "packet.h"
+#include "runtime/common.h"
+#include "runtime/packet.h"
 
 namespace xlb {
 

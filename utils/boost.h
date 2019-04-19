@@ -1,18 +1,6 @@
 #pragma once
 
-#include <boost/algorithm/cxx11/any_of.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/range/irange.hpp>
-#include <boost/range/algorithm/sort.hpp>
-#include <boost/range/algorithm/unique.hpp>
-//#include <boost/range/begin.hpp>
-//#include <boost/range/end.hpp>
-//#include <boost/functional/hash.hpp>
-#include <boost/intrusive_ptr.hpp>
-#include <boost/range/algorithm/find_if.hpp>
-#include <boost/range/algorithm_ext/erase.hpp>
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include "utils/common.h"
 
 namespace xlb::utils {
 
@@ -27,8 +15,6 @@ using boost::algorithm::trim;
 using boost::sort;
 using boost::unique;
 
-// using boost::begin;
-// using boost::end;
 using boost::find_if;
 using boost::intrusive_ptr;
 using boost::remove_erase_if;

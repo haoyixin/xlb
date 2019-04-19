@@ -1,14 +1,7 @@
-#include <utility>
+#include "conntrack/service.h"
+#include "conntrack/table.h"
 
-#include "config.h"
-#include "service.h"
-#include "table.h"
-#include "worker.h"
-
-#include "utils/allocator.h"
-#include "utils/boost.h"
-
-namespace xlb {
+namespace xlb::conntrack {
 
 SvcBase::SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric)
     : tuple_(tuple), metrics_(metric) {
@@ -34,7 +27,7 @@ void SvcBase::reset_metrics() {
   bytes_out_ = 0;
 }
 
-void SvcBase::execute(xlb::TimerWheel<xlb::SvcBase> *timer) {
+void SvcBase::execute(TimerWheel<SvcBase> *timer) {
   W_DVLOG(2) << "[SvcBase] commit metrics of: " << tuple_;
 
   commit_metrics();
@@ -54,15 +47,14 @@ void RealSvc::bind_local_ips() {
   if (W_MASTER) return;
 
   local_tuple_pool_ = decltype(local_tuple_pool_)(
-      utils::make_vector<Tuple2>(std::numeric_limits<uint16_t>::max()));
+      make_vector<Tuple2>(std::numeric_limits<uint16_t>::max()));
 
   auto range = CONFIG.slave_local_ips.equal_range(W_ID);
 
   for (auto it = range.first; it != range.second; ++it) {
     W_DVLOG(1) << "[RealSvc] Binding local ip: " << ToIpv4Address(it->second)
                << " to: " << tuple_;
-    for (auto i :
-         utils::irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
+    for (auto i : irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
       local_tuple_pool_.emplace(it->second, be16_t(i));
   }
 }
@@ -85,4 +77,4 @@ RealSvc::~RealSvc() {
   STABLE.rs_map_.erase(tuple_);
 }
 
-}  // namespace xlb
+}  // namespace xlb::conntrack

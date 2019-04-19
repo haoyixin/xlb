@@ -5,22 +5,22 @@ namespace xlb::modules {
 void EtherInc::InitInSlave(uint16_t wid) {
   RegisterTask(
       [this](Context *ctx) -> Result {
-        PacketBatch batch{};
+        PacketBatch batch;
 
-        if (!kni_ring_.Empty()) {
-          batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
+        batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
+
+        if (!batch.Empty())
           Handle<PortOut<PMD>>(ctx, &batch);
-        }
 
         return {.packets = batch.cnt()};
       },
-      weight_);
+      kWeight);
 }
 
 template <>
 void EtherInc::Process<KNI>(Context *ctx, PacketBatch *batch) {
   while (!kni_ring_.Push(batch->pkts(), batch->cnt()))
-    W_LOG(ERROR) << "Too many packets from kernel are on the fly";
+    W_LOG(ERROR) << "too many packets from kernel are on the fly";
 }
 
 template <>

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-
+#include "utils/common.h"
 #include "utils/time.h"
 
 namespace xlb::utils {

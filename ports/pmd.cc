@@ -1,18 +1,5 @@
 #include "ports/pmd.h"
 
-#include <rte_ethdev_pci.h>
-#include <rte_flow.h>
-#include <rte_ip.h>
-
-#include "utils/boost.h"
-#include "utils/format.h"
-
-#include "headers/ether.h"
-#include "headers/ip.h"
-
-#include "config.h"
-#include "packet_pool.h"
-
 namespace xlb::ports {
 
 namespace {
@@ -68,8 +55,8 @@ void filter_add(uint16_t port_id, const std::string &dst_ip, uint16_t qid) {
 
 void set_lip_affinity(uint16_t port_id, const utils::be32_t &dst,
                       uint16_t qid) {
-  LOG(INFO) << "[PMD] Set local ip affinity: " << headers::ToIpv4Address(dst)
-            << " to rxq: " << qid;
+  F_LOG(INFO) << "set local ip affinity: " << headers::ToIpv4Address(dst)
+              << " to rxq: " << qid;
 
   //  utils::be32_t dst{};
   //  headers::ParseIpv4Address(dst_ip, &dst);
@@ -123,8 +110,8 @@ void init_driver() {
 
   CHECK_NE(num_dpdk_ports, 0);
 
-  LOG(INFO) << "[PMD] " << static_cast<int>(num_dpdk_ports)
-            << " nics have been recognized";
+  F_LOG(INFO) << static_cast<int>(num_dpdk_ports)
+              << " nics have been recognized";
 
   for (auto i : utils::irange((uint16_t)0, num_dpdk_ports)) {
     struct rte_eth_dev_info dev_info {};
@@ -146,12 +133,12 @@ void init_driver() {
     numa_node = rte_eth_dev_socket_id(static_cast<int>(i));
     rte_eth_macaddr_get(i, reinterpret_cast<ether_addr *>(mac_addr.bytes));
 
-    LOG(INFO) << "[PMD] DPDK port_id: " << static_cast<int>(i)
-              << " driver: " << dev_info.driver_name
-              << " RXQ: " << dev_info.max_rx_queues
-              << " TXQ: " << dev_info.max_tx_queues
-              << " mac_address: " << mac_addr.ToString()
-              << " pci_address: " << pci_info << " numa_node: " << numa_node;
+    F_LOG(INFO) << "port_id: " << static_cast<int>(i)
+                << " driver: " << dev_info.driver_name
+                << " RXQ: " << dev_info.max_rx_queues
+                << " TXQ: " << dev_info.max_tx_queues
+                << " mac_address: " << mac_addr.ToString()
+                << " pci_address: " << pci_info << " numa_node: " << numa_node;
   }
 }
 
@@ -230,14 +217,14 @@ PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
   // Call the blocking version update cache once
   rte_eth_link_get(dpdk_port_id_, &dpdk_status);
 
-  LOG(INFO) << "[PMD] initialize successful, speed: " << dpdk_status.link_speed
-            << " full-duplex: " << dpdk_status.link_duplex
-            << " auto-neg: " << dpdk_status.link_autoneg
-            << " up: " << dpdk_status.link_status;
+  F_LOG(INFO) << "initialize successful, speed: " << dpdk_status.link_speed
+              << " full-duplex: " << dpdk_status.link_duplex
+              << " auto-neg: " << dpdk_status.link_autoneg
+              << " up: " << dpdk_status.link_status;
 }
 
 PMD::~PMD() {
-  LOG(INFO) << "Stopping dpdk port: " << dpdk_port_id_;
+  F_LOG(INFO) << "stopping dpdk port: " << dpdk_port_id_;
   rte_eth_dev_stop(dpdk_port_id_);
 }
 
