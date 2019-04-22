@@ -23,7 +23,7 @@
 #include "runtime/module.h"
 #include "runtime/worker.h"
 
-#include "rpc/control.h"
+#include "rpc/server.h"
 
 using namespace xlb;
 using namespace xlb::ports;

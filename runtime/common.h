@@ -54,3 +54,4 @@
 #include "utils/simd.h"
 #include "utils/singleton.h"
 #include "utils/time.h"
+#include "utils/channel.h"

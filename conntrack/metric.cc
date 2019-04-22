@@ -36,7 +36,7 @@ void Metric::Hide() {
   count_.hide();
 }
 
-SvcMetrics::SvcMetrics(std::string_view type, Tuple2 &tuple)
+SvcMetrics::SvcMetrics(std::string_view type, const Tuple2 &tuple)
     : conns_(combine_prefix(type), combine_svc_metric_name(tuple, "conns")),
       packets_in_(combine_prefix(type),
                   combine_svc_metric_name(tuple, "packets_in")),
@@ -55,7 +55,7 @@ void SvcMetrics::Hide() {
   bytes_out_.Hide();
 }
 
-SvcMetrics::Ptr SvcMetricsPool::GetVs(Tuple2 &tuple) {
+SvcMetrics::Ptr SvcMetricsPool::GetVs(const Tuple2 &tuple) {
   auto pair = vs_map_.try_emplace(tuple, nullptr);
   if (!pair.second) return pair.first->second;
 
@@ -63,7 +63,7 @@ SvcMetrics::Ptr SvcMetricsPool::GetVs(Tuple2 &tuple) {
   return pair.first->second;
 }
 
-SvcMetrics::Ptr SvcMetricsPool::GetRs(Tuple2 &tuple) {
+SvcMetrics::Ptr SvcMetricsPool::GetRs(const Tuple2 &tuple) {
   auto pair = rs_map_.try_emplace(tuple, nullptr);
   if (!pair.second) return pair.first->second;
 
@@ -71,7 +71,7 @@ SvcMetrics::Ptr SvcMetricsPool::GetRs(Tuple2 &tuple) {
   return pair.first->second;
 }
 
-void SvcMetricsPool::PurgeVs(Tuple2 &tuple) {
+void SvcMetricsPool::PurgeVs(const Tuple2 &tuple) {
   auto iter = vs_map_.find(tuple);
 
   // In fact, only the metric is hidden here and the ptr is deleted from the
@@ -84,7 +84,7 @@ void SvcMetricsPool::PurgeVs(Tuple2 &tuple) {
   }
 }
 
-void SvcMetricsPool::PurgeRs(Tuple2 &tuple) {
+void SvcMetricsPool::PurgeRs(const Tuple2 &tuple) {
   auto iter = rs_map_.find(tuple);
 
   if (iter != rs_map_.end()) {

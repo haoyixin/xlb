@@ -65,6 +65,7 @@ set(OBJS
         runtime/worker.cc
         runtime/config.cc
         rpc/pb/xlb.pb.cc
+        rpc/server.cc
         rpc/control.cc
         conntrack/service.cc
         conntrack/table.cc

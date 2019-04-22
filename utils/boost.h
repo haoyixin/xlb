@@ -29,4 +29,7 @@ template <typename T>
 using intrusive_ref_counter =
     boost::intrusive_ref_counter<T, boost::thread_safe_counter>;
 
+using boost::sp_adl_block::intrusive_ptr_add_ref;
+using boost::sp_adl_block::intrusive_ptr_release;
+
 }  // namespace xlb::utils

@@ -2,7 +2,7 @@
 
 void signal_handler(int sig) {
   F_LOG(INFO) << "interrupt signal (" << sig << ") received";
-  RpcServer::Abort();
+  Server::Abort();
   Worker::Abort();
 }
 
@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
   // TODO: conntrack -> dnat -> snat -> toa -> csum / rpc
 
   Worker::Launch();
-  RpcServer::Launch();
+  Server::Launch();
 
-  RpcServer::Wait();
+  Server::Wait();
   Worker::Wait();
 }

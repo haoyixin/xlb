@@ -3,7 +3,7 @@
 
 namespace xlb::conntrack {
 
-SvcBase::SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric)
+SvcBase::SvcBase(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
     : tuple_(tuple), metrics_(metric) {
   reset_metrics();
   //  stable_->timer_.Schedule(this, kCommitInterval * tsc_sec);
@@ -34,7 +34,7 @@ void SvcBase::execute(TimerWheel<SvcBase> *timer) {
   STABLE.timer_.ScheduleInRange(this, kTimerStart * tsc_ms, kTimerEnd * tsc_ms);
 }
 
-RealSvc::Ptr VirtSvc::SelectRs(Tuple2 &ctuple) {
+RealSvc::Ptr VirtSvc::SelectRs(const Tuple2 &ctuple) {
   if (unlikely(rs_vec_.empty())) return {};
 
   // TODO: abstract selector

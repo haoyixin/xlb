@@ -1,19 +1,8 @@
 syntax = "proto2";
 
-package xlb.pb;
+package xlb.rpc;
 
 option cc_generic_services = true;
-
-// common
-message Value {
-    oneof value {
-        bool bool = 1;
-        string string = 2;
-        int64 int64 = 3;
-        uint64 uint64 = 4;
-        float float = 5;
-    }
-}
 
 message Error {
     required int32 code = 1;
@@ -23,88 +12,35 @@ message Error {
 message EmptyRequest {
 }
 
-message EmptyResponse {
+message GeneralResponse {
     required Error error = 1;
 }
 
-message ConfResponse {
+message Service {
+    required string addr = 1;
+    required uint32 port = 2;
+}
+
+message VirtualServiceRequest {
+    required Service svc = 1;
+}
+
+message RealServiceRequest {
+    required Service virt = 1;
+    required Service real = 2;
+}
+
+message ServicesResponse {
     required Error error = 1;
-    map<string, Value> pairs = 2;
-}
-
-message StatsResponse {
-    required Error error = 1;
-    map<string, Value> pairs = 2;
-}
-
-// global
-message GlobalConfRequest {
-    map<string, Value> pairs = 1;
-}
-
-// virtual server
-message VirtualServerIdent {
-    required string vaddr = 1;
-    required uint32 vport = 2;
-    required string proto = 3;
-}
-
-message ListVirtualServerResponse {
-    required Error error = 1;
-    repeated VirtualServerIdent vlist = 2;
-}
-
-message VirtualServerConfRequest {
-    required VirtualServerIdent ident = 1;
-    map<string, Value> pairs = 2;
-}
-
-// real server
-message RealServerIdent {
-    required string vaddr = 1;
-    required uint32 vport = 2;
-    required string proto = 3;
-    required string raddr = 4;
-    required uint32 rport = 5;
-}
-
-message ListRealServerResponse {
-    required Error error = 1;
-    repeated RealServerIdent rlist = 2;
-}
-
-message RealServerConfRequest {
-    required RealServerIdent ident = 1;
-    map<string, Value> pairs = 2;
+    repeated Service list = 2;
 }
 
 service Control {
-    // global
-    rpc SetGlobalConf (GlobalConfRequest) returns (EmptyResponse);
-    rpc GetGlobalConf (EmptyRequest) returns (ConfResponse);
+    rpc AddVirtualService (VirtualServiceRequest) returns (GeneralResponse);
+    rpc DelVirtualService (VirtualServiceRequest) returns (GeneralResponse);
+    rpc ListVirtualService (EmptyRequest) returns (ServicesResponse);
 
-    // virtual server
-    rpc AddVirtualServer (VirtualServerIdent) returns (EmptyResponse);
-    rpc DelVirtualServer (VirtualServerIdent) returns (EmptyResponse);
-    rpc ListVirtualServer (EmptyRequest) returns (ListVirtualServerResponse);
-    rpc SetVirtualServerConf (VirtualServerConfRequest) returns (EmptyResponse);
-    rpc GetVirtualServerConf (VirtualServerIdent) returns (ConfResponse);
-
-    // real server
-    rpc AddRealServer (RealServerIdent) returns (EmptyResponse);
-    rpc DelRealServer (RealServerIdent) returns (EmptyResponse);
-    rpc ListRealServer (VirtualServerIdent) returns (ListRealServerResponse);
-    rpc SetRealServerConf (RealServerConfRequest) returns (EmptyResponse);
-    rpc GetRealServerConf (RealServerIdent) returns (ConfResponse);
-}
-
-service Stats {
-    // global
-    rpc GetGlobalStats (EmptyRequest) returns (StatsResponse);
-
-    // virtual server
-    rpc GetVirtualServerStats (VirtualServerIdent) returns (StatsResponse);
-
-    // real server
-    rpc GetRealServerStats (RealServerIdent) returns (StatsResponse);
+    rpc AttachRealService (RealServiceRequest) returns (GeneralResponse);
+    rpc DetachRealService (RealServiceRequest) returns (GeneralResponse);
+    rpc ListRealService (VirtualServiceRequest) returns (ServicesResponse);
 }

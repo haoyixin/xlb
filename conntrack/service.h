@@ -10,7 +10,7 @@ class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
                 public EventBase<SvcBase>,
                 public INew {
  public:
-  SvcBase(Tuple2 &tuple, SvcMetrics::Ptr &metric);
+  SvcBase(const Tuple2 &tuple, SvcMetrics::Ptr &metric);
   // WARNING: This is not a virtual function (optimized for size)
   ~SvcBase() = default;
 
@@ -58,7 +58,7 @@ class alignas(64) RealSvc : public SvcBase {
   void PutLocal(const Tuple2 &tuple);
 
  private:
-  RealSvc(Tuple2 &tuple, SvcMetrics::Ptr &metric)
+  RealSvc(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
       : SvcBase(tuple, metric), local_tuple_pool_() {
     bind_local_ips();
   }
@@ -82,10 +82,14 @@ class alignas(64) VirtSvc : public SvcBase {
 
   ~VirtSvc() = default;
 
-  inline RealSvc::Ptr SelectRs(Tuple2 &ctuple);
+  inline RealSvc::Ptr SelectRs(const Tuple2 &ctuple);
+
+  // TODO: lazy transform
+  auto begin() { return rs_vec_.begin(); }
+  auto end() { return rs_vec_.end(); }
 
  private:
-  VirtSvc(Tuple2 &tuple, SvcMetrics::Ptr &metric)
+  VirtSvc(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
       : SvcBase(tuple, metric), rs_vec_(ALLOC) {
     //    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
   }

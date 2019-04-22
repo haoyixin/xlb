@@ -32,7 +32,7 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
   void Hide();
 
  protected:
-  SvcMetrics(std::string_view type, Tuple2 &tuple);
+  SvcMetrics(std::string_view type, const Tuple2 &tuple);
 
  private:
   Metric conns_;
@@ -55,11 +55,11 @@ class SvcMetricsPool {
   }
   ~SvcMetricsPool() = default;
 
-  SvcMetrics::Ptr GetVs(Tuple2 &tuple);
-  SvcMetrics::Ptr GetRs(Tuple2 &tuple);
+  SvcMetrics::Ptr GetVs(const Tuple2 &tuple);
+  SvcMetrics::Ptr GetRs(const Tuple2 &tuple);
 
-  void PurgeVs(Tuple2 &tuple);
-  void PurgeRs(Tuple2 &tuple);
+  void PurgeVs(const Tuple2 &tuple);
+  void PurgeRs(const Tuple2 &tuple);
 
  private:
   using SvcMetricsMap = unordered_map<Tuple2, SvcMetrics::Ptr>;
@@ -69,5 +69,8 @@ class SvcMetricsPool {
 
   DISALLOW_COPY_AND_ASSIGN(SvcMetricsPool);
 };
+
+#define SMPOOL_INIT (UnsafeSingleton<conntrack::SvcMetricsPool>::Init)
+#define SMPOOL (UnsafeSingleton<conntrack::SvcMetricsPool>::instance())
 
 }  // namespace xlb::conntrack

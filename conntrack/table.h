@@ -23,23 +23,27 @@ class SvcTable {
   }
   ~SvcTable() = default;
 
-  inline VirtSvc::Ptr FindVs(Tuple2 &tuple);
+  VirtSvc::Ptr FindVs(const Tuple2 &tuple);
 
   // TODO: make sure local ip is not used as vip or rsip
-  inline VirtSvc::Ptr EnsureVsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric);
-  inline RealSvc::Ptr EnsureRsExist(Tuple2 &tuple, SvcMetrics::Ptr &metric);
+  VirtSvc::Ptr EnsureVsExist(const Tuple2 &tuple, SvcMetrics::Ptr metric);
+  RealSvc::Ptr EnsureRsExist(const Tuple2 &tuple, SvcMetrics::Ptr metric);
 
-  inline bool EnsureRsAttachedTo(VirtSvc::Ptr &vs, RealSvc::Ptr &rs);
-  inline void EnsureRsDetachedFrom(Tuple2 &vs, Tuple2 &rs);
+  bool EnsureRsAttachedTo(VirtSvc::Ptr vs, RealSvc::Ptr rs);
+  void EnsureRsDetachedFrom(const Tuple2 &vs, const Tuple2 &rs);
 
-  inline void EnsureVsNotExist(Tuple2 &vs);
+  void EnsureVsNotExist(const Tuple2 &vs);
   // This should only be called in the master to confirm whether the rs-metric
   // in the metric-pool can be purged
-  inline bool RsDetached(Tuple2 &rs);
+  bool RsDetached(const Tuple2 &rs);
 
   const std::string &LastError() { return last_error_; }
 
   size_t Sync() { return timer_.AdvanceTo(W_TSC); }
+
+  // TODO: lazy transform
+  auto begin() { return vs_map_.begin(); }
+  auto end() { return vs_map_.end(); }
 
  private:
   using VsMap = XMap<Tuple2, VirtSvc::Ptr>;
@@ -77,7 +81,7 @@ class ConnTable {
   ~ConnTable() = default;
 
   inline Conn *Find(Tuple4 &tuple);
-  inline Conn *EnsureConnExist(VirtSvc::Ptr &vs_ptr, Tuple2 &cli_tp);
+  inline Conn *EnsureConnExist(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp);
 
   size_t Sync() { return timer_.AdvanceTo(W_TSC); }
 
@@ -104,4 +108,4 @@ namespace xlb {
 #define CTABLE_INIT (UnsafeSingletonTLS<conntrack::ConnTable>::Init)
 #define CTABLE (UnsafeSingletonTLS<conntrack::ConnTable>::instance())
 
-}
+}  // namespace xlb

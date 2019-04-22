@@ -39,6 +39,7 @@ using utils::be64_t;
 // container
 using utils::unordered_map;
 using utils::unordered_multimap;
+using utils::UnsafeSingleton;
 using utils::UnsafeSingletonTLS;
 using utils::vector;
 using utils::XMap;

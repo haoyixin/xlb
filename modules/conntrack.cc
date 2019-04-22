@@ -3,7 +3,10 @@
 
 namespace xlb::modules {
 
-void Conntrack::InitInMaster() { STABLE_INIT(); }
+void Conntrack::InitInMaster() {
+  SMPOOL_INIT();
+  STABLE_INIT();
+}
 
 void Conntrack::InitInSlave(uint16_t) {
   STABLE_INIT();
@@ -17,8 +20,6 @@ void Conntrack::InitInSlave(uint16_t) {
 }
 
 template <>
-void Conntrack::Process<PMD>(Context *ctx, Packet *packet) {
-
-}
+void Conntrack::Process<PMD>(Context *ctx, Packet *packet) {}
 
 }  // namespace xlb::modules
