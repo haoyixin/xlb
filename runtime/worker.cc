@@ -1,6 +1,7 @@
 #include "runtime/worker.h"
 #include "runtime/packet_pool.h"
 // TODO: ......
+#include "runtime/exec.h"
 #include "runtime/module.h"
 
 namespace xlb {
@@ -14,6 +15,7 @@ bool Worker::master_started_ = false;
 std::atomic<uint16_t> Worker::counter_ = 0;
 std::vector<std::thread> Worker::slave_threads_ = {};
 std::thread Worker::master_thread_ = {};
+std::thread Worker::trivial_thread_ = {};
 
 // The entry point of worker threads
 void *Worker::run() {
@@ -79,8 +81,27 @@ Worker::Worker(uint16_t core, bool master)
 }
 
 void Worker::Launch() {
+  trivial_thread_ = std::thread([]() {
+    /*
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+    CPU_SET(CONFIG.trivial_core, &cpu_set);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
+     */
+
+    Exec::RegisterTrivial();
+
+    for (;;) {
+      if (slaves_aborted() && Exec::Sync() == 0) break;
+
+      Exec::Sync();
+      usleep(1000000 / CONFIG.rpc.max_concurrency);
+    }
+  });
+
   master_thread_ = std::thread(
       [=]() { (new (&current_) Worker(CONFIG.master_core, true))->run(); });
+
 
   for (auto core : CONFIG.slave_cores)
     slave_threads_.emplace_back(
@@ -90,11 +111,10 @@ void Worker::Launch() {
 void Worker::Abort() { aborting_ = true; }
 
 void Worker::Wait() {
-  for (auto &thread : slave_threads_)
-    if (thread.joinable()) thread.join();
+  for (auto &thread : slave_threads_) thread.join();
 
-  if (master_thread_.joinable()) master_thread_.join();
-
+  master_thread_.join();
+  trivial_thread_.join();
   rte_eal_mp_wait_lcore();
 }
 

@@ -11,7 +11,7 @@ namespace xlb {
 class Scheduler {
  public:
   explicit Scheduler();
-  virtual ~Scheduler();
+  ~Scheduler() = default;
 
   // Runs the scheduler loop forever.
   template <bool master>
@@ -53,11 +53,13 @@ class Scheduler {
       friend Task;
     };
 
+    /*
     struct Compare {
       bool operator()(Task *t1, Task *t2) const {
         return t1->current_weight_ < t2->current_weight_;
       }
     };
+     */
 
     struct Result {
       uint64_t packets;
@@ -65,34 +67,34 @@ class Scheduler {
 
     using Func = std::function<Result(Context *)>;
 
-   protected:
-    explicit Task(Func &&func, uint8_t weight);
+    explicit Task(Func &&func, uint32_t weight);
 
     ~Task();
 
    private:
     Func func_;
 
-    uint8_t current_weight_;
-    uint8_t max_weight_;
+    int64_t current_weight_;
+    uint32_t max_weight_;
 
     alignas(64) Context context_;
 
     friend Scheduler;
   };
 
-  void RegisterTask(Task::Func &&func, uint8_t weight) {
-    runnable_->emplace(new Task(std::move(func), weight));
+  void RegisterTask(Task::Func &&func, uint32_t weight) {
+    runnable_.emplace_back(new Task(std::move(func), weight));
   }
 
  private:
   using M = utils::Metric<TS("xlb_scheduler"), TS("cpu")>;
-  using TaskQueue = utils::extended_priority_queue<Task *, Task::Compare>;
+  //  using TaskQueue = utils::extended_priority_queue<Task *, Task::Compare>;
+  using TaskQueue = utils::vector<Task *>;
 
   Task::Context *next_ctx();
 
-  TaskQueue *runnable_;
-  TaskQueue *blocked_;
+  TaskQueue runnable_;
+  //  TaskQueue *blocked_;
 
   uint64_t checkpoint_;
 

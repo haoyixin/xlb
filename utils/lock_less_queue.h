@@ -1,7 +1,7 @@
 #pragma once
 
-#include "utils/common.h"
 #include "utils/allocator.h"
+#include "utils/common.h"
 #include "utils/format.h"
 
 namespace xlb::utils {
@@ -30,7 +30,7 @@ class LockLessQueue {
     else if constexpr (SC)
       flags |= RING_F_SC_DEQ;
 
-    auto name = Format("[%s(%d, %d)]", demangle<T>().c_str(),
+    auto name = Format("[%d(%d, %d)]", std::hash<std::string>{}(demangle<T>()),
                        counter.fetch_add(1), flags);
 
     ring_ = rte_ring_create(name.c_str(), actual_capacity, socket, flags);

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 #add_subdirectory(${GTEST_SRC})
 #add_subdirectory(${BRPC_SRC})
 
-add_compile_options(-O0 -msse4 -mavx -Wall -Wextra)
+add_compile_options(-O3 -msse4 -mavx -Wall -Wextra)
 
 set(DPDK_LIBS
         "-Wl,--whole-archive"
@@ -90,8 +90,7 @@ set(OBJS
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
 
-#add_definitions(-DNDEBUG)
-
+add_definitions(-DNDEBUG)
 
 #add_subdirectory(abseil-cpp)
 
@@ -99,7 +98,7 @@ add_executable(xlb xlb.cc ${OBJS})
 #add_executable(timer_test tests/timer.cc ${OBJS})
 #add_executable(x_map_test tests/x_map.cc ${OBJS})
 
-#set_property(TARGET xlb PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
+set_property(TARGET xlb PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
 
 target_link_libraries(xlb ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS})
 #target_link_libraries(x_map_test ${DPDK_LIBS} ${3RD_PARTY_LIBS} ${SYS_LIBS} ${GTEST_LIBS})

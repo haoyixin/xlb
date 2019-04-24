@@ -102,6 +102,18 @@ void InitDpdk() {
   if (!dpdk_initialized.test_and_set()) {
     F_LOG(INFO) << "initializing dpdk";
     init_eal();
+
+    using utils::tsc_hz, utils::tsc_sec, utils::tsc_ms, utils::tsc_us,
+        utils::tsc_ns;
+    tsc_hz = rte_get_tsc_hz();
+
+    tsc_sec = tsc_hz;
+    tsc_ms = tsc_sec / 1000;
+    tsc_us = tsc_ms / 1000;
+    tsc_ns = tsc_us / 1000;
+
+    F_DLOG(INFO) << "tsc_hz: " << utils::tsc_hz;
+
     utils::InitDefaultAllocator(CONFIG.nic.socket);
   }
 }

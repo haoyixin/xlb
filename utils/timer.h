@@ -268,7 +268,7 @@ class alignas(64) TimerWheel {
     size_t slot_index = (abs >> kWidthBits * level) & kMask;
     auto slot = &slots_[level][slot_index];
 
-    F_DVLOG(2) << "at level: " << level << " slot_index: " << slot_index
+    F_DVLOG(4) << "at level: " << level << " slot_index: " << slot_index
                << " scheduled_at: " << abs << " now: " << now_[0];
 
     event->scheduled_at_ = abs;

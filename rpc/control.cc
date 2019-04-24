@@ -2,6 +2,7 @@
 
 #include <sstream>
 
+#include <bthread/bthread.h>
 #include <brpc/closure_guard.h>
 #include <glog/logging.h>
 
@@ -21,6 +22,7 @@
 
 namespace xlb::rpc {
 
+using conntrack::SvcMetrics;
 using conntrack::Tuple2;
 using headers::ParseIpv4Address;
 using utils::any_of_equal;
@@ -28,6 +30,24 @@ using utils::be16_t;
 using utils::be32_t;
 
 namespace {
+
+template <typename T>
+void make_error(T *resp, const std::string &str) {
+  resp->mutable_error()->set_code(-1);
+  resp->mutable_error()->set_errmsg(str);
+}
+
+template <typename T>
+void make_warn(T *resp, const std::string &str) {
+  resp->mutable_error()->set_code(1);
+  resp->mutable_error()->set_errmsg(str);
+}
+
+template <typename T>
+void make_ok(T *resp) {
+  resp->mutable_error()->set_code(0);
+  resp->mutable_error()->set_errmsg("");
+}
 
 std::pair<bool, Tuple2> validate_service(const Service &svc, Error *err) {
   std::stringstream ss;
@@ -39,7 +59,7 @@ std::pair<bool, Tuple2> validate_service(const Service &svc, Error *err) {
   }
 
   if (svc.port() > 65535) {
-    ss << "forbidden service port: " << svc.port();
+    ss << "invalid service port: " << svc.port();
     goto FAILED;
   }
 
@@ -76,17 +96,42 @@ void ControlImpl::AddVirtualService(RpcController *controller,
 
   Exec::InMaster([tuple = pair.second, response, done]() {
     brpc::ClosureGuard done_guard(done);
-    auto metric = SMPOOL.GetVs(tuple);
 
-    if (!STABLE.EnsureVsExist(tuple, metric)) {
-      response->mutable_error()->set_code(-1);
-      response->mutable_error()->set_errmsg(STABLE.LastError());
-      SMPOOL.PurgeVs(tuple);
+    if (STABLE.FindRs(tuple)) {
+      make_error(response, "recursion is not allowed");
       return;
     }
-    Exec::InSlaves([tuple, metric]() { STABLE.EnsureVsExist(tuple, metric); });
 
-    response->mutable_error()->set_code(0);
+    auto vs = STABLE.FindVs(tuple);
+    if (vs) {
+      make_warn(response, "virtual service already exists");
+      return;
+    }
+
+    if (STABLE.CountVs() >= CONFIG.svc.max_virtual_service) {
+      make_error(response, "number of virtual service exceeds the limit");
+      return;
+    }
+
+    vs = STABLE.AddVs(tuple);
+
+    if (!vs) {
+      make_error(response, STABLE.LastError());
+      return;
+    }
+
+    auto metric = SvcMetrics::Get();
+    metric->Expose("virt", tuple);
+    vs->set_metrics(metric);
+
+    Exec::InSlaves(
+        [tuple, metric]() { STABLE.AddVs(tuple)->set_metrics(metric); });
+
+    make_ok(response);
+    done_guard.release();
+    Exec::InTrivial([done]() {
+      brpc::ClosureGuard done_guard(done);
+    });
   });
 }
 
@@ -103,12 +148,23 @@ void ControlImpl::DelVirtualService(RpcController *controller,
   Exec::InMaster([tuple = pair.second, response, done]() {
     brpc::ClosureGuard done_guard(done);
 
-    STABLE.EnsureVsNotExist(tuple);
-    SMPOOL.PurgeVs(tuple);
+    auto vs = STABLE.FindVs(tuple);
+    if (!vs) {
+      make_warn(response, "virtual service does not exist");
+      return;
+    }
 
-    Exec::InSlaves([tuple]() { STABLE.EnsureVsNotExist(tuple); });
+    vs->metrics()->Hide();
+    STABLE.ForeachRs(vs, [](auto *rs) { rs->metrics()->Hide(); });
+    STABLE.RemoveVs(vs);
 
-    response->mutable_error()->set_code(0);
+    Exec::InSlaves([tuple]() { STABLE.RemoveVs(STABLE.FindVs(tuple)); });
+
+    make_ok(response);
+    done_guard.release();
+    Exec::InTrivial([done]() {
+      brpc::ClosureGuard done_guard(done);
+    });
   });
 }
 
@@ -123,13 +179,22 @@ void ControlImpl::ListVirtualService(RpcController *controller,
   Exec::InMaster([response, done]() {
     brpc::ClosureGuard done_guard(done);
 
-    for (auto &vs : STABLE) {
-      auto resp_vs = response->add_list();
-      resp_vs->set_addr(ToIpv4Address(vs.key.ip));
-      resp_vs->set_port(vs.key.port.value());
+    STABLE.ForeachVs([response](auto *vs) {
+      auto *resp_vs = response->add_list();
+      resp_vs->set_addr(ToIpv4Address(vs->tuple().ip));
+      resp_vs->set_port(vs->tuple().port.value());
+    });
+
+    if (response->list().empty()) {
+      make_warn(response, "there is no virtual service");
+      return;
     }
 
-    response->mutable_error()->set_code(0);
+    make_ok(response);
+    done_guard.release();
+    Exec::InTrivial([done]() {
+      brpc::ClosureGuard done_guard(done);
+    });
   });
 }
 
@@ -143,43 +208,73 @@ void ControlImpl::AttachRealService(RpcController *controller,
   auto rpair = validate_service(request->real(), response->mutable_error());
   if (!rpair.first) return;
 
+  if (vpair.second == rpair.second) {
+    make_error(response, "real service and virtual service can not be same");
+    return;
+  }
+
   done_guard.release();
 
   Exec::InMaster(
       [vtuple = vpair.second, rtuple = rpair.second, response, done]() {
         brpc::ClosureGuard done_guard(done);
 
+        if (STABLE.FindVs(rtuple)) {
+          make_error(response, "recursion is not allowed");
+          return;
+        }
+
         auto vs = STABLE.FindVs(vtuple);
         if (!vs) {
-          response->mutable_error()->set_code(-1);
-          response->mutable_error()->set_errmsg("virtual service is not exist");
+          make_error(response, "virtual service does not exist");
           return;
         }
 
-        auto metric = SMPOOL.GetRs(rtuple);
-        auto rs = STABLE.EnsureRsExist(rtuple, metric);
-        auto rs_fail = [&]() {
-          response->mutable_error()->set_code(-1);
-          response->mutable_error()->set_errmsg(STABLE.LastError());
-          if (STABLE.RsDetached(rtuple)) SMPOOL.PurgeRs(rtuple);
-        };
+        auto rs = STABLE.FindRs(rtuple);
+        if (rs) {
+          // In the master, the existence of rs means that there must be a vs
+          // reference to it
+          auto pair = STABLE.RsAttached(vs, rs);
+          if (pair.first) {
+            make_warn(response, "real service has attached");
+            return;
+          }
+        } else {
+          if (STABLE.CountRs() >= CONFIG.svc.max_real_service) {
+            make_error(response, "number of real service exceeds the limit");
+            return;
+          }
+          // If the 'AttachRs' is not called, rs will destroy at the end of the
+          // closure
+          rs = STABLE.AddRs(rtuple);
+          auto metric = SvcMetrics::Get();
+          if (!metric->Expose("real", rtuple)) {
+            make_error(response, "failed to expose metrics");
+            return;
+          }
 
-        if (!rs) {
-          rs_fail();
+          rs->set_metrics(metric);
+        }
+
+        if (STABLE.CountRs(vs) >= CONFIG.svc.max_real_per_virtual) {
+          make_error(
+              response,
+              "number of real service per virtual service exceeds the limit");
           return;
         }
 
-        if (!STABLE.EnsureRsAttachedTo(vs, rs)) {
-          rs_fail();
-          return;
-        }
+        STABLE.AttachRs(vs, rs);
 
-        Exec::InSlaves([vs, rs, metric]() {
-          STABLE.EnsureRsExist(rs->tuple(), metric);
-          STABLE.EnsureRsAttachedTo(vs, rs);
+        Exec::InSlaves([vtuple, rtuple, metric = rs->metrics()]() {
+          STABLE.AttachRs(STABLE.FindVs(vtuple), STABLE.AddRs(rtuple))
+              ->set_metrics(metric);
         });
 
-        response->mutable_error()->set_code(0);
+        make_ok(response);
+        done_guard.release();
+        Exec::InTrivial([done]() {
+          brpc::ClosureGuard done_guard(done);
+        });
       });
 }
 
@@ -199,20 +294,41 @@ void ControlImpl::DetachRealService(RpcController *controller,
       [vtuple = vpair.second, rtuple = rpair.second, response, done]() {
         brpc::ClosureGuard done_guard(done);
 
-        if (!STABLE.FindVs(vtuple)) {
-          response->mutable_error()->set_code(-1);
-          response->mutable_error()->set_errmsg("virtual service is not exist");
+        auto vs = STABLE.FindVs(vtuple);
+        if (!vs) {
+          make_warn(response, "virtual service does not exist");
           return;
         }
 
-        STABLE.EnsureRsDetachedFrom(vtuple, rtuple);
-        if (STABLE.RsDetached(rtuple)) SMPOOL.PurgeRs(rtuple);
+        auto rs = STABLE.FindRs(rtuple);
+        if (rs) {
+          auto pair = STABLE.RsAttached(vs, rs);
+          if (!pair.first) {
+            make_warn(response, "real service has detached");
+            return;
+          }
 
-        Exec::InSlaves([vtuple, rtuple]() {
-          STABLE.EnsureRsDetachedFrom(vtuple, rtuple);
+          STABLE.DetachRs(vs, rs, pair.second);
+
+          // For the case of adding the same rs immediately after deletion
+          if (STABLE.RsDetached(rs)) rs->metrics()->Hide();
+
+          Exec::InSlaves([vtuple, rtuple]() {
+            auto vs = STABLE.FindVs(vtuple);
+            auto rs = STABLE.FindRs(rtuple);
+
+            STABLE.DetachRs(vs, rs, STABLE.RsAttached(vs, rs).second);
+          });
+        } else {
+          make_warn(response, "real service does not exist");
+          return;
+        }
+
+        make_ok(response);
+        done_guard.release();
+        Exec::InTrivial([done]() {
+          brpc::ClosureGuard done_guard(done);
         });
-
-        response->mutable_error()->set_code(0);
       });
 }
 
@@ -232,18 +348,26 @@ void ControlImpl::ListRealService(RpcController *controller,
     auto vs = STABLE.FindVs(tuple);
 
     if (!vs) {
-      response->mutable_error()->set_code(-1);
-      response->mutable_error()->set_errmsg("virtual service is not exist");
+      make_error(response, "virtual service does not exist");
       return;
     }
 
-    for (auto &rs : *vs) {
+    STABLE.ForeachRs(vs, [response](auto *rs) {
       auto resp_rs = response->add_list();
       resp_rs->set_addr(ToIpv4Address(rs->tuple().ip));
       resp_rs->set_port(rs->tuple().port.value());
+    });
+
+    if (response->list().empty()) {
+      make_warn(response, "there is no real service");
+      return;
     }
 
-    response->mutable_error()->set_code(0);
+    make_ok(response);
+    done_guard.release();
+    Exec::InTrivial([done]() {
+      brpc::ClosureGuard done_guard(done);
+    });
   });
 }
 

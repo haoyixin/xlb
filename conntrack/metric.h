@@ -12,15 +12,14 @@ class Metric {
   void Hide();
 
  private:
-  Metric(std::string_view prefix, std::string_view name);
+  Metric() : count_(), per_second_(&count_) {}
+  bool Expose(std::string_view prefix, std::string_view name);
 
   bvar::Adder<uint64_t> count_;
   bvar::PerSecond<bvar::Adder<uint64_t>> per_second_;
 
   friend class SvcMetrics;
   friend class SvcBase;
-
-  DISALLOW_IMPLICIT_CONSTRUCTORS(Metric);
 };
 
 class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
@@ -29,10 +28,13 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
 
   ~SvcMetrics() = default;
 
+  bool Expose(std::string_view type, const Tuple2 &tuple);
   void Hide();
 
+  static Ptr Get() { return {new SvcMetrics()}; }
+
  protected:
-  SvcMetrics(std::string_view type, const Tuple2 &tuple);
+  SvcMetrics() = default;
 
  private:
   Metric conns_;
@@ -43,10 +45,9 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
 
   friend class SvcMetricsPool;
   friend class SvcBase;
-
-  DISALLOW_IMPLICIT_CONSTRUCTORS(SvcMetrics);
 };
 
+/*
 class SvcMetricsPool {
  public:
   SvcMetricsPool() : vs_map_(ALLOC), rs_map_(ALLOC) {
@@ -69,8 +70,15 @@ class SvcMetricsPool {
 
   DISALLOW_COPY_AND_ASSIGN(SvcMetricsPool);
 };
-
-#define SMPOOL_INIT (UnsafeSingleton<conntrack::SvcMetricsPool>::Init)
-#define SMPOOL (UnsafeSingleton<conntrack::SvcMetricsPool>::instance())
+ */
 
 }  // namespace xlb::conntrack
+
+namespace xlb {
+
+/*
+#define SMPOOL_INIT (UnsafeSingleton<conntrack::SvcMetricsPool>::Init)
+#define SMPOOL (UnsafeSingleton<conntrack::SvcMetricsPool>::instance())
+ */
+
+}  // namespace xlb

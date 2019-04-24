@@ -4,16 +4,23 @@
 namespace xlb::modules {
 
 void Conntrack::InitInMaster() {
-  SMPOOL_INIT();
   STABLE_INIT();
+  Exec::RegisterMaster();
+
+  RegisterTask([](Context *) -> Result { return {.packets = Exec::Sync()}; },
+               10);
 }
 
 void Conntrack::InitInSlave(uint16_t) {
   STABLE_INIT();
   CTABLE_INIT();
+  Exec::RegisterSlave();
 
   RegisterTask([](Context *) -> Result { return {.packets = STABLE.Sync()}; },
                1);
+
+  RegisterTask([](Context *) -> Result { return {.packets = Exec::Sync()}; },
+               10);
 
   RegisterTask([](Context *) -> Result { return {.packets = CTABLE.Sync()}; },
                100);

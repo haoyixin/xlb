@@ -16,8 +16,8 @@ using boost::sort;
 using boost::unique;
 
 using boost::find_if;
-using boost::intrusive_ptr;
 using boost::remove_erase_if;
+using boost::for_each;
 
 using boost::intrusive_ptr;
 

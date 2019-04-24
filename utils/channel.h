@@ -16,9 +16,9 @@ class Channel {
 
   // 'G' means group
   template <typename G>
-  static void Register() {
+  static void Register(size_t size) {
     // This is safe since 'Init' will judge whether it is null
-    auto *ring = &UnsafeSingletonTLS<Ring>::Init();
+    auto *ring = &UnsafeSingletonTLS<Ring>::Init(size);
 
     std::lock_guard guard(internal<G>::lock);
     if (any_of_equal(internal<G>::rings, ring)) return;
@@ -32,24 +32,30 @@ class Channel {
   static void Send(Ptr sp) {
     for (auto &r : internal<G>::rings) {
       auto *spp = new Ptr(sp);
-      while (!r->Push(spp)) F_LOG(ERROR) << "channel is full, retrying";
+      for (;;) {
+        if (r->Push(spp))
+          return;
+        else
+          LOG(WARNING) << "channel is full, retrying";
+      }
+      //      while (!r->Push(spp)) F_LOG(ERROR) << "channel is full, retrying";
     }
   }
 
-//  template <typename G>
-//  static void Send(T *ptr) {
-//    send(ptr);
-//  }
-//
-//  template <typename G>
-//  static void Send(Ptr &&sp) {
-//    send(sp);
-//  }
-//
-//  template <typename G>
-//  static void Send(Ptr &sp) {
-//    send(sp);
-//  }
+  //  template <typename G>
+  //  static void Send(T *ptr) {
+  //    send(ptr);
+  //  }
+  //
+  //  template <typename G>
+  //  static void Send(Ptr &&sp) {
+  //    send(sp);
+  //  }
+  //
+  //  template <typename G>
+  //  static void Send(Ptr &sp) {
+  //    send(sp);
+  //  }
 
   template <typename G, typename... Args>
   static void Send(Args &&... args) {
@@ -59,7 +65,7 @@ class Channel {
   static Ptr Recv() {
     Ptr *spp;
     // Calling 'Recv' in unregistered thread is undefined behavior
-    auto ring = UnsafeSingletonTLS<Ring>::instance();
+    auto &ring = UnsafeSingletonTLS<Ring>::instance();
     if (!ring.Pop(spp)) return {};
 
     Ptr sp = *spp;

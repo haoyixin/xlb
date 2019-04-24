@@ -22,6 +22,7 @@
 #include "runtime/module.h"
 #include "runtime/port.h"
 #include "runtime/worker.h"
+#include "runtime/exec.h"
 
 namespace xlb::modules {
 

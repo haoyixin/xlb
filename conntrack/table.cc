@@ -11,63 +11,65 @@ VirtSvc::Ptr SvcTable::FindVs(const Tuple2 &tuple) {
     return {};
 }
 
-VirtSvc::Ptr SvcTable::EnsureVsExist(const Tuple2 &tuple,
-                                     SvcMetrics::Ptr metric) {
-  if (vs_map_.Size() >= CONFIG.svc.max_virtual_service) {
-    last_error_ = "max_virtual_service exceeded";
-    return {};
-  }
+RealSvc::Ptr SvcTable::FindRs(const Tuple2 &tuple) {
+  auto iter = rs_map_.find(tuple);
 
-  VsMap::Entry *entry = vs_map_.Emplace(tuple, nullptr);
+  if (iter != rs_map_.end()) return {iter->second};
+
+  return {};
+}
+
+VirtSvc::Ptr SvcTable::AddVs(const Tuple2 &tuple) {
+  VsMap::Entry *entry = vs_map_.EmplaceUnsafe(tuple, nullptr);
 
   // There is a very small probability of returning nullptr
-  if (entry != nullptr) {
-    if (entry->value == nullptr) {
-      W_DVLOG(1) << "creating VirtSvc: " << tuple;
-      entry->value = new VirtSvc(tuple, metric);
-    }
-    // TODO: safe ?
-    //    entry->value->metrics_ = metric;
-    return entry->value;
-  } else {
-    last_error_ = "virtual service map collision exceeded";
+  if (!entry) {
+    last_error_ = "number of conflicts exceeds the limit";
     return {};
   }
+
+  DCHECK(!entry->value);
+
+  W_DVLOG(1) << "creating VirtSvc: " << tuple;
+  entry->value = new VirtSvc(tuple);
+
+  return {entry->value};
 }
 
-RealSvc::Ptr SvcTable::EnsureRsExist(const Tuple2 &tuple,
-                                     SvcMetrics::Ptr metric) {
-  if (rs_vs_map_.size() >= CONFIG.svc.max_real_service) {
-    last_error_ = "max_real_service exceeded";
-    return {};
-  }
-
+RealSvc::Ptr SvcTable::AddRs(const Tuple2 &tuple) {
   auto pair = rs_map_.try_emplace(tuple, nullptr);
 
-  if (!pair.second) {
-    // TODO: is it safe ?
-    // Here rs may already be detached, so we need to replace metric with
-    // exposed one
-    pair.first->second->metrics_ = metric;
-    return pair.first->second;
+  // Recycling rs that have not been released yet
+  if (pair.second) {
+    W_DVLOG(1) << "creating RealSvc: " << tuple;
+    pair.first->second = new RealSvc(tuple);
   }
 
-  W_DVLOG(1) << "creating RealSvc: " << tuple;
-  pair.first->second = new RealSvc(tuple, metric);
+  DCHECK_NOTNULL(pair.first->second);
 
-  return pair.first->second;
+  return {pair.first->second};
 }
 
-bool SvcTable::EnsureRsAttachedTo(VirtSvc::Ptr vs, RealSvc::Ptr rs) {
-  if (vs->rs_vec_.size() > CONFIG.svc.max_real_per_virtual) {
-    last_error_ = "max_real_per_virtual exceeded";
-    return false;
-  }
+std::pair<bool, SvcTable::Hint> SvcTable::RsAttached(VirtSvc::Ptr vs,
+                                                     RealSvc::Ptr rs) {
+  DCHECK_NOTNULL(vs);
+  DCHECK_NOTNULL(rs);
 
   auto range = rs_vs_map_.equal_range(rs->tuple_);
 
   for (auto it = range.first; it != range.second; ++it)
-    if (it->second == vs->tuple_) return true;
+    if (it->second == vs->tuple_) return {true, it};
+
+  return {false, {}};
+}
+
+bool SvcTable::RsDetached(RealSvc::Ptr rs) {
+  return rs_vs_map_.count(rs->tuple_) == 0;
+}
+
+RealSvc::Ptr SvcTable::AttachRs(VirtSvc::Ptr vs, RealSvc::Ptr rs) {
+  DCHECK_NOTNULL(vs);
+  DCHECK_NOTNULL(rs);
 
   W_DVLOG(1) << "attaching RealSvc: " << rs->tuple_
              << " to VirtSvc: " << vs->tuple_;
@@ -75,47 +77,38 @@ bool SvcTable::EnsureRsAttachedTo(VirtSvc::Ptr vs, RealSvc::Ptr rs) {
   vs->rs_vec_.emplace_back(rs);
   rs_vs_map_.emplace(rs->tuple_, vs->tuple_);
 
-  return true;
+  return rs;
 }
 
-void SvcTable::EnsureRsDetachedFrom(const Tuple2 &vs, const Tuple2 &rs) {
-  auto range = rs_vs_map_.equal_range(rs);
+void SvcTable::DetachRs(VirtSvc::Ptr vs, RealSvc::Ptr rs, Hint it) {
+  DCHECK_NOTNULL(vs);
+  DCHECK_NOTNULL(rs);
+  DCHECK(it != rs_vs_map_.end());
 
-  auto attached = false;
-  auto it = range.first;
+  W_DVLOG(1) << "detaching RealSvc: " << rs->tuple_
+             << " to VirtSvc: " << vs->tuple_;
 
-  for (; it != range.second; ++it)
-    if (it->second == vs) attached = true;
-
-  if (attached) {
-    auto vs_ptr = vs_map_.Find(vs)->value;
-    remove_erase_if(vs_ptr->rs_vec_,
-                    [&rs](auto &rs_ptr) { return rs_ptr->tuple_ == rs; });
-    rs_vs_map_.erase(it);
-  }
+  remove_erase_if(vs->rs_vec_,
+                  [&rs](auto &_rs) { return _rs->tuple_ == rs->tuple_; });
+  rs_vs_map_.erase(it);
 }
 
-void SvcTable::EnsureVsNotExist(const Tuple2 &vs) {
-  VsMap::Entry *entry = vs_map_.Find(vs);
-  if (entry == nullptr) return;
+void SvcTable::RemoveVs(VirtSvc::Ptr vs) {
+  DCHECK_NOTNULL(vs);
 
-  W_DVLOG(1) << "erasing VirtSvc: " << vs;
+  W_DVLOG(1) << "removing VirtSvc: " << vs->tuple_;
 
-  for (auto &rs : entry->value->rs_vec_) {
+  for (auto &rs : vs->rs_vec_) {
     auto range = rs_vs_map_.equal_range(rs->tuple_);
     auto it = range.first;
     for (; it != range.second; ++it)
-      if (it->second == vs) break;
+      if (it->second == vs->tuple_) break;
 
     rs_vs_map_.erase(it);
   }
 
-  entry->value->rs_vec_.clear();
-  vs_map_.Remove(vs);
-}
-
-bool SvcTable::RsDetached(const Tuple2 &rs) {
-  return rs_vs_map_.count(rs) == 0;
+  vs->rs_vec_.clear();
+  vs_map_.Remove(vs->tuple_);
 }
 
 Conn *ConnTable::Find(Tuple4 &tuple) {

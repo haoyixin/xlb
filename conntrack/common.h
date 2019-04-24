@@ -38,7 +38,9 @@ using utils::be64_t;
 
 // container
 using utils::unordered_map;
+using utils::unordered_set;
 using utils::unordered_multimap;
+using utils::unordered_multiset;
 using utils::UnsafeSingleton;
 using utils::UnsafeSingletonTLS;
 using utils::vector;
@@ -49,6 +51,8 @@ using utils::Format;
 using utils::irange;
 using utils::make_vector;
 using utils::remove_erase_if;
+using utils::find_if;
+using utils::for_each;
 
 // time
 using utils::EventBase;
@@ -58,8 +62,8 @@ using utils::tsc_ms;
 using utils::tsc_sec;
 
 // pointer
-using std::make_shared;
 using std::shared_ptr;
+using utils::make_shared;
 using utils::INew;
 using utils::intrusive_ptr;
 using utils::intrusive_ref_counter;

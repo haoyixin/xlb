@@ -6,11 +6,9 @@
 
 namespace xlb::conntrack {
 
-class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
-                public EventBase<SvcBase>,
-                public INew {
+class SvcBase : public EventBase<SvcBase>, public INew {
  public:
-  SvcBase(const Tuple2 &tuple, SvcMetrics::Ptr &metric);
+  explicit SvcBase(const Tuple2 &tuple);
   // WARNING: This is not a virtual function (optimized for size)
   ~SvcBase() = default;
 
@@ -23,6 +21,8 @@ class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
   void INcrBytesOut(uint64_t n) { bytes_out_ += n; }
 
   void execute(TimerWheel<SvcBase> *timer);
+  auto &metrics() { return metrics_; }
+  void set_metrics(const SvcMetrics::Ptr &metric) { metrics_ = metric; }
 
  protected:
   static const uint64_t kTimerStart = 3000;
@@ -47,7 +47,8 @@ class SvcBase : public unsafe_intrusive_ref_counter<SvcBase>,
   DISALLOW_IMPLICIT_CONSTRUCTORS(SvcBase);
 };
 
-class alignas(64) RealSvc : public SvcBase {
+class alignas(64) RealSvc : public unsafe_intrusive_ref_counter<RealSvc>,
+                            public SvcBase {
  public:
   using Ptr = intrusive_ptr<RealSvc>;
 
@@ -58,8 +59,8 @@ class alignas(64) RealSvc : public SvcBase {
   void PutLocal(const Tuple2 &tuple);
 
  private:
-  RealSvc(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : SvcBase(tuple, metric), local_tuple_pool_() {
+  explicit RealSvc(const Tuple2 &tuple) : SvcBase(tuple), local_tuple_pool_() {
+    W_DVLOG(1) << "creating: " << tuple;
     bind_local_ips();
   }
 
@@ -75,7 +76,8 @@ class alignas(64) RealSvc : public SvcBase {
 
 static_assert(sizeof(RealSvc) == 128);
 
-class alignas(64) VirtSvc : public SvcBase {
+class alignas(64) VirtSvc : public unsafe_intrusive_ref_counter<VirtSvc>,
+                            public SvcBase {
  public:
   using Ptr = intrusive_ptr<VirtSvc>;
   using RsVec = vector<RealSvc::Ptr>;
@@ -85,12 +87,12 @@ class alignas(64) VirtSvc : public SvcBase {
   inline RealSvc::Ptr SelectRs(const Tuple2 &ctuple);
 
   // TODO: lazy transform
-  auto begin() { return rs_vec_.begin(); }
-  auto end() { return rs_vec_.end(); }
+  //  auto begin() { return rs_vec_.begin(); }
+  //  auto end() { return rs_vec_.end(); }
 
  private:
-  VirtSvc(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
-      : SvcBase(tuple, metric), rs_vec_(ALLOC) {
+  explicit VirtSvc(const Tuple2 &tuple) : SvcBase(tuple), rs_vec_(ALLOC) {
+    W_DVLOG(1) << "creating: " << tuple;
     //    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
   }
 

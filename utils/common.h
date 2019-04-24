@@ -41,6 +41,7 @@
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -49,6 +50,7 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/range/algorithm/find_if.hpp>
+#include <boost/range/algorithm/for_each.hpp>
 #include <boost/range/algorithm/sort.hpp>
 #include <boost/range/algorithm/unique.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>

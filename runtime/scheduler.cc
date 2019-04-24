@@ -23,17 +23,20 @@ bvar::PassiveStatus<double> cpu_usage_slave("xlb_scheduler", "cpu_usage_slaves",
 }  // namespace
 
 Scheduler::Scheduler()
-    : runnable_(new TaskQueue()), blocked_(new TaskQueue()), checkpoint_() {}
+    : runnable_(ALLOC), checkpoint_() {}
 
+    /*
 Scheduler::~Scheduler() {
-  for (auto &t : runnable_->container()) delete (t);
+  for (auto &t : runnable_) delete (t);
   for (auto &t : blocked_->container()) delete (t);
 
   delete (runnable_);
   delete (blocked_);
 }
+     */
 
 Scheduler::Task::Context *Scheduler::next_ctx() {
+  /*
   while (runnable_->empty()) std::swap(runnable_, blocked_);
 
   Task *t;
@@ -47,14 +50,30 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
   }
 
   return &t->context_;
+   */
+  Task *best = nullptr;
+  size_t total = 0;
+
+  for (auto &task : runnable_) {
+    task->current_weight_ += task->max_weight_;
+    total += task->max_weight_;
+
+    if (!best || task->current_weight_ > best->current_weight_)
+      best = task;
+  }
+
+  DCHECK_NOTNULL(best);
+
+  best->current_weight_ -= total;
+  return &best->context_;
 }
 
-Scheduler::Task::Task(Func &&func, uint8_t weight)
+Scheduler::Task::Task(Func &&func, uint32_t weight)
     : func_(std::move(func)),
-      current_weight_(weight),
+      current_weight_(0),
       max_weight_(weight),
       context_() {
-  CHECK_NE(weight, 0);
+  CHECK_GT(weight, 0);
   context_.dead_batch_.Clear();
   context_.stage_batch_.Clear();
   context_.task_ = this;

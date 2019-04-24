@@ -38,9 +38,14 @@ struct Config {
     size_t max_conn;
   };
 
-  std::string rpc_ip_port;
+  struct Rpc {
+    std::string ip_port;
+    size_t max_concurrency;
+  };
+
   std::vector<uint16_t> slave_cores;
   uint8_t master_core;
+  //  uint8_t trivial_core;
   std::unordered_multimap<uint16_t, utils::be32_t> slave_local_ips;
 
   // TODO: support multi numa node
@@ -48,6 +53,7 @@ struct Config {
   Mem mem;
   Kni kni;
   Svc svc;
+  Rpc rpc;
 
   static void Load();
 
@@ -64,5 +70,6 @@ VISITABLE_STRUCT(xlb::Config::Mem, hugepage, channel, packet_pool);
 VISITABLE_STRUCT(xlb::Config::Kni, ip_address, netmask, gateway, ring_size);
 VISITABLE_STRUCT(xlb::Config::Svc, max_virtual_service, max_real_service,
                  max_real_per_virtual, max_conn);
-VISITABLE_STRUCT(xlb::Config, rpc_ip_port, slave_cores, master_core, nic, mem,
-                 kni, svc);
+VISITABLE_STRUCT(xlb::Config::Rpc, ip_port, max_concurrency);
+VISITABLE_STRUCT(xlb::Config, slave_cores, master_core, nic, mem, kni, svc,
+                 rpc);

@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 
   FLAGS_logtostderr = 1;
   FLAGS_colorlogtostderr = 1;
-  FLAGS_v = 3;
+  FLAGS_v = 0;
 
   Config::Load();
   InitDpdk();

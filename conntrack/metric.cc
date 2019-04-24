@@ -22,13 +22,11 @@ std::string combine_svc_metric_name(const Tuple2 &tuple,
 
 }  // namespace
 
-Metric::Metric(std::string_view prefix, std::string_view name)
-    : count_(), per_second_(&count_) {
-  count_.expose_as(std::string(prefix), combine_metric_name(name, "count"));
-  per_second_.expose_as(std::string(prefix),
-                        combine_metric_name(name, "second"));
-
-  W_DLOG(INFO) << "Exposed metrics prefix: " << prefix << " name: " << name;
+bool Metric::Expose(std::string_view prefix, std::string_view name) {
+  return (per_second_.expose_as(std::string(prefix),
+                                combine_metric_name(name, "second")) == 0 &&
+          count_.expose_as(std::string(prefix),
+                           combine_metric_name(name, "count")) == 0);
 }
 
 void Metric::Hide() {
@@ -36,16 +34,26 @@ void Metric::Hide() {
   count_.hide();
 }
 
-SvcMetrics::SvcMetrics(std::string_view type, const Tuple2 &tuple)
-    : conns_(combine_prefix(type), combine_svc_metric_name(tuple, "conns")),
-      packets_in_(combine_prefix(type),
-                  combine_svc_metric_name(tuple, "packets_in")),
-      bytes_in_(combine_prefix(type),
-                combine_svc_metric_name(tuple, "bytes_in")),
-      packets_out_(combine_prefix(type),
-                   combine_svc_metric_name(tuple, "packets_out")),
-      bytes_out_(combine_prefix(type),
-                 combine_svc_metric_name(tuple, "bytes_out")) {}
+bool SvcMetrics::Expose(std::string_view type, const Tuple2 &tuple) {
+  if (conns_.Expose(combine_prefix(type),
+                    combine_svc_metric_name(tuple, "conns")) &&
+      packets_in_.Expose(combine_prefix(type),
+                         combine_svc_metric_name(tuple, "packets_in")) &&
+      bytes_in_.Expose(combine_prefix(type),
+                       combine_svc_metric_name(tuple, "bytes_in")) &&
+      packets_out_.Expose(combine_prefix(type),
+                          combine_svc_metric_name(tuple, "packets_out")) &&
+      bytes_out_.Expose(combine_prefix(type),
+                        combine_svc_metric_name(tuple, "bytes_out"))) {
+    W_DVLOG(1) << "exposed metrics type: " << type << " service: " << tuple;
+    return true;
+  } else {
+    Hide();
+    W_DVLOG(1) << "failed to expose metrics type: " << type
+                 << " service: " << tuple;
+    return false;
+  }
+}
 
 void SvcMetrics::Hide() {
   conns_.Hide();
@@ -55,6 +63,7 @@ void SvcMetrics::Hide() {
   bytes_out_.Hide();
 }
 
+/*
 SvcMetrics::Ptr SvcMetricsPool::GetVs(const Tuple2 &tuple) {
   auto pair = vs_map_.try_emplace(tuple, nullptr);
   if (!pair.second) return pair.first->second;
@@ -92,5 +101,6 @@ void SvcMetricsPool::PurgeRs(const Tuple2 &tuple) {
     rs_map_.erase(iter);
   }
 }
+ */
 
 }  // namespace xlb::conntrack

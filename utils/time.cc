@@ -18,7 +18,9 @@ class TscHzSetter {
     tsc_ms = tsc_sec / 1000;
     tsc_us = tsc_ms / 1000;
     tsc_ns = tsc_us / 1000;
+
+    F_DLOG(INFO) << "tsc_hz: " << tsc_hz;
   }
-} _dummy;
+};
 
 }  // namespace xlb::utils

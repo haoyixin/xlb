@@ -71,6 +71,7 @@ class Worker {
   static std::atomic<uint16_t> counter_;
   static std::vector<std::thread> slave_threads_;
   static std::thread master_thread_;
+  static std::thread trivial_thread_;
 
   static __thread Worker current_;
 

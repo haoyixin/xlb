@@ -34,6 +34,7 @@ class ControlImpl final : public Control {
   void ListRealService(RpcController *controller,
                        const VirtualServiceRequest *request,
                        ServicesResponse *response, Closure *done) override;
+
 };
 
 }  // namespace xlb::rpc

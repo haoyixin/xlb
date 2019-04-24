@@ -3,8 +3,8 @@
 
 namespace xlb::conntrack {
 
-SvcBase::SvcBase(const Tuple2 &tuple, SvcMetrics::Ptr &metric)
-    : tuple_(tuple), metrics_(metric) {
+SvcBase::SvcBase(const Tuple2 &tuple)
+    : tuple_(tuple), metrics_(nullptr) {
   reset_metrics();
   //  stable_->timer_.Schedule(this, kCommitInterval * tsc_sec);
   STABLE.timer_.ScheduleInRange(this, kTimerStart * tsc_ms, kTimerEnd * tsc_ms);
@@ -28,7 +28,7 @@ void SvcBase::reset_metrics() {
 }
 
 void SvcBase::execute(TimerWheel<SvcBase> *timer) {
-  W_DVLOG(2) << "[SvcBase] commit metrics of: " << tuple_;
+  W_DVLOG(4) << "commit metrics of: " << tuple_;
 
   commit_metrics();
   STABLE.timer_.ScheduleInRange(this, kTimerStart * tsc_ms, kTimerEnd * tsc_ms);
@@ -52,7 +52,7 @@ void RealSvc::bind_local_ips() {
   auto range = CONFIG.slave_local_ips.equal_range(W_ID);
 
   for (auto it = range.first; it != range.second; ++it) {
-    W_DVLOG(1) << "[RealSvc] Binding local ip: " << ToIpv4Address(it->second)
+    W_DVLOG(1) << "local ip: " << ToIpv4Address(it->second)
                << " to: " << tuple_;
     for (auto i : irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
       local_tuple_pool_.emplace(it->second, be16_t(i));
@@ -71,7 +71,7 @@ bool RealSvc::GetLocal(Tuple2 &tuple) {
 void RealSvc::PutLocal(const Tuple2 &tuple) { local_tuple_pool_.push(tuple); }
 
 RealSvc::~RealSvc() {
-  W_DVLOG(1) << "[RealSvc] Lazy destroying: " << tuple_;
+  W_DVLOG(1) << "lazy destroying: " << tuple_;
   // Means that it cannot be reused
   //  stable_->rs_map_.erase(tuple_);
   STABLE.rs_map_.erase(tuple_);

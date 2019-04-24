@@ -19,10 +19,19 @@ using unordered_map =
     std::unordered_map<K, V, std::hash<K>, std::equal_to<K>,
                        pmr::polymorphic_allocator<std::pair<const K, V>>>;
 
+template <typename K>
+using unordered_set = std::unordered_set<K, std::hash<K>, std::equal_to<K>,
+                                         pmr::polymorphic_allocator<K>>;
+
 template <typename K, typename V>
 using unordered_multimap =
     std::unordered_multimap<K, V, std::hash<K>, std::equal_to<K>,
                             pmr::polymorphic_allocator<std::pair<const K, V>>>;
+
+template <typename K>
+using unordered_multiset =
+    std::unordered_multiset<K, std::hash<K>, std::equal_to<K>,
+                            pmr::polymorphic_allocator<K>>;
 
 template <typename T>
 class Allocator {
@@ -65,7 +74,10 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
     throw std::bad_alloc();
   }
 
-  void do_deallocate(void *p, std::size_t, std::size_t) override {
+  void do_deallocate(void *p, std::size_t bytes,
+                     std::size_t alignment) override {
+    F_DVLOG(1) << "bytes: " << bytes << " alignment: " << alignment;
+
     rte_free(p);
   }
 
@@ -92,10 +104,8 @@ struct INew {
   static void *operator new[](std::size_t sz, std::align_val_t al) {
     return ALLOC->do_allocate(sz, static_cast<size_t>(al));
   }
-  static void operator delete(void *ptr) { (ALLOC)->do_deallocate(ptr, 0, 0); }
-  static void operator delete[](void *ptr) {
-    ALLOC->do_deallocate(ptr, 0, 0);
-  }
+  static void operator delete(void *ptr) { ALLOC->do_deallocate(ptr, 0, 0); }
+  static void operator delete[](void *ptr) { ALLOC->do_deallocate(ptr, 0, 0); }
 };
 
 inline void InitDefaultAllocator(int socket) {

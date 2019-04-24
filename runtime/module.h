@@ -54,12 +54,12 @@ class Module {
 
   Module() { Modules::instance().emplace_back(this); }
 
-  void RegisterTask(Func &&func, uint8_t weight) {
+  void RegisterTask(Func &&func, uint32_t weight) {
     auto worker = Worker::current();
+    DCHECK_NOTNULL(worker);
 
-    DCHECK(Worker::current());
     W_LOG(INFO) << "module: " << module_name()
-                << " weight: " << unsigned(weight);
+                << " weight: " << weight;
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 

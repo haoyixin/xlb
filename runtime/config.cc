@@ -42,7 +42,8 @@ void Config::validate() {
   }
 
   // TODO: validate legality
-  CHECK_NE(rpc_ip_port, "");
+  CHECK_NE(rpc.ip_port, "");
+  CHECK_NE(rpc.max_concurrency, 0);
 
   CHECK_NE(nic.name, "");
   CHECK_NE(nic.pci_address, "");
