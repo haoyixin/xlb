@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/common.h"
+#include "runtime/worker.h"
 
 namespace xlb {
 
@@ -16,15 +17,16 @@ class Exec {
 
  public:
   static void RegisterMaster() {
-    Channel::Register<Master>(CONFIG.rpc.max_concurrency);
-    Channel::Register<Any>(CONFIG.rpc.max_concurrency);
+    Channel::Register<Master>(CONFIG.execute_channel_size);
+    Channel::Register<Any>(CONFIG.execute_channel_size);
   }
   static void RegisterSlave() {
-    Channel::Register<Slave>(CONFIG.rpc.max_concurrency);
-    Channel::Register<Any>(CONFIG.rpc.max_concurrency);
+    Channel::Register<Slave>(CONFIG.execute_channel_size);
+    Channel::Register<Any>(CONFIG.execute_channel_size);
   }
   static void RegisterTrivial() {
-    Channel::Register<Trivial>(CONFIG.rpc.max_concurrency);
+    Channel::Register<Trivial>(CONFIG.execute_channel_size);
+    Channel::Register<Any>(CONFIG.execute_channel_size);
   }
 
   template <typename... Args>

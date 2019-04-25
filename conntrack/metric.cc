@@ -49,18 +49,20 @@ bool SvcMetrics::Expose(std::string_view type, const Tuple2 &tuple) {
     return true;
   } else {
     Hide();
-    W_DVLOG(1) << "failed to expose metrics type: " << type
+    W_LOG(ERROR) << "failed to expose metrics type: " << type
                  << " service: " << tuple;
     return false;
   }
 }
 
 void SvcMetrics::Hide() {
-  conns_.Hide();
-  packets_in_.Hide();
-  bytes_in_.Hide();
-  packets_out_.Hide();
-  bytes_out_.Hide();
+  if (!hidden_.test_and_set()) {
+    conns_.Hide();
+    packets_in_.Hide();
+    bytes_in_.Hide();
+    packets_out_.Hide();
+    bytes_out_.Hide();
+  }
 }
 
 /*

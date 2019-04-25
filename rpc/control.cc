@@ -2,8 +2,8 @@
 
 #include <sstream>
 
-#include <bthread/bthread.h>
 #include <brpc/closure_guard.h>
+#include <bthread/bthread.h>
 #include <glog/logging.h>
 
 #include "runtime/config.h"
@@ -82,6 +82,10 @@ FAILED:
   return {false, {}};
 }
 
+void trivial_done(Closure *done) {
+  Exec::InTrivial([done]() { brpc::ClosureGuard done_guard(done); });
+}
+
 }  // namespace
 
 void ControlImpl::AddVirtualService(RpcController *controller,
@@ -94,7 +98,7 @@ void ControlImpl::AddVirtualService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster([tuple = pair.second, response, done]() {
+  Exec::InTrivial([tuple = pair.second, response, done]() {
     brpc::ClosureGuard done_guard(done);
 
     if (STABLE.FindRs(tuple)) {
@@ -121,7 +125,12 @@ void ControlImpl::AddVirtualService(RpcController *controller,
     }
 
     auto metric = SvcMetrics::Get();
-    metric->Expose("virt", tuple);
+    // Just in case
+    if (!metric->Expose("virt", tuple)) {
+      STABLE.RemoveVs(vs);
+      make_error(response, "failed to expose metrics");
+      return;
+    }
     vs->set_metrics(metric);
 
     Exec::InSlaves(
@@ -129,9 +138,7 @@ void ControlImpl::AddVirtualService(RpcController *controller,
 
     make_ok(response);
     done_guard.release();
-    Exec::InTrivial([done]() {
-      brpc::ClosureGuard done_guard(done);
-    });
+    trivial_done(done);
   });
 }
 
@@ -145,7 +152,7 @@ void ControlImpl::DelVirtualService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster([tuple = pair.second, response, done]() {
+  Exec::InTrivial([tuple = pair.second, response, done]() {
     brpc::ClosureGuard done_guard(done);
 
     auto vs = STABLE.FindVs(tuple);
@@ -154,17 +161,15 @@ void ControlImpl::DelVirtualService(RpcController *controller,
       return;
     }
 
-    vs->metrics()->Hide();
-    STABLE.ForeachRs(vs, [](auto *rs) { rs->metrics()->Hide(); });
+    // vs->metrics()->Hide();
+    // STABLE.ForeachRs(vs, [](auto *rs) { rs->metrics()->Hide(); });
     STABLE.RemoveVs(vs);
 
     Exec::InSlaves([tuple]() { STABLE.RemoveVs(STABLE.FindVs(tuple)); });
 
     make_ok(response);
     done_guard.release();
-    Exec::InTrivial([done]() {
-      brpc::ClosureGuard done_guard(done);
-    });
+    trivial_done(done);
   });
 }
 
@@ -176,7 +181,7 @@ void ControlImpl::ListVirtualService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster([response, done]() {
+  Exec::InTrivial([response, done]() {
     brpc::ClosureGuard done_guard(done);
 
     STABLE.ForeachVs([response](auto *vs) {
@@ -192,9 +197,7 @@ void ControlImpl::ListVirtualService(RpcController *controller,
 
     make_ok(response);
     done_guard.release();
-    Exec::InTrivial([done]() {
-      brpc::ClosureGuard done_guard(done);
-    });
+    trivial_done(done);
   });
 }
 
@@ -215,7 +218,7 @@ void ControlImpl::AttachRealService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster(
+  Exec::InTrivial(
       [vtuple = vpair.second, rtuple = rpair.second, response, done]() {
         brpc::ClosureGuard done_guard(done);
 
@@ -248,6 +251,7 @@ void ControlImpl::AttachRealService(RpcController *controller,
           // closure
           rs = STABLE.AddRs(rtuple);
           auto metric = SvcMetrics::Get();
+          // Just in case
           if (!metric->Expose("real", rtuple)) {
             make_error(response, "failed to expose metrics");
             return;
@@ -272,9 +276,7 @@ void ControlImpl::AttachRealService(RpcController *controller,
 
         make_ok(response);
         done_guard.release();
-        Exec::InTrivial([done]() {
-          brpc::ClosureGuard done_guard(done);
-        });
+        trivial_done(done);
       });
 }
 
@@ -290,7 +292,7 @@ void ControlImpl::DetachRealService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster(
+  Exec::InTrivial(
       [vtuple = vpair.second, rtuple = rpair.second, response, done]() {
         brpc::ClosureGuard done_guard(done);
 
@@ -311,7 +313,7 @@ void ControlImpl::DetachRealService(RpcController *controller,
           STABLE.DetachRs(vs, rs, pair.second);
 
           // For the case of adding the same rs immediately after deletion
-          if (STABLE.RsDetached(rs)) rs->metrics()->Hide();
+          // if (STABLE.RsDetached(rs)) rs->metrics()->Hide();
 
           Exec::InSlaves([vtuple, rtuple]() {
             auto vs = STABLE.FindVs(vtuple);
@@ -326,9 +328,7 @@ void ControlImpl::DetachRealService(RpcController *controller,
 
         make_ok(response);
         done_guard.release();
-        Exec::InTrivial([done]() {
-          brpc::ClosureGuard done_guard(done);
-        });
+        trivial_done(done);
       });
 }
 
@@ -342,7 +342,7 @@ void ControlImpl::ListRealService(RpcController *controller,
 
   done_guard.release();
 
-  Exec::InMaster([tuple = pair.second, response, done]() {
+  Exec::InTrivial([tuple = pair.second, response, done]() {
     brpc::ClosureGuard done_guard(done);
 
     auto vs = STABLE.FindVs(tuple);
@@ -365,9 +365,7 @@ void ControlImpl::ListRealService(RpcController *controller,
 
     make_ok(response);
     done_guard.release();
-    Exec::InTrivial([done]() {
-      brpc::ClosureGuard done_guard(done);
-    });
+    trivial_done(done);
   });
 }
 

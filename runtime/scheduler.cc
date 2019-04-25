@@ -15,25 +15,32 @@ double get_cpu_usage_master(void *arg) {
                              TS("busy_cycles_master")>();
 }
 
+double get_cpu_usage_trivial(void *arg) {
+  return Scheduler::CpuUsage<TS("idle_cycles_trivial"),
+                             TS("busy_cycles_trivial")>();
+}
+
 bvar::PassiveStatus<double> cpu_usage_master("xlb_scheduler",
                                              "cpu_usage_master",
                                              get_cpu_usage_master, nullptr);
 bvar::PassiveStatus<double> cpu_usage_slave("xlb_scheduler", "cpu_usage_slaves",
                                             get_cpu_usage_slaves, nullptr);
+bvar::PassiveStatus<double> cpu_usage_trivial("xlb_scheduler",
+                                              "cpu_usage_trivial",
+                                              get_cpu_usage_trivial, nullptr);
 }  // namespace
 
-Scheduler::Scheduler()
-    : runnable_(ALLOC), checkpoint_() {}
+Scheduler::Scheduler() : runnable_(ALLOC), checkpoint_() {}
 
-    /*
+/*
 Scheduler::~Scheduler() {
-  for (auto &t : runnable_) delete (t);
-  for (auto &t : blocked_->container()) delete (t);
+for (auto &t : runnable_) delete (t);
+for (auto &t : blocked_->container()) delete (t);
 
-  delete (runnable_);
-  delete (blocked_);
+delete (runnable_);
+delete (blocked_);
 }
-     */
+ */
 
 Scheduler::Task::Context *Scheduler::next_ctx() {
   /*
@@ -58,8 +65,7 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
     task->current_weight_ += task->max_weight_;
     total += task->max_weight_;
 
-    if (!best || task->current_weight_ > best->current_weight_)
-      best = task;
+    if (!best || task->current_weight_ > best->current_weight_) best = task;
   }
 
   DCHECK_NOTNULL(best);

@@ -10,7 +10,12 @@ class SvcBase : public EventBase<SvcBase>, public INew {
  public:
   explicit SvcBase(const Tuple2 &tuple);
   // WARNING: This is not a virtual function (optimized for size)
-  ~SvcBase() = default;
+  ~SvcBase() {
+    // It is impossible for 'Conn' to have a reference to 'RealSvc/VirtSvc' in
+    // master, so the first call of 'Hide' must be in the master, since the call
+    // to 'Hide' is atomic, and then the call in the slave will return directly
+    metrics_->Hide();
+  }
 
   auto &tuple() const { return tuple_; }
 
@@ -86,14 +91,10 @@ class alignas(64) VirtSvc : public unsafe_intrusive_ref_counter<VirtSvc>,
 
   inline RealSvc::Ptr SelectRs(const Tuple2 &ctuple);
 
-  // TODO: lazy transform
-  //  auto begin() { return rs_vec_.begin(); }
-  //  auto end() { return rs_vec_.end(); }
-
  private:
   explicit VirtSvc(const Tuple2 &tuple) : SvcBase(tuple), rs_vec_(ALLOC) {
     W_DVLOG(1) << "creating: " << tuple;
-    //    rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
+    // rs_vec_.reserve(CONFIG.svc.max_real_per_virtual);
   }
 
   RsVec rs_vec_;

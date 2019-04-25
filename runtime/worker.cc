@@ -8,72 +8,77 @@ namespace xlb {
 
 __thread Worker Worker::current_ = {};
 
-bool Worker::aborting_ = false;
-bool Worker::slaves_aborted_ = false;
-bool Worker::master_started_ = false;
-
-std::atomic<uint16_t> Worker::counter_ = 0;
 std::vector<std::thread> Worker::slave_threads_ = {};
 std::thread Worker::master_thread_ = {};
 std::thread Worker::trivial_thread_ = {};
 
-// The entry point of worker threads
-void *Worker::run() {
-  random_ = new utils::Random();
-
-  std::string name;
-
-  if (!master_)
-    name = utils::Format("worker@%u", core_);
+std::string Worker::type_string() const {
+  if (type_ == Slave)
+    return "slave";
+  else if (type_ == Master)
+    return "master";
+  else if (type_ == Trivial)
+    return "trivial";
   else
-    name = utils::Format("master@%u", core_);
-
-  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_), &cpu_set_);
-  pthread_setname_np(pthread_self(), name.c_str());
-
-  // DPDK lcore ID == worker ID (0, 1, 2, 3, ...)
-  RTE_PER_LCORE(_lcore_id) = id_;
-
-  // shouldn't be SOCKET_ID_ANY (-1)
-  CHECK_GE(socket_, 0);
-  CHECK_NOTNULL(packet_pool_);
-
-  if (!master_)
-    while (!master_started_) INST_BARRIER();
-
-  W_LOG(INFO) << "Starting on core: " << core_ << " socket: " << socket_;
-
-  scheduler_ = new Scheduler();
-
-  if (!master_)
-    scheduler_->Loop<false>();
-  else
-    scheduler_->Loop<true>();
-
-  W_LOG(INFO) << "Quitting on core: " << core_ << " socket: " << socket_;
-
-  if (!master_ && (counter_.fetch_sub(1) == 1)) {
-    W_LOG(INFO) << "All slaves have been aborted";
-    slaves_aborted_ = true;
-  }
-
-  delete scheduler_;
-  delete random_;
-
-  return nullptr;
+    CHECK(0);
 }
 
-Worker::Worker(uint16_t core, bool master)
-    : master_(master),
+template <>
+void Worker::MarkStarted<Worker::Master>() {
+  internal<Slave>::starting_.store(true, std::memory_order_release);
+}
+
+template <>
+void Worker::MarkStarted<Worker::Slave>() {
+  static std::atomic<uint16_t> counter = 0;
+  if (counter.fetch_add(1) + 1 == CONFIG.slave_cores.size()) {
+    W_LOG(INFO) << "All slaves have been started";
+    internal<Trivial>::starting_.store(true, std::memory_order_release);
+  }
+}
+
+template <>
+void Worker::MarkStarted<Worker::Trivial>() {}
+
+template <>
+void Worker::MarkAborted<Worker::Trivial>() {
+  internal<Slave>::aborting_.store(true, std::memory_order_release);
+}
+
+template <>
+void Worker::MarkAborted<Worker::Slave>() {
+  static std::atomic<uint16_t> counter = 0;
+  if (counter.fetch_add(1) + 1 == CONFIG.slave_cores.size()) {
+    W_LOG(INFO) << "All slaves have been aborted";
+    internal<Master>::aborting_.store(true, std::memory_order_release);
+  }
+}
+
+template <>
+void Worker::MarkAborted<Worker::Master>() {}
+
+Worker::Worker(uint16_t core, Type type)
+    : type_(type),
       core_(core),
       packet_pool_(&utils::Singleton<PacketPool>::instance()),
       current_tsc_(utils::Rdtsc()) {
-  if (!master_) {
-    id_ = counter_.fetch_add(1);
-    socket_ = CONFIG.nic.socket;
-  } else {
-    id_ = std::numeric_limits<decltype(id_)>::max();
-    socket_ = utils::CoreSocketId(core_).value();
+  static std::atomic<uint16_t> counter = 0;
+  switch (type_) {
+    case Slave:
+      id_ = counter.fetch_add(1);
+      socket_ = CONFIG.nic.socket;
+      break;
+    case Master:
+      id_ = CONFIG.slave_cores.size();
+      socket_ = utils::CoreSocketId(core_).value();
+      break;
+    case Trivial:
+      id_ = CONFIG.slave_cores.size() + 1;
+      socket_ = utils::CoreSocketId(core_).value();
+      break;
+    default:
+      CHECK(0);
+      break;
   }
 
   CPU_ZERO(&cpu_set_);
@@ -81,40 +86,32 @@ Worker::Worker(uint16_t core, bool master)
 }
 
 void Worker::Launch() {
-  trivial_thread_ = std::thread([]() {
-    /*
-    cpu_set_t cpu_set;
-    CPU_ZERO(&cpu_set);
-    CPU_SET(CONFIG.trivial_core, &cpu_set);
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
-     */
-
-    Exec::RegisterTrivial();
-
-    for (;;) {
-      if (slaves_aborted() && Exec::Sync() == 0) break;
-
-      Exec::Sync();
-      usleep(1000000 / CONFIG.rpc.max_concurrency);
-    }
+  master_thread_ = std::thread([=]() {
+    (new (&current_) Worker(CONFIG.master_core, Master))->run<Master>();
   });
-
-  master_thread_ = std::thread(
-      [=]() { (new (&current_) Worker(CONFIG.master_core, true))->run(); });
-
 
   for (auto core : CONFIG.slave_cores)
     slave_threads_.emplace_back(
-        [=]() { (new (&current_) Worker(core, false))->run(); });
+        [=]() { (new (&current_) Worker(core, Slave))->run<Slave>(); });
+
+  trivial_thread_ = std::thread([=]() {
+    (new (&current_) Worker(CONFIG.trivial_core, Trivial))->run<Trivial>();
+  });
+
+  internal<Master>::starting_.store(true, std::memory_order_release);
 }
 
-void Worker::Abort() { aborting_ = true; }
+void Worker::Abort() {
+  internal<Trivial>::aborting_.store(true, std::memory_order_release);
+}
 
 void Worker::Wait() {
+  trivial_thread_.join();
+
   for (auto &thread : slave_threads_) thread.join();
 
   master_thread_.join();
-  trivial_thread_.join();
+
   rte_eal_mp_wait_lcore();
 }
 

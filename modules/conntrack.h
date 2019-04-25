@@ -6,7 +6,7 @@ namespace xlb::modules {
 
 class Conntrack : public Module {
  public:
-  void InitInMaster() override;
+  void InitInTrivial() override;
   void InitInSlave(uint16_t) override;
 
   template <typename Tag = NoneTag>

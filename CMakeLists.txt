@@ -90,7 +90,7 @@ set(OBJS
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
 
-add_definitions(-DNDEBUG)
+#add_definitions(-DNDEBUG)
 
 #add_subdirectory(abseil-cpp)
 

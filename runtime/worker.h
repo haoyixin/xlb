@@ -9,6 +9,7 @@ class PacketPool;
 
 class Worker {
  public:
+  enum Type { Master = 0, Slave = 1, Trivial = 2 };
   // This is used for static ctor
   Worker() = default;
 
@@ -19,6 +20,8 @@ class Worker {
   uint16_t id() const { return id_; }
   uint16_t core() const { return core_; }
   int socket() const { return socket_; }
+  Type type() const { return type_; }
+  std::string type_string() const;
 
   Scheduler *scheduler() const { return scheduler_; }
   PacketPool *packet_pool() const { return packet_pool_; }
@@ -27,29 +30,33 @@ class Worker {
   uint64_t current_tsc() const { return current_tsc_; }
   uint64_t busy_loops() const { return busy_loops_; }
 
-  bool master() const { return master_; }
-
-  static bool aborting() { return aborting_; }
-  static bool slaves_aborted() { return slaves_aborted_; }
-  static bool master_started() { return master_started_; }
   static Worker *current() { return &current_; }
 
-  static void confirm_master() { master_started_ = true; }
-
-  //  void IncrSilentDrops(uint64_t drops) { silent_drops_ += drops; }
-  void UpdateTsc() {
-    current_tsc_ = utils::Rdtsc();
-    //    current_ns_ = utils::TscToNs(current_ns_);
-  }
+  void UpdateTsc() { current_tsc_ = utils::Rdtsc(); }
   void IncrBusyLoops() { ++busy_loops_; }
 
+  template <Type type>
+  static void MarkStarted();
+  template <Type type>
+  static void MarkAborted();
+
+  template <Type type>
+  static bool starting() {
+    return internal<type>::starting_.load(std::memory_order_consume);
+  }
+  template <Type type>
+  static bool aborting() {
+    return internal<type>::aborting_.load(std::memory_order_consume);
+  }
+
  private:
-  explicit Worker(uint16_t core, bool master);
+  explicit Worker(uint16_t core, Type type);
 
   // The entry point of worker threads.
+  template <Type type>
   void *run();
 
-  bool master_;
+  Type type_;
 
   uint16_t id_;
   uint16_t core_;
@@ -60,34 +67,44 @@ class Worker {
   Scheduler *scheduler_;
   utils::Random *random_;
 
-  //  uint64_t silent_drops_;  // packets that have been sent to a deadend
   uint64_t current_tsc_;
   uint64_t busy_loops_;
 
-  static bool aborting_;
-  static bool slaves_aborted_;
-  static bool master_started_;
+  template <Type type>
+  struct internal {
+    static std::atomic<bool> starting_;
+    static std::atomic<bool> aborting_;
+  };
 
-  static std::atomic<uint16_t> counter_;
   static std::vector<std::thread> slave_threads_;
   static std::thread master_thread_;
   static std::thread trivial_thread_;
 
   static __thread Worker current_;
 
-  friend std::ostream &operator<<(std::ostream &os, const Worker &worker) {
-    if (worker.master_)
-      os << "[Master]";
-    else
-      os << "[Slave(" << worker.id_ << ")]";
+  template <Type type>
+  static constexpr const char *type_str() {
+    if constexpr (type == Slave)
+      return "slave";
+    else if constexpr (type == Master)
+      return "master";
+    else if constexpr (type == Trivial)
+      return "trivial";
+  }
 
-    return os;
+  friend std::ostream &operator<<(std::ostream &os, const Worker &worker) {
+    return os << "[" << worker.type_string() << "(" << worker.id() << ")]";
   }
 };
 
+template <Worker::Type type>
+std::atomic<bool> Worker::internal<type>::starting_ = false;
+template <Worker::Type type>
+std::atomic<bool> Worker::internal<type>::aborting_ = false;
+
 #define W_CURRENT (Worker::current())
 
-#define W_MASTER (W_CURRENT->master())
+#define W_SLAVE (W_CURRENT->type() == Worker::Slave)
 #define W_TSC (W_CURRENT->current_tsc())
 #define W_ID (W_CURRENT->id())
 

@@ -37,6 +37,19 @@ class Module {
 
   virtual void InitInSlave(uint16_t wid) { CHECK(1); }
   virtual void InitInMaster() { CHECK(1); };
+  virtual void InitInTrivial() { CHECK(1); };
+
+  template <Worker::Type type>
+  void InitIn(uint16_t wid) {
+    if constexpr (type == Worker::Slave)
+      InitInSlave(wid);
+    else if constexpr (type == Worker::Master)
+      InitInMaster();
+    else if constexpr (type == Worker::Trivial)
+      InitInTrivial();
+    else
+      CHECK(0);
+  }
 
   template <typename T, typename... Args>
   static void Init(Args &&... args) {
@@ -58,8 +71,7 @@ class Module {
     auto worker = Worker::current();
     DCHECK_NOTNULL(worker);
 
-    W_LOG(INFO) << "module: " << module_name()
-                << " weight: " << weight;
+    W_LOG(INFO) << "module: " << module_name() << " weight: " << weight;
     worker->scheduler()->RegisterTask(std::move(func), weight);
   }
 
@@ -89,8 +101,44 @@ class Module {
 };
 
 // TODO: ......
+// The entry point of worker threads
+template <Worker::Type T>
+void *Worker::run() {
+  random_ = new utils::Random();
 
-template <bool master>
+  std::string name;
+
+  name = utils::Format("%s@%u", type_str<T>(), core_);
+
+  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_), &cpu_set_);
+  pthread_setname_np(pthread_self(), name.c_str());
+
+  // DPDK lcore ID == worker ID (0, 1, 2, 3, ...)
+  RTE_PER_LCORE(_lcore_id) = id_;
+
+  // shouldn't be SOCKET_ID_ANY (-1)
+  CHECK_GE(socket_, 0);
+  CHECK_NOTNULL(packet_pool_);
+
+  for (;;) {
+    if (starting<T>()) break;
+  }
+
+  W_LOG(INFO) << "starting on core: " << core_ << " socket: " << socket_;
+
+  scheduler_ = new Scheduler();
+  scheduler_->Loop<T>();
+
+  W_LOG(INFO) << "quitting on core: " << core_ << " socket: " << socket_;
+  MarkAborted<T>();
+
+  delete scheduler_;
+  delete random_;
+
+  return nullptr;
+}
+
+template <Worker::Type T>
 void Scheduler::Loop() {
   bool idle{true};
   Task::Context *ctx;
@@ -98,23 +146,16 @@ void Scheduler::Loop() {
 
   W_CURRENT->UpdateTsc();
 
-  if constexpr (master)
-    for (auto &m : Modules::instance()) m->InitInMaster();
-  else
-    for (auto &m : Modules::instance()) m->InitInSlave(W_ID);
+  for (auto &m : Modules::instance()) m->InitIn<T>(W_ID);
 
-  if constexpr (master) Worker::confirm_master();
+  Worker::MarkStarted<T>();
 
   W_CURRENT->UpdateTsc();
   checkpoint_ = W_TSC;
 
   // The main scheduling, running, accounting master loop.
   for (uint64_t round = 0;; ++round) {
-    if constexpr (master) {
-      if (Worker::slaves_aborted()) break;
-    } else {
-      if (Worker::aborting()) break;
-    }
+    if (Worker::aborting<T>()) break;
 
     ctx = next_ctx();
     ctx->silent_drops_ = 0;
@@ -122,19 +163,7 @@ void Scheduler::Loop() {
     W_CURRENT->UpdateTsc();
     cycles = W_TSC - checkpoint_;
 
-    if (idle) {
-      if constexpr (master)
-        M::Adder<TS("idle_cycles_master")>() << cycles;
-      else
-        M::Adder<TS("idle_cycles_slaves")>() << cycles;
-    } else {
-      W_CURRENT->IncrBusyLoops();
-      if constexpr (master)
-        M::Adder<TS("busy_cycles_master")>() << cycles;
-      else
-        M::Adder<TS("busy_cycles_slaves")>() << cycles;
-    }
-
+    UpdateCpuUsage<T>(idle, cycles);
     checkpoint_ = W_TSC;
 
     idle = (ctx->task_->func_(ctx).packets == 0);

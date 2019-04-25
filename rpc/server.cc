@@ -4,13 +4,13 @@
 
 #include "rpc/control.h"
 #include "runtime/config.h"
+#include "utils/numa.h"
 
 namespace xlb::rpc {
 
 brpc::Server Server::server_ = {};
 
 void Server::Launch() {
-  //  ControlImpl control_impl;
   CHECK_EQ(server_.AddService(new ControlImpl(), brpc::SERVER_OWNS_SERVICE), 0);
 
   // TODO: ssl options

@@ -28,6 +28,7 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
 
   ~SvcMetrics() = default;
 
+  // 'Expose' is not thread safe, but 'Hide' is different
   bool Expose(std::string_view type, const Tuple2 &tuple);
   void Hide();
 
@@ -37,6 +38,8 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
   SvcMetrics() = default;
 
  private:
+  std::atomic_flag hidden_ = ATOMIC_FLAG_INIT;
+
   Metric conns_;
   Metric packets_in_;
   Metric bytes_in_;

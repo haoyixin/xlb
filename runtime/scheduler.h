@@ -14,7 +14,7 @@ class Scheduler {
   ~Scheduler() = default;
 
   // Runs the scheduler loop forever.
-  template <bool master>
+  template <Worker::Type type>
   void Loop();
 
   template <typename I, typename B>
@@ -27,6 +27,28 @@ class Scheduler {
     double busy_ps = busy->get_value(busy->window_size());
 
     return busy_ps / (busy_ps + idle_ps);
+  }
+
+  template <Worker::Type type>
+  static void UpdateCpuUsage(bool idle, size_t cycles) {
+    if constexpr (type == Worker::Slave) {
+      if (idle)
+        M::Adder<TS("idle_cycles_slaves")>() << cycles;
+      else
+        M::Adder<TS("busy_cycles_slaves")>() << cycles;
+    } else if constexpr (type == Worker::Master) {
+      if (idle)
+        M::Adder<TS("idle_cycles_master")>() << cycles;
+      else
+        M::Adder<TS("busy_cycles_master")>() << cycles;
+    } else if constexpr (type == Worker::Trivial) {
+      if (idle)
+        M::Adder<TS("idle_cycles_trivial")>() << cycles;
+      else
+        M::Adder<TS("busy_cycles_trivial")>() << cycles;
+    } else {
+      CHECK(0);
+    }
   }
 
   // Functor used by a Worker's Scheduler to run a task in a module.
@@ -100,5 +122,7 @@ class Scheduler {
 
   DISALLOW_COPY_AND_ASSIGN(Scheduler);
 };
+
+// TODO: ......
 
 }  // namespace xlb

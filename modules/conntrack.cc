@@ -3,13 +3,15 @@
 
 namespace xlb::modules {
 
-void Conntrack::InitInMaster() {
+void Conntrack::InitInTrivial() {
   STABLE_INIT();
-  Exec::RegisterMaster();
+  Exec::RegisterTrivial();
 
   RegisterTask([](Context *) -> Result { return {.packets = Exec::Sync()}; },
-               10);
+               100);
 }
+
+//void Conntrack::InitInMaster() {}
 
 void Conntrack::InitInSlave(uint16_t) {
   STABLE_INIT();

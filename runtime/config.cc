@@ -24,7 +24,7 @@ void Config::Load() {
 }
 
 void Config::validate() {
-  CHECK_GE(master_core, 0);
+  CHECK_NE(master_core, trivial_core);
   CHECK(utils::CoreSocketId(master_core));
 
   // TODO: more detail log
@@ -36,14 +36,19 @@ void Config::validate() {
   nic.socket = socket.value();
 
   for (auto &w : slave_cores) {
+    CHECK_NE(w, master_core);
+    CHECK_NE(w, trivial_core);
+
     auto socket_id = utils::CoreSocketId(w);
     CHECK(socket_id.has_value());
     CHECK_EQ(nic.socket, socket_id.value());
   }
 
+  CHECK_GT(execute_channel_size, 0);
+
   // TODO: validate legality
   CHECK_NE(rpc.ip_port, "");
-  CHECK_NE(rpc.max_concurrency, 0);
+  CHECK_GT(rpc.max_concurrency, 0);
 
   CHECK_NE(nic.name, "");
   CHECK_NE(nic.pci_address, "");

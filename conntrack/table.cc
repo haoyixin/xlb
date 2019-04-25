@@ -63,9 +63,11 @@ std::pair<bool, SvcTable::Hint> SvcTable::RsAttached(VirtSvc::Ptr vs,
   return {false, {}};
 }
 
+/*
 bool SvcTable::RsDetached(RealSvc::Ptr rs) {
   return rs_vs_map_.count(rs->tuple_) == 0;
 }
+ */
 
 RealSvc::Ptr SvcTable::AttachRs(VirtSvc::Ptr vs, RealSvc::Ptr rs) {
   DCHECK_NOTNULL(vs);

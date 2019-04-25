@@ -59,6 +59,7 @@ class AddrPool {
 
 class SvcTable {
  private:
+  using TPool = std::stack<Tuple2, vector<Tuple2>>;
   using VsMap = XMap<Tuple2, VirtSvc::Ptr>;
   using RsMap = unordered_map<Tuple2, RealSvc *>;
   using RelatedMap = unordered_multimap<Tuple2, Tuple2>;
@@ -73,6 +74,16 @@ class SvcTable {
     rs_map_.reserve(CONFIG.svc.max_real_service);
     rs_vs_map_.reserve(CONFIG.svc.max_real_per_virtual *
                        CONFIG.svc.max_virtual_service);
+
+    if (!W_SLAVE) return;
+
+    auto range = CONFIG.slave_local_ips.equal_range(W_ID);
+
+    for (auto it = range.first; it != range.second; ++it) {
+      for (auto i :
+           irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
+        prototype_.emplace(it->second, be16_t(i));
+    }
 
     W_LOG(INFO) << "initializing succeed";
   }
@@ -91,7 +102,7 @@ class SvcTable {
   RealSvc::Ptr AttachRs(VirtSvc::Ptr vs, RealSvc::Ptr rs);
   // This should only be called in the master to confirm whether the rs-metric
   // in the metric-pool can be purged
-  bool RsDetached(RealSvc::Ptr rs);
+  // bool RsDetached(RealSvc::Ptr rs);
 
   std::pair<bool, Hint> RsAttached(VirtSvc::Ptr vs, RealSvc::Ptr rs);
   void DetachRs(VirtSvc::Ptr vs, RealSvc::Ptr rs, Hint it);
@@ -118,7 +129,10 @@ class SvcTable {
                   [&func](auto &entry) { func(entry.value.get()); });
   }
 
+  TPool &Prototype() { return prototype_; }
+
  private:
+  TPool prototype_;
   VsMap vs_map_;
   // In order to reuse detached rs, since local-tuple-pool in rs must be unique
   // for the same rs-tuple in the same worker to avoid collision in snat

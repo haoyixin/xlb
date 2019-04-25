@@ -34,7 +34,7 @@ class Channel {
       auto *spp = new Ptr(sp);
       for (;;) {
         if (r->Push(spp))
-          return;
+          break;
         else
           LOG(WARNING) << "channel is full, retrying";
       }

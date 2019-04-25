@@ -66,7 +66,7 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
 
  protected:
   void *do_allocate(std::size_t bytes, std::size_t alignment) override {
-    F_DVLOG(1) << "bytes: " << bytes << " alignment: " << alignment;
+    F_DVLOG(2) << "bytes: " << bytes << " alignment: " << alignment;
 
     if (auto p = rte_malloc_socket(nullptr, bytes, alignment, socket_))
       return p;
@@ -76,7 +76,7 @@ class MemoryResource : public std::experimental::pmr::memory_resource {
 
   void do_deallocate(void *p, std::size_t bytes,
                      std::size_t alignment) override {
-    F_DVLOG(1) << "bytes: " << bytes << " alignment: " << alignment;
+    F_DVLOG(2) << "bytes: " << bytes << " alignment: " << alignment;
 
     rte_free(p);
   }
