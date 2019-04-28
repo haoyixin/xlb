@@ -1,0 +1,45 @@
+{
+  "slave_cores": [
+    4,
+    5
+  ],
+  "master_core": 6,
+  "trivial_core": 7,
+  "execute_channel_size": 10000,
+  "rpc": {
+    "ip_port": "192.168.0.250:19415",
+    "max_concurrency": 2000
+  },
+  "mem": {
+    "hugepage": 24000,
+    "channel": 2,
+    "packet_pool": 100000
+  },
+  "nic": {
+    "name": "xxx",
+    "pci_address": "0000:01:00.0",
+    "mtu": 1500,
+    "local_ips": [
+      "192.168.1.101",
+      "192.168.1.102",
+      "192.168.1.103",
+      "192.168.1.104",
+      "192.168.1.105",
+      "192.168.1.106",
+      "192.168.1.107",
+      "192.168.1.108"
+    ]
+  },
+  "kni": {
+    "ip_address": "192.168.1.100",
+    "netmask": "255.255.255.0",
+    "gateway": "192.168.1.1",
+    "ring_size": 10000
+  },
+  "svc": {
+    "max_virtual_service": 20000,
+    "max_real_service": 100000,
+    "max_real_per_virtual": 1000,
+    "max_conn": 10000000
+  }
+}

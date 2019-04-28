@@ -40,13 +40,6 @@ RealSvc::Ptr VirtSvc::SelectRs(const Tuple2 &ctuple) {
   return rs_vec_[std::hash<Tuple2>()(ctuple) % rs_vec_.size()];
 }
 
-void RealSvc::bind_local_ips() {
-  // Meaningless when called in the master thread
-  if (!W_SLAVE) return;
-
-  local_tuple_pool_ = STABLE.Prototype();
-}
-
 bool RealSvc::GetLocal(Tuple2 &tuple) {
   if (local_tuple_pool_.empty()) return false;
 

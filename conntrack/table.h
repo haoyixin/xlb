@@ -8,58 +8,8 @@
 
 namespace xlb::conntrack {
 
-// This is not a must, it is just an insurance, and it is not strict. It is
-// purely for the purpose of changing the network segment without restarting the
-// service (in fact, in either case, it rarely happens)
-/*
-class AddrPool {
- public:
-  AddrPool() : vs_set_(ALLOC), rs_set_(ALLOC) {
-    vs_set_.reserve(CONFIG.svc.max_virtual_service);
-    rs_set_.reserve(CONFIG.svc.max_real_service);
-
-    W_LOG(INFO) << "initializing succeed";
-  }
-  ~AddrPool() = default;
-
-  bool GetVs(const be32_t &addr) {
-    if (rs_set_.find(addr) == rs_set_.end()) {
-      vs_set_.emplace(addr);
-      return true;
-    } else {
-      return false;
-    }
-  }
-  bool GetRs(const be32_t &addr) {
-    if (vs_set_.find(addr) == vs_set_.end()) {
-      rs_set_.emplace(addr);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  void PutVs(const be32_t &addr) {
-    auto it = vs_set_.find(addr);
-    if (it != vs_set_.end()) vs_set_.erase(it);
-  }
-  void PutRs(const be32_t &addr) {
-    auto it = rs_set_.find(addr);
-    if (it != rs_set_.end()) rs_set_.erase(it);
-  }
-
- private:
-  using VsSet = unordered_multiset<be32_t>;
-  using RsSet = unordered_multiset<be32_t>;
-
-  VsSet vs_set_;
-  RsSet rs_set_;
-};
- */
-
 class SvcTable {
  private:
-  using TPool = std::stack<Tuple2, vector<Tuple2>>;
   using VsMap = XMap<Tuple2, VirtSvc::Ptr>;
   using RsMap = unordered_map<Tuple2, RealSvc *>;
   using RelatedMap = unordered_multimap<Tuple2, Tuple2>;
@@ -75,16 +25,7 @@ class SvcTable {
     rs_vs_map_.reserve(CONFIG.svc.max_real_per_virtual *
                        CONFIG.svc.max_virtual_service);
 
-    if (!W_SLAVE) return;
-
-    auto range = CONFIG.slave_local_ips.equal_range(W_ID);
-
-    for (auto it = range.first; it != range.second; ++it) {
-      for (auto i :
-           irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
-        prototype_.emplace(it->second, be16_t(i));
-    }
-
+    RealSvc::InitPrototype();
     W_LOG(INFO) << "initializing succeed";
   }
   ~SvcTable() = default;
@@ -129,10 +70,7 @@ class SvcTable {
                   [&func](auto &entry) { func(entry.value.get()); });
   }
 
-  TPool &Prototype() { return prototype_; }
-
  private:
-  TPool prototype_;
   VsMap vs_map_;
   // In order to reuse detached rs, since local-tuple-pool in rs must be unique
   // for the same rs-tuple in the same worker to avoid collision in snat
@@ -163,8 +101,8 @@ class ConnTable {
   }
   ~ConnTable() = default;
 
-  inline Conn *Find(Tuple4 &tuple);
-  inline Conn *EnsureConnExist(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp);
+  Conn *Find(Tuple4 &tuple);
+  Conn *Get(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp);
 
   size_t Sync() { return timer_.AdvanceTo(W_TSC); }
 
@@ -184,11 +122,6 @@ class ConnTable {
 }  // namespace xlb::conntrack
 
 namespace xlb {
-
-/*
-#define APOOL_INIT (UnsafeSingleton<conntrack::AddrPool>::Init)
-#define APOOL (UnsafeSingleton<conntrack::AddrPool>::instance())
- */
 
 #define STABLE_INIT (UnsafeSingletonTLS<conntrack::SvcTable>::Init)
 #define STABLE (UnsafeSingletonTLS<conntrack::SvcTable>::instance())

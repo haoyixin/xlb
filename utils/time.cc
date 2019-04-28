@@ -9,6 +9,7 @@ uint64_t tsc_us;
 uint64_t tsc_ms;
 uint64_t tsc_sec;
 
+/*
 class TscHzSetter {
  public:
   TscHzSetter() {
@@ -22,5 +23,6 @@ class TscHzSetter {
     F_DLOG(INFO) << "tsc_hz: " << tsc_hz;
   }
 };
+ */
 
 }  // namespace xlb::utils

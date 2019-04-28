@@ -67,12 +67,14 @@ class Module {
 
   Module() { Modules::instance().emplace_back(this); }
 
-  void RegisterTask(Func &&func, uint32_t weight) {
+  // T must be a type_string, such as 'TS("your_task")'
+  template <typename T>
+  void RegisterTask(Func &&func) {
     auto worker = Worker::current();
     DCHECK_NOTNULL(worker);
 
-    W_LOG(INFO) << "module: " << module_name() << " weight: " << weight;
-    worker->scheduler()->RegisterTask(std::move(func), weight);
+    W_LOG(INFO) << "module: " << module_name() << " name: " << T::data();
+    worker->scheduler()->RegisterTask(std::move(func), T::data());
   }
 
   // Avoid virtual function calls, reduce branch prediction failure, and let the
@@ -100,10 +102,10 @@ class Module {
   DISALLOW_COPY_AND_ASSIGN(Module);
 };
 
-// TODO: ......
+// TODO: solve the problem of include recursion
 // The entry point of worker threads
 template <Worker::Type T>
-void *Worker::run() {
+inline void *Worker::run() {
   random_ = new utils::Random();
 
   std::string name;
@@ -139,8 +141,9 @@ void *Worker::run() {
 }
 
 template <Worker::Type T>
-void Scheduler::Loop() {
+inline void Scheduler::Loop() {
   bool idle{true};
+  uint64_t packets{0};
   Task::Context *ctx;
   uint64_t cycles{};
 
@@ -150,23 +153,27 @@ void Scheduler::Loop() {
 
   Worker::MarkStarted<T>();
 
-  W_CURRENT->UpdateTsc();
-  checkpoint_ = W_TSC;
-
-  // The main scheduling, running, accounting master loop.
-  for (uint64_t round = 0;; ++round) {
-    if (Worker::aborting<T>()) break;
-
+  auto execute = [this, &ctx, &idle]() {
     ctx = next_ctx();
     ctx->silent_drops_ = 0;
+    idle = ctx->task_->execute(ctx);
+  };
+
+  W_CURRENT->UpdateTsc();
+  checkpoint_ = W_TSC;
+  execute();
+
+  // The main scheduling, running, accounting master loop.
+  for (;;) {
+    if (Worker::aborting<T>()) break;
 
     W_CURRENT->UpdateTsc();
     cycles = W_TSC - checkpoint_;
-
-    UpdateCpuUsage<T>(idle, cycles);
+    ctx->task_->update_weight(idle, cycles);
+    update_cpu_usage<T>(idle, cycles);
     checkpoint_ = W_TSC;
 
-    idle = (ctx->task_->func_(ctx).packets == 0);
+    execute();
   }
 }
 

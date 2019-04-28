@@ -105,11 +105,15 @@ std::atomic<bool> Worker::internal<type>::aborting_ = false;
 #define W_CURRENT (Worker::current())
 
 #define W_SLAVE (W_CURRENT->type() == Worker::Slave)
+#define W_TYPE_STR (W_CURRENT->type_string().c_str())
 #define W_TSC (W_CURRENT->current_tsc())
 #define W_ID (W_CURRENT->id())
 
 #define W_LOG(severity) \
   (LOG(severity) << *W_CURRENT << " [" << __FUNCTION__ << "] ")
+
+#define W_LOG_EVERY_SECOND(severity) \
+  LOG_EVERY_SECOND(severity) << *W_CURRENT << " [" << __FUNCTION__ << "] "
 
 #if DCHECK_IS_ON()
 

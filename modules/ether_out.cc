@@ -3,17 +3,15 @@
 namespace xlb::modules {
 
 void EtherOut::InitInMaster() {
-  RegisterTask(
-      [this](Context *ctx) -> Result {
-        PacketBatch batch;
+  RegisterTask<TS("kni_send")>([this](Context *ctx) -> Result {
+    PacketBatch batch;
 
-        batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
+    batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
 
-        if (!batch.Empty()) Handle<PortOut<KNI>>(ctx, &batch);
+    if (!batch.Empty()) Handle<PortOut<KNI>>(ctx, &batch);
 
-        return {.packets = batch.cnt()};
-      },
-      kWeight);
+    return {.packets = batch.cnt()};
+  });
 }
 
 template <>

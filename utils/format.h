@@ -1,5 +1,3 @@
-// C's sprintf-like functionality for std::string
-
 #pragma once
 
 #include "utils/common.h"

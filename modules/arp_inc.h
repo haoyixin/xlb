@@ -11,6 +11,8 @@ class ArpInc : public Module {
       : gw_ip_addr_(Singleton<be32_t, ArpInc>::instance()),
         gw_hw_addr_(Singleton<Ethernet::Address>::instance()) {
     ParseIpv4Address(CONFIG.kni.gateway, &gw_ip_addr_);
+
+    // TODO: broadcast when start
   }
 
   template <typename Tag = NoneTag>

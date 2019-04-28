@@ -3,18 +3,15 @@
 namespace xlb::modules {
 
 void EtherInc::InitInSlave(uint16_t wid) {
-  RegisterTask(
-      [this](Context *ctx) -> Result {
-        PacketBatch batch;
+  RegisterTask<TS("kni_recv")>([this](Context *ctx) -> Result {
+    PacketBatch batch;
 
-        batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
+    batch.SetCnt(kni_ring_.Pop(batch.pkts(), Packet::kMaxBurst));
 
-        if (!batch.Empty())
-          Handle<PortOut<PMD>>(ctx, &batch);
+    if (!batch.Empty()) Handle<PortOut<PMD>>(ctx, &batch);
 
-        return {.packets = batch.cnt()};
-      },
-      kWeight);
+    return {.packets = batch.cnt()};
+  });
 }
 
 template <>
@@ -25,17 +22,17 @@ void EtherInc::Process<KNI>(Context *ctx, PacketBatch *batch) {
 
 template <>
 void EtherInc::Process<PMD>(Context *ctx, PacketBatch *batch) {
-
   for (Packet &p : *batch) {
     auto &type = p.head_data<Ethernet *>()->ether_type;
-    p.set_l2_len(sizeof(Ethernet));
 
-    if (likely(type == be16_t(Ethernet::kIpv4)))
+    if (likely(type == be16_t(Ethernet::kIpv4))) {
+      p.set_l2_len(sizeof(Ethernet));
       Handle<Ipv4Inc, PMD>(ctx, &p);
-    else if (type == be16_t(Ethernet::kArp))
+    } else if (type == be16_t(Ethernet::kArp)) {
       Handle<ArpInc, PMD>(ctx, &p);
-    else
+    } else {
       ctx->Drop(&p);
+    }
   }
 
   if (!ctx->stage_batch().Empty()) {

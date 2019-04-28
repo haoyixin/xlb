@@ -31,9 +31,9 @@ int main(int argc, char **argv) {
   Module::Init<ArpInc>();
   Module::Init<Ipv4Inc>();
   Module::Init<TcpInc>();
-  Module::Init<CSum>();
+//  Module::Init<CSum>();
 
-  Module::Init<Conntrack>();
+  //  Module::Init<Conntrack>();
 
   // TODO: conntrack -> dnat -> snat -> toa -> csum / rpc
 

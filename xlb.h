@@ -9,8 +9,6 @@
 #include "ports/pmd.h"
 
 #include "modules/arp_inc.h"
-#include "modules/conntrack.h"
-#include "modules/csum.h"
 #include "modules/ether_inc.h"
 #include "modules/ether_out.h"
 #include "modules/ipv4_inc.h"

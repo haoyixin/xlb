@@ -176,16 +176,26 @@ constexpr tcp_conntrack
 
 #define HZ 1
 #define SECS *HZ
-#define MINS *60 SECS
+#define SECSMINS *60 SECS
 #define HOURS *60 MINS
 #define DAYS *24 HOURS
 
+/*
 constexpr size_t tcp_timeouts[TCP_CONNTRACK_MAX] = {
     [TCP_CONNTRACK_NONE] = HZ,          [TCP_CONNTRACK_SYN_SENT] = 2 MINS,
     [TCP_CONNTRACK_SYN_RECV] = 60 SECS, [TCP_CONNTRACK_ESTABLISHED] = 5 DAYS,
     [TCP_CONNTRACK_FIN_WAIT] = 2 MINS,  [TCP_CONNTRACK_CLOSE_WAIT] = 60 SECS,
     [TCP_CONNTRACK_LAST_ACK] = 30 SECS, [TCP_CONNTRACK_TIME_WAIT] = 2 MINS,
     [TCP_CONNTRACK_CLOSE] = 10 SECS,    [TCP_CONNTRACK_SYN_SENT2] = 2 MINS,
+};
+ */
+
+constexpr size_t tcp_timeouts[TCP_CONNTRACK_MAX] = {
+    [TCP_CONNTRACK_NONE] = HZ,          [TCP_CONNTRACK_SYN_SENT] = 3 SECS,
+    [TCP_CONNTRACK_SYN_RECV] = 3 SECS, [TCP_CONNTRACK_ESTABLISHED] = 3 SECS,
+    [TCP_CONNTRACK_FIN_WAIT] = 3 SECS,  [TCP_CONNTRACK_CLOSE_WAIT] = 3 SECS,
+    [TCP_CONNTRACK_LAST_ACK] = 3 SECS, [TCP_CONNTRACK_TIME_WAIT] = 3 SECS,
+    [TCP_CONNTRACK_CLOSE] = 3 SECS,    [TCP_CONNTRACK_SYN_SENT2] = 3 SECS,
 };
 
 #define TCPHDR_FIN 0x01ul
@@ -235,12 +245,18 @@ tcp_bit_set get_conntrack_index(const Tcp *tcph) {
   return tcp_conntrack_indexes[tcph->flags];
 }
 
-tcp_conntrack Conn::UpdateState(tcp_bit_set index, ip_conntrack_dir dir) {
+std::pair<bool, tcp_conntrack> Conn::UpdateState(tcp_bit_set index,
+                                                 ip_conntrack_dir dir) {
+  DCHECK_NOTNULL(virt_);
+  DCHECK_NOTNULL(real_);
+
   auto new_state = tcp_conntracks[dir][index][state_];
+  bool est = false;
 
   if (likely(new_state < TCP_CONNTRACK_MAX)) {
     if (state_ == TCP_CONNTRACK_SYN_RECV &&
         new_state == TCP_CONNTRACK_ESTABLISHED) {
+      est = true;
       real_->IncrConns(1);
       virt_->IncrConns(1);
     }
@@ -250,7 +266,7 @@ tcp_conntrack Conn::UpdateState(tcp_bit_set index, ip_conntrack_dir dir) {
     CTABLE.timer_.ScheduleInRange(this, timeout, timeout + 100 * tsc_ms);
   }
 
-  return new_state;
+  return {est, new_state};
 }
 
 uint32_t Conn::index() const { return (this - &CTABLE.conns_[0]); }
@@ -269,7 +285,7 @@ void Conn::execute(TimerWheel<Conn> *timer) {
   real_->PutLocal(local_);
 
   CTABLE.idx_map_.Remove({client_, virt_->tuple()});
-  CTABLE.idx_map_.Remove({local_, real_->tuple()});
+  CTABLE.idx_map_.Remove({real_->tuple(), local_});
   CTABLE.idx_pool_.push(index());
 
   real_.reset();

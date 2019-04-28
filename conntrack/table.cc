@@ -114,14 +114,20 @@ void SvcTable::RemoveVs(VirtSvc::Ptr vs) {
 }
 
 Conn *ConnTable::Find(Tuple4 &tuple) {
-  IdxMap ::Entry *entry = idx_map_.Find(tuple);
+  IdxMap::Entry *entry = idx_map_.Find(tuple);
 
   if (entry == nullptr) return nullptr;
 
-  return &conns_[entry->value];
+  auto conn = &conns_[entry->value];
+
+  DCHECK_NOTNULL(conn->virt());
+  DCHECK_NOTNULL(conn->real());
+
+  return conn;
 }
 
-Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp) {
+Conn *ConnTable::Get(xlb::conntrack::VirtSvc::Ptr vs_ptr,
+                     const xlb::conntrack::Tuple2 &cli_tp) {
   IdxMap::Entry *orig_ent = idx_map_.Emplace({cli_tp, vs_ptr->tuple()}, 0);
 
   // Collision exceeded
@@ -173,6 +179,8 @@ Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp) {
     return nullptr;
   }
 
+  orig_ent->value = idx;
+
   Conn *conn = &conns_[idx];
 
   conn->local_ = loc_tp;
@@ -180,9 +188,11 @@ Conn *ConnTable::EnsureConnExist(VirtSvc::Ptr vs_ptr, const Tuple2 &cli_tp) {
   conn->virt_ = vs_ptr;
   conn->real_ = rs_ptr;
 
-  conn->state_ = TCP_CONNTRACK_SYN_SENT;
+  conn->state_ = TCP_CONNTRACK_NONE;
 
-  W_DVLOG(2) << "creating Conn: " << *conn;
+  W_DVLOG(2) << "created Conn: " << *conn;
+
+  return conn;
 }
 
 }  // namespace xlb::conntrack

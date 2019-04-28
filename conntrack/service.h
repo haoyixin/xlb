@@ -23,7 +23,7 @@ class SvcBase : public EventBase<SvcBase>, public INew {
   void IncrPacketsIn(uint64_t n) { packets_in_ += n; }
   void IncrBytesIn(uint64_t n) { bytes_in_ += n; }
   void IncrPacketsOut(uint64_t n) { packets_out_ += n; }
-  void INcrBytesOut(uint64_t n) { bytes_out_ += n; }
+  void IncrBytesOut(uint64_t n) { bytes_out_ += n; }
 
   void execute(TimerWheel<SvcBase> *timer);
   auto &metrics() { return metrics_; }
@@ -57,6 +57,8 @@ class alignas(64) RealSvc : public unsafe_intrusive_ref_counter<RealSvc>,
  public:
   using Ptr = intrusive_ptr<RealSvc>;
 
+  static void InitPrototype() { UnsafeSingletonTLS<prototype>::Init(); }
+
   ~RealSvc();
 
   // Return false if empty
@@ -64,14 +66,32 @@ class alignas(64) RealSvc : public unsafe_intrusive_ref_counter<RealSvc>,
   void PutLocal(const Tuple2 &tuple);
 
  private:
-  explicit RealSvc(const Tuple2 &tuple) : SvcBase(tuple), local_tuple_pool_() {
+  using TPool = std::stack<Tuple2, vector<Tuple2>>;
+  struct prototype {
+    prototype() {
+      auto range = CONFIG.slave_local_ips.equal_range(W_ID);
+
+      for (auto it = range.first; it != range.second; ++it) {
+        for (auto i :
+             irange((uint16_t)1024u, std::numeric_limits<uint16_t>::max()))
+          local_tuple_pool.emplace(it->second, be16_t(i));
+      }
+    }
+    ~prototype() = default;
+    TPool local_tuple_pool;
+  };
+
+  explicit RealSvc(const Tuple2 &tuple)
+      : SvcBase(tuple),
+        local_tuple_pool_(
+            UnsafeSingletonTLS<prototype>::instance().local_tuple_pool) {
     W_DVLOG(1) << "creating: " << tuple;
-    bind_local_ips();
+    //    bind_local_ips();
   }
 
-  void bind_local_ips();
+  //  void bind_local_ips();
 
-  std::stack<Tuple2, vector<Tuple2>> local_tuple_pool_;
+  TPool local_tuple_pool_;
 
   friend class VirtSvc;
   friend class SvcTable;
@@ -89,7 +109,7 @@ class alignas(64) VirtSvc : public unsafe_intrusive_ref_counter<VirtSvc>,
 
   ~VirtSvc() = default;
 
-  inline RealSvc::Ptr SelectRs(const Tuple2 &ctuple);
+  RealSvc::Ptr SelectRs(const Tuple2 &ctuple);
 
  private:
   explicit VirtSvc(const Tuple2 &tuple) : SvcBase(tuple), rs_vec_(ALLOC) {

@@ -32,38 +32,26 @@ bvar::PassiveStatus<double> cpu_usage_trivial("xlb_scheduler",
 
 Scheduler::Scheduler() : runnable_(ALLOC), checkpoint_() {}
 
-/*
-Scheduler::~Scheduler() {
-for (auto &t : runnable_) delete (t);
-for (auto &t : blocked_->container()) delete (t);
-
-delete (runnable_);
-delete (blocked_);
+void Scheduler::RegisterTask(Task::Func &&func, std::string_view name) {
+  auto *task = new Task(std::move(func), name);
+  CHECK_EQ(
+      task->display_weight_.expose_as(
+          "xlb_scheduler", utils::Format("task_%s_%d_%s_weight", W_TYPE_STR,
+                                         W_ID, task->name_.c_str())),
+      0);
+  runnable_.emplace_back(task);
 }
- */
 
 Scheduler::Task::Context *Scheduler::next_ctx() {
-  /*
-  while (runnable_->empty()) std::swap(runnable_, blocked_);
-
-  Task *t;
-
-  if (--(t = runnable_->top())->current_weight_ <= 0) {
-    t->current_weight_ = t->max_weight_;
-    blocked_->push(t);
-    runnable_->pop();
-  } else {
-    runnable_->decrease_key_top();
-  }
-
-  return &t->context_;
-   */
+  // This is a variant of nginx's smooth weighted round-robin algorithm. We
+  // update the effective weights according to the load. See 'update_weight' for
+  // details
   Task *best = nullptr;
   size_t total = 0;
 
   for (auto &task : runnable_) {
-    task->current_weight_ += task->max_weight_;
-    total += task->max_weight_;
+    task->current_weight_ += task->effective_weight_;
+    total += task->effective_weight_;
 
     if (!best || task->current_weight_ > best->current_weight_) best = task;
   }
@@ -74,12 +62,34 @@ Scheduler::Task::Context *Scheduler::next_ctx() {
   return &best->context_;
 }
 
-Scheduler::Task::Task(Func &&func, uint32_t weight)
+void Scheduler::Task::update_weight(bool idle, uint64_t cycles) {
+  int64_t expect_weight;
+
+  // It is almost impossible to overflow here
+  if (idle)
+    expect_weight = effective_weight_ - cycles;
+  else
+    expect_weight = effective_weight_ + cycles;
+
+  if (expect_weight <= min_weight_)
+    effective_weight_ = min_weight_;
+  else if (expect_weight >= max_weight_)
+    effective_weight_ = max_weight_;
+  else
+    effective_weight_ = expect_weight;
+
+  display_weight_.set_value(effective_weight_);
+}
+
+Scheduler::Task::Task(Func &&func, std::string_view name)
     : func_(std::move(func)),
-      current_weight_(0),
-      max_weight_(weight),
+      name_(name),
+      min_weight_(kMinWeight * utils::tsc_us),
+      max_weight_(kMaxWeight * utils::tsc_us),
+      current_weight_(min_weight_),
+      effective_weight_(min_weight_),
+      display_weight_(effective_weight_),
       context_() {
-  CHECK_GT(weight, 0);
   context_.dead_batch_.Clear();
   context_.stage_batch_.Clear();
   context_.task_ = this;

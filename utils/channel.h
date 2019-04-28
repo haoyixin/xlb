@@ -38,7 +38,6 @@ class Channel {
         else
           LOG(WARNING) << "channel is full, retrying";
       }
-      //      while (!r->Push(spp)) F_LOG(ERROR) << "channel is full, retrying";
     }
   }
 

@@ -137,9 +137,7 @@ class alignas(64) TimerWheel {
 
   size_t AdvanceTo(Tick abs) {
     DCHECK_GT(abs, now_[0]);
-
     //    F_DVLOG(4) << "tick: " << abs;
-
     return Advance(abs - now_[0]);
     //    DCHECK_EQ(now_[0], abs);
   }

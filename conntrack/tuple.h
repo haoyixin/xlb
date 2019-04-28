@@ -102,8 +102,3 @@ inline bool operator!=(const conntrack::Tuple4 &lhs,
 
 }  // namespace xlb
 
-// namespace xlb {
-//
-// using TPool = std::stack<Tuple2, utils::vector<Tuple2>>;
-//
-//}

@@ -34,7 +34,7 @@ KNI::KNI() : Port() {
   CHECK(utils::SetHwAddr("xlb", conf_.addr.bytes));
 
   CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
-                   TS("tx_bytes"), TS("tx_dropped"), TS("req_failed")>));
+                   TS("tx_bytes"), TS("tx_dropped"), TS("req_failed")>()));
 
   F_LOG(INFO) << "initialize successful";
 }

@@ -146,7 +146,7 @@ void init_driver() {
 
 PMD::PMD() : Port(), dpdk_port_id_(kDpdkPortUnknown), dev_info_() {
   CHECK((M::Expose<TS("rx_packets"), TS("rx_bytes"), TS("tx_packets"),
-                   TS("tx_bytes"), TS("tx_dropped")>));
+                   TS("tx_bytes"), TS("tx_dropped")>()));
 
   init_driver();
 

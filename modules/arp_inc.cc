@@ -1,7 +1,5 @@
 #include "modules/arp_inc.h"
 
-#include "modules/ether_out.h"
-
 namespace xlb::modules {
 
 template <>

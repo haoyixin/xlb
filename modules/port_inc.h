@@ -26,17 +26,15 @@ class PortInc final : public Module {
 
  protected:
   void register_task() {
-    RegisterTask(
-        [this](Context *ctx) -> Result {
-          PacketBatch batch;
+    RegisterTask<TS("pmd_recv")>([this](Context *ctx) -> Result {
+      PacketBatch batch;
 
-          batch.SetCnt(port_.Recv(W_ID, batch.pkts(), Packet::kMaxBurst));
+      batch.SetCnt(port_.Recv(W_ID, batch.pkts(), Packet::kMaxBurst));
 
-          if (!batch.Empty()) Handle<EtherInc, T>(ctx, &batch);
+      if (!batch.Empty()) Handle<EtherInc, T>(ctx, &batch);
 
-          return {.packets = batch.cnt()};
-        },
-        kWeight);
+      return {.packets = batch.cnt()};
+    });
   }
 
  private:

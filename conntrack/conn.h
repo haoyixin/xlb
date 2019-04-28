@@ -41,7 +41,7 @@ enum tcp_bit_set : uint8_t {
   TCP_MAX_SET,
 };
 
-inline tcp_bit_set get_conntrack_index(const Tcp *tcph);
+tcp_bit_set get_conntrack_index(const Tcp *tcph);
 
 class alignas(64) Conn : public EventBase<Conn> {
  public:
@@ -50,10 +50,18 @@ class alignas(64) Conn : public EventBase<Conn> {
 
   void execute(TimerWheel<Conn> *timer);
 
-  // Here you need to ensure that the tuple belongs to this connection
-  inline ip_conntrack_dir direction(Tuple4 &tuple);
+  VirtSvc::Ptr &virt() { return virt_; }
+  RealSvc::Ptr &real() { return real_; }
+  Tuple2 &local() { return local_; }
+  Tuple2 &client() { return client_; }
+  tcp_conntrack &state() { return state_; }
 
-  tcp_conntrack UpdateState(tcp_bit_set index, ip_conntrack_dir dir);
+  // Here you need to ensure that the tuple belongs to this connection
+  ip_conntrack_dir direction(Tuple4 &tuple);
+
+  // Return true when conn first becomes established
+  std::pair<bool, tcp_conntrack> UpdateState(tcp_bit_set index,
+                                             ip_conntrack_dir dir);
 
  private:
   tcp_conntrack state_;

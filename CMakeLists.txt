@@ -54,10 +54,6 @@ set(SYS_INCS
 #        ${GTEST_SRC}/include
 #        )
 
-#set(ABSL_INCS
-#        ${ABSL_SRC}
-#        )
-
 set(OBJS
         runtime/scheduler.cc
         runtime/packet_pool.cc
@@ -84,15 +80,12 @@ set(OBJS
         modules/arp_inc.cc
         modules/ipv4_inc.cc
         modules/tcp_inc.cc
-        modules/conntrack.cc
         )
 
 link_directories(/usr/local/lib)
 include_directories(${SRC_INCS} ${DPDK_INCS} ${SYS_INCS} 3rdparty)
 
 #add_definitions(-DNDEBUG)
-
-#add_subdirectory(abseil-cpp)
 
 add_executable(xlb xlb.cc ${OBJS})
 #add_executable(timer_test tests/timer.cc ${OBJS})

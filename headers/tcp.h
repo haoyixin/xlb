@@ -28,10 +28,10 @@ struct [[gnu::packed]] Tcp {
 #else
 #error __BYTE_ORDER must be defined.
 #endif
-  union {
+//  union {
     uint8_t flags;
-    bool fin : 1, syn : 1, rst : 1, psh : 1, ack : 1, urg : 1, ece : 1, cwr : 1;
-  };
+//    uint8_t fin : 1, syn : 1, rst : 1, psh : 1, ack : 1, urg : 1, ece : 1, cwr : 1;
+//  };
   be16_t window;      // Receive window.
   uint16_t checksum;  // Checksum.
   be16_t urgent_ptr;  // Urgent pointer.
