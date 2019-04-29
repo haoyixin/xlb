@@ -9,6 +9,8 @@
 #include "utils/common.h"
 #include "utils/endian.h"
 #include "utils/lock_less_queue.h"
+#include "utils/time.h"
+#include "utils/timer.h"
 
 #include "headers/arp.h"
 #include "headers/ether.h"
@@ -33,6 +35,9 @@ using utils::be32_t;
 using utils::be64_t;
 
 using utils::Singleton;
+using utils::tsc_sec;
+using utils::TimerWheel;
+using utils::EventBase;
 
 using ports::KNI;
 using ports::PMD;
