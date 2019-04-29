@@ -50,38 +50,4 @@ class SvcMetrics : public intrusive_ref_counter<SvcMetrics>, public INew {
   friend class SvcBase;
 };
 
-/*
-class SvcMetricsPool {
- public:
-  SvcMetricsPool() : vs_map_(ALLOC), rs_map_(ALLOC) {
-    vs_map_.reserve(CONFIG.svc.max_virtual_service);
-    rs_map_.reserve(CONFIG.svc.max_real_service);
-  }
-  ~SvcMetricsPool() = default;
-
-  SvcMetrics::Ptr GetVs(const Tuple2 &tuple);
-  SvcMetrics::Ptr GetRs(const Tuple2 &tuple);
-
-  void PurgeVs(const Tuple2 &tuple);
-  void PurgeRs(const Tuple2 &tuple);
-
- private:
-  using SvcMetricsMap = unordered_map<Tuple2, SvcMetrics::Ptr>;
-
-  SvcMetricsMap vs_map_;
-  SvcMetricsMap rs_map_;
-
-  DISALLOW_COPY_AND_ASSIGN(SvcMetricsPool);
-};
- */
-
 }  // namespace xlb::conntrack
-
-namespace xlb {
-
-/*
-#define SMPOOL_INIT (UnsafeSingleton<conntrack::SvcMetricsPool>::Init)
-#define SMPOOL (UnsafeSingleton<conntrack::SvcMetricsPool>::instance())
- */
-
-}  // namespace xlb

@@ -65,44 +65,4 @@ void SvcMetrics::Hide() {
   }
 }
 
-/*
-SvcMetrics::Ptr SvcMetricsPool::GetVs(const Tuple2 &tuple) {
-  auto pair = vs_map_.try_emplace(tuple, nullptr);
-  if (!pair.second) return pair.first->second;
-
-  pair.first->second = new SvcMetrics("virt", tuple);
-  return pair.first->second;
-}
-
-SvcMetrics::Ptr SvcMetricsPool::GetRs(const Tuple2 &tuple) {
-  auto pair = rs_map_.try_emplace(tuple, nullptr);
-  if (!pair.second) return pair.first->second;
-
-  pair.first->second = new SvcMetrics("real", tuple);
-  return pair.first->second;
-}
-
-void SvcMetricsPool::PurgeVs(const Tuple2 &tuple) {
-  auto iter = vs_map_.find(tuple);
-
-  // In fact, only the metric is hidden here and the ptr is deleted from the
-  // pool. When the metric of the same tuple is created again, the expose is
-  // guaranteed to be safe. The original metric will be automatically destroyed,
-  // and rs is the same
-  if (iter != vs_map_.end()) {
-    iter->second->Hide();
-    vs_map_.erase(iter);
-  }
-}
-
-void SvcMetricsPool::PurgeRs(const Tuple2 &tuple) {
-  auto iter = rs_map_.find(tuple);
-
-  if (iter != rs_map_.end()) {
-    iter->second->Hide();
-    rs_map_.erase(iter);
-  }
-}
- */
-
 }  // namespace xlb::conntrack
